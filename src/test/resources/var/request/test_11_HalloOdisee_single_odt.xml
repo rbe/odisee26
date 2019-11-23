@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odisee:odisee xmlns:odisee="http://xmlns.odisee.de/v2/request">
+    <odisee:request name="HalloOdisee">
+        <!-- Template: name and desired output format -->
+        <odisee:template name="HalloOdisee" outputFormat="odt"/>
+        <!-- Archive generated files? Useful for debugging -->
+        <odisee:archive files="false"/>
+        <!-- Instructions executed against the template, order does matter! -->
+        <odisee:instructions>
+            <!-- Set userfield 'Hallo' -->
+            <odisee:userfield name="Hallo">art of coding UG (haftungsbeschränkt)</odisee:userfield>
+            <!-- Set table cell 'A4' in table 'Tabelle1' -->
+            <odisee:userfield name="Tabelle1!A4">support@odisee.de</odisee:userfield>
+        </odisee:instructions>
+    </odisee:request>
+</odisee:odisee>

@@ -1,0 +1,812 @@
+#!/usr/bin/env bash
+# 
+# Odisee(R)
+# Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt).
+# Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
+#
+# Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
+# 
+
+#
+# DECLARATIONS
+#
+
+# OpenOffice installation, binaries, libraries
+declare OOO_HOME
+declare OOO_UNOPKG
+declare OOOJ
+declare OOOU
+declare OOOL
+
+# Instance configuration as associative array
+declare -A INSTCFG
+# Instance status
+declare -A INSTSTAT
+
+# Bad environment?
+declare BADENV=false
+# cmdopt is an array holding options from command line
+declare -A cmdopt
+# Options (name/value pairs) given with -o
+declare -A option
+# Default options
+declare -A DEFAULT_OPTION
+# Command line option dependencies
+declare -A CMD_DEPENDENCY_AND
+# Command line option no-goes
+declare -A CMD_DEPENDENCY_OR
+# Command line option no-goes
+declare -A CMD_NOGO
+
+# ---------------------------------------------------------------------------
+#
+# Command Line.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Is an option specified?
+#
+is_cmdopt() {
+    local ok=true
+    for o in $*
+    do
+        [ -z "${cmdopt[$o]}" ] && ok=false
+    done
+    echo $ok
+}
+
+#
+# Is an option not specified?
+#
+isnot_cmdopt() {
+    local ok=true
+    for o in $*
+    do
+        [ -n "${cmdopt[$o]}" ] && ok=false
+    done
+    echo $ok
+}
+
+#
+# Set default value for an option, if not given through command line.
+#
+def_cmdopt() {
+    [ -z "${cmdopt[$1]}" ] && cmdopt[$1]=$2
+}
+
+#
+# Set default value for an -o option, if not given through command line.
+#
+def_option() {
+    [ -z "${option[$1]}" ] && option[$1]=$2
+}
+
+#
+# Replace comma by space in value of an option for use with for-loops.
+#
+_splitcmdopt() {
+    echo ${cmdopt[$1]//,/ }
+}
+
+#
+# Check command line options.
+#
+check_cmdopt() {
+    # Check needed parameters
+    local needed
+    for c in ${!cmdopt[*]}
+    do
+        needed=${CMD_DEPENDENCY_AND[$c]}
+        if [ -n "$needed" ]
+        then
+            for n in $needed
+            do
+                if [ -z "${cmdopt[$n]}" ]
+                then
+                    echo "Odisee: Option -$c needs -$needed."
+                    CMDOK=false
+                fi
+            done
+        fi
+    done
+    # Check needed parameters
+    local orcount=0
+    local orfound=0
+    for c in ${!cmdopt[*]}
+    do
+        needed=${CMD_DEPENDENCY_OR[$c]}
+        if [ -n "$needed" ]
+        then
+            for n in $needed
+            do
+                orcount=$((orcount + 1))
+                [ -n "${cmdopt[$n]}" ] && orfound=$((orfound + 1))
+            done
+            if [ $orfound -eq 0 ]
+            then
+                echo -n "Odisee: Option -$c needs one of the following options: "
+                for o in ${CMD_DEPENDENCY_OR[$c]}
+                do
+                    echo -n "-$o "
+                done
+                echo "."
+                CMDOK=false
+            fi
+        fi
+    done
+    # Check no-goes
+    local nogo
+    for c in ${!cmdopt[*]}
+    do
+        nogo=${CMD_NOGO[$c]}
+        if [ -n "$nogo" ]
+        then
+            for n in $nogo
+            do
+                if [ -n "${cmdopt[$n]}" ]
+                then
+                    echo "Odisee: Option -$c cannot be used with -$n."
+                    CMDOK=false
+                fi
+            done
+        fi
+    done
+}
+
+#
+# Accept a value for an option as long as it does not start with a dash.
+#
+_acceptopt() {
+    local opt=$1
+    shift
+    local val=$*
+    if [ ${val:0:1} = "-" ]
+    then
+        echo "Odisee: Value for option $opt invalid: cannot start with a dash."
+        BADENV=true
+    else
+        cmdopt[$opt]=$val
+    fi
+}
+
+# ---------------------------------------------------------------------------
+#
+# OpenOffice.org and LibreOffice instances.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Find OpenOffice installation.
+#
+find_installation() {
+    FOUND_HOME=
+    case ${ODISEE_OS} in
+        Darwin)
+            for i in /Applications/LibreOffice.app /Applications/OpenOffice.org.app
+            do
+                if [ -d "${i}" -a -d "${i}/Contents" -a -d "${i}/Contents/program" ]
+                then
+                    FOUND_HOME="${FOUND_HOME} ${i}"
+                fi
+            done
+        ;;
+        FreeBSD)
+            for i in /usr/local/lib/libreoffice /usr/local/lib/openoffice
+            do
+                if [ -d "${i}" -a -d "${i}/program" ]
+                then
+                    FOUND_HOME="${FOUND_HOME} ${i}"
+                fi
+            done
+        ;;
+        SunOS | Linux)
+            for i in /opt/openoffice.org3
+            do
+                if [ -d "${i}" -a -d "${i}/program" ]
+                then
+                    FOUND_HOME="${FOUND_HOME} ${i}"
+                fi
+            done
+        ;;
+    esac
+    FOUND_HOME=${FOUND_HOME:1}
+}
+
+#
+# Extract IP address from ip:port
+#
+get_ip() {
+    local ipport=$1
+    local ip
+    if [[ "${ipport}" == *:* ]]
+    then
+        ip=${ipport%:*}
+    elif [[ "${ipport}" =~ [[:alnum:]] ]]
+    then
+        ip=${ipport}
+    ## else
+    ##     ip="127.0.0.1"
+    fi
+    echo ${ip}
+}
+
+#
+# Extract TCP/IP port from ip:port
+#
+get_port() {
+    local ipport=$1
+    local port
+    if [[ "${ipport}" == *:* ]]
+    then
+        port=${ipport#*:}
+    elif [[ ${ipport} =~ ^[0-9]+$ ]]
+    then
+        port=${ipport}
+    ## else
+    ##     port=$(get_free_port)
+    fi
+    echo ${port}
+}
+
+#
+# Calculate next free TCP/IP port
+#
+get_free_port() {
+    local highest_port=$(cat ${ODISEE_INST} | awk -F\| '{print $3}' | sort | tail -1)
+    [ -z "${highest_port}" ] && highest_port=2000
+    echo $((highest_port + 1))
+}
+
+#
+# Find an OpenOffice process by port number.
+#
+get_pid_by_port() {
+    local port=$1
+    case "${ODISEE_OS}" in
+        Linux|FreeBSD)
+            echo $(ps axww | grep soffice.bin | grep -v grep | grep "port=${port}" | awk '{print $1}')
+        ;;
+        Darwin)
+            echo $(ps axww | grep soffice | grep -v grep | grep "port=${port}" | awk '{print $1}')
+        ;;
+        Solaris)
+            echo $(ps -ef | grep soffice.bin | grep -v grep | grep "port=${port}" | awk '{print $2}')
+        ;;
+    esac
+}
+
+#
+# Count soffice processes.
+#
+count_process() {
+    echo $(ps ax | grep -v grep | grep -c soffice)
+}
+
+#
+# Check if an instance exists in odiinst.
+#
+inst_exists() {
+    local inst=$1
+    local exists=$(grep -c "^${inst}|" ${ODISEE_INST})
+    if [ ${exists} -gt 0 ]
+    then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+#
+# Print error message and exit if an instance does not exist in odiinst.
+#
+exit_inst_does_not_exist() {
+    local inst=$1
+    if [ x"$(inst_exists ${inst})" = x"false" ]
+    then
+        echo "Odisee: Instance '${inst}' does not exist."
+        exit 1
+    fi
+}
+
+#
+# Get all unique OOO_HOME.
+#
+get_inst_names() {
+    echo $(cat ${ODISEE_INST} | awk -F\| '{print $1}')
+}
+
+#
+# Get all, unique OOO_HOME.
+#
+get_uniq_inst_home() {
+    echo $(cat ${ODISEE_INST} | awk -F\| '{print $1" "$4}' | uniq -f 1 | awk '{print $2}')
+}
+
+#
+# Get names of all OpenOffice instances having a unique OOO_HOME.
+#
+get_names_of_uniq_inst_home() {
+    echo $(cat ${ODISEE_INST} | awk -F\| '{print $1" "$4}' | uniq -f 1 | awk '{print $1}')
+}
+
+#
+# Lookup instance configuration.
+#
+get_inst_cfg() {
+    local inst=$1
+    # Check if instance exists
+    exit_inst_does_not_exist ${inst}
+    # Get configuration data
+    INSTCFG[ip]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $2}')
+    INSTCFG[port]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $3}')
+    INSTCFG[ipport]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $2":"$3}')
+    INSTCFG[home]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $4}')
+    INSTCFG[data]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $5}')
+    # Default data directory
+    if [ x"${INSTCFG[data]}" = x"" ]
+    then
+        INSTCFG[data]="${ODISEE_USER_PROFILE}/${inst}"
+    fi
+    INSTCFG[options]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $6}')
+    INSTCFG[autostart]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $7}')
+}
+
+#
+# Get information about instance's status.
+#
+get_inst_status() {
+    local inst=$1
+    get_inst_cfg ${inst}
+    # TCP/IP sockets, connections
+    case "${ODISEE_OS}" in
+        Darwin)
+            INSTSTAT[numlist]=$(netstat -f inet -p tcp -an | grep ${INSTCFG[port]} | grep LIST)
+            INSTSTAT[numconn]=$(netstat -f inet -p tcp -an | grep ${INSTCFG[port]} | grep EST)
+        ;;
+        FreeBSD)
+            INSTSTAT[numlist]=$(sockstat -46l -p ${INSTCFG[port]} | grep -v USER)
+            INSTSTAT[numconn]=$(sockstat -46c -p ${INSTCFG[port]} | grep -v USER)
+        ;;
+        *)
+            # sudo needed for netstat -p
+            INSTSTAT[numlist]=$(netstat -46lnt | grep ${INSTCFG[port]} | grep LIST)
+            INSTSTAT[numconn]=$(netstat -46lnt | grep ${INSTCFG[port]} | grep EST)
+        ;;
+    esac
+    [ -n "${INSTSTAT[numlist]}" ] && INSTSTAT[numlist]=$(echo ${INSTSTAT[numlist]} | wc -l) || INSTSTAT[numlist]=0
+    [ -n "${INSTSTAT[numconn]}" ] && INSTSTAT[numconn]=$(echo ${INSTSTAT[numconn]} | wc -l) || INSTSTAT[numconn]=0
+    # PID
+    INSTSTAT[pid]=$(get_pid_by_port ${INSTCFG[port]})
+    # Status
+    if [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -eq 1 -a ${INSTSTAT[numconn]} -gt 0 ]
+    then
+        INSTSTAT[status]="ONLINE, WORKING"
+    elif [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -eq 1 -a ${INSTSTAT[numconn]} -eq 0 ]
+    then
+        INSTSTAT[status]="ONLINE, READY"
+    elif [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -eq 0 ]
+    then
+        INSTSTAT[status]="ONLINE, BUT NOT ACCEPTING CONNECTIONS"
+    else
+        INSTSTAT[status]="OFFLINE"
+    fi
+}
+
+#
+# Setup OpenOffice instance and its directories.
+#
+setup_inst() {
+    local inst=$1
+    #
+    get_inst_cfg ${inst}
+    # MacOS X: Don't use program link: http://www.openoffice.org/issues/show_bug.cgi?id=101203
+    case "${ODISEE_OS}" in
+        Darwin)
+            OOO_HOME="${INSTCFG[home]}/Contents"
+            OOO_PROGRAM="${OOO_HOME}/MacOS"
+        ;;
+        *)
+            OOO_HOME="${INSTCFG[home]}"
+            OOO_PROGRAM="${OOO_HOME}/program"
+        ;;
+    esac
+    OOO_UNOPKG=${OOO_PROGRAM}/unopkg
+    # TODO Still needed?
+    ####OOOJ=${OOO_HOME}/basis-link/ure-link/share/java
+    ####[ ! -d ${OOOJ} ] && echo "Odisee: Directory ${OOOJ} does not exist."
+    ####OOOU=${OOO_HOME}/basis-link/program/classes
+    ####[ ! -d ${OOOU} ] && echo "Odisee: Directory ${OOOU} does not exist."
+    ####OOOL=${OOO_HOME}/basis-link/program:${OOO_HOME}/basis-link/program/components:${OOO_HOME}/basis-link/ure-link/lib
+    # TODO Reset IFS
+    #    IFS=:
+    #    for d in ${OOOL}
+    #    do
+    #        [ ! -d ${d} ] && echo "Odisee: Directory ${d} does not exist."
+    #    done
+    # Set UNO path
+    UNO_PATH=${OOO_PROGRAM}
+    export UNO_PATH
+    ## Unused, see env:UserInstallation below
+    ### Set and create path for data; user home
+    ##HOME=${INSTCFG[data]}
+    ##[ ! -d ${HOME} ] && mkdir -p ${HOME}
+    ##export HOME
+    # Copy juh.jar into program folder: http://user.services.openoffice.org/en/forum/viewtopic.php?f=44&t=10825
+    #if [ -n "${OOO_PROGRAM}" -a ! -e ${OOO_PROGRAM}/juh.jar ]; then
+        #echo "Copying juh.jar to ${OOO_PROGRAM}"
+        #sudo cp ${OOOJ}/juh.jar ${OOO_PROGRAM}
+    #fi
+    # Make classpath (for certain OOo instance) with JARs for Java.
+    INST_CP=${OOO_PROGRAM}/juh.jar:${OOOJ}/jurt.jar:${OOOJ}/ridl.jar:${OOOU}/unoil.jar
+}
+
+#
+# Add an instance.
+#
+add_instance() {
+    local inst=$1
+    if [ x"$(inst_exists ${inst})" = x"false" ]
+    then
+        local home=${cmdopt[f]}
+        local data=${cmdopt[y]}
+        # Default values
+        if [ x"$(is_cmdopt f)" = x"false" ]
+        then
+            find_installation
+            if [ -n "${FOUND_HOME}" ]
+            then
+                home=${FOUND_HOME}
+            else
+                echo "Odisee: No installation found, using default."
+                home=${OOO_HOME}
+            fi
+        fi
+        ## Default data directory
+        ##if [ x"$(is_cmdopt y)" = x"false" ]
+        ##then
+        ##    data=${ODISEE_OOO_USERINST}/${inst}
+        ##fi
+        local ipport=${cmdopt[p]:-$ODISEE_FQHN:$(get_free_port)}
+        local ip=$(get_ip $ipport)
+        local port=$(get_port $ipport)
+        # Build options: set default options if none were given
+        local opts
+        local autostart
+        if [ ${#option[*]} -eq 0 ]
+        then
+            for o in ${!DEFAULT_OPTION[*]}
+            do
+                option[$o]=${DEFAULT_OPTION[$o]}
+            done
+        fi
+        for o in ${!option[*]}
+        do
+            if [ x"${o}" = x"autostart" ]
+            then
+                autostart=${option[$o]}
+            else
+                [ x"${option[$o]}" = x"true" ] && opts="${opts} $o"
+            fi
+        done
+        opts=${opts:1}
+        # Create entry in odiinst
+        echo "${inst}|${ip}|${port}|${home}|${data}|${opts}|${autostart}" >> ${ODISEE_INST}
+        echo "Instance '${inst}' added."
+    else
+        echo "Odisee: Instance '${inst}' already exists."
+    fi
+}
+
+#
+# Manage an instance.
+#
+manage_instance() {
+    local inst=$1
+    #
+    if [ x"$(inst_exists ${inst})" = x"true" ]
+    then
+        # Get configuration
+        # TODO Use INSTCFG[], see below
+        get_inst_cfg ${inst}
+        #
+        local cfg=$(grep ${inst} ${ODISEE_INST})
+        local ipport=$(echo ${cfg} | awk -F\| '{print $2":"$3}' )
+        local ip=$(get_ip ${ipport})
+        local port=$(get_port ${ipport})
+        if [ x"$(is_cmdopt p)" = x"true" ]
+        then
+            local ip2=$(get_ip ${cmdopt[p]}); [ -n "${ip2}" ] && ip=${ip2}
+            local port2=$(get_port ${cmdopt[p]}); [ -n "${port2}" ] && port=${port2}
+        fi
+        local falt=$(echo ${cfg} | awk -F\| '{print $4}')
+        local home=${cmdopt[f]:-${falt}}
+        local yalt=$(echo ${cfg} | awk -F\| '{print $5}')
+        local data=${cmdopt[y]:-yalt}
+        # Build options
+        opts=$(echo ${cfg} | awk -F\| '{print $6}')
+        # Add option=true, remove option=false
+        local autostart
+        for o in ${!option[*]}
+        do
+            if [ x"${option[$o]}" = x"true" ]
+            then
+                if [ x"${o}" = x"autostart" ]
+                then
+                    autostart=${option[$o]}
+                else
+                    [[ x${opts} != x*${o}* ]] && opts="${opts} $o"
+                fi
+            else
+                opts=${opts/${o}/}
+            fi
+        done
+        opts=${opts/# /}; opts=${opts/% /}
+        # Re-create entry in odiinst
+        $SED -i'' -e "/^${inst}[|]/c\
+${inst}|${ip}|${port}|${home}|${data}|${opts}|${autostart}" ${ODISEE_INST}
+        echo "Instance '${inst}' modified."
+        #
+        get_inst_status ${inst}
+        if [[ x"${INSTSTAT[status]}" == xONLINE,* ]]
+        then
+            echo "Instance '${inst}' has status ${INSTSTAT[status]}, please restart it."
+        fi
+    else
+        echo "Odisee: Cannot manage instance '${inst}' as it does not exist."
+    fi
+}
+
+#
+# Remove an instance.
+#
+remove_instance() {
+    local inst=$1
+    # First stop it
+    stop_instance ${inst}
+    # Remove from odiinst
+    $SED -i'' -e "/^${inst}[|]/d" ${ODISEE_INST}
+    if [ $(grep -c "${inst}|" ${ODISEE_INST}) -eq 0 ]
+    then
+        echo "Instance '${inst}' removed."
+    else
+        echo "Instance '${inst}' NOT removed."
+    fi
+}
+
+#
+# Start OpenOffice instance.
+#
+start_instance() {
+    local inst=$1
+    # Options for soffice
+    get_inst_cfg ${inst}
+    get_inst_status ${inst}
+    if [ x"${INSTSTAT[status]}" != x"OFFLINE" ]
+    then
+        echo "Odisee: Instance '${inst}' already started."
+        return
+    else
+        sock="socket,host=${INSTCFG[ip]},port=${INSTCFG[port]},tcpNoDelay=1;urp;StarOffice.ServiceManager"
+        local opts
+        for o in ${INSTCFG[options]}
+        do
+            # OpenOffice upto 3.4 opts="${opts} -${o}"
+            opts="${opts} --${o}" # LibreOffice
+        done
+        opts=${opts:1}
+        # Setup OpenOffice instance
+        setup_inst ${inst}
+        # Start OpenOffice instance
+        # ATTENTION: Use full paths for home directory in option -env:UserInstallation/-userdir for soffice
+        echo "Starting OpenOffice instance '${inst}' on ${INSTCFG[ip]}:${INSTCFG[port]} using data directory ${INSTCFG[data]}"
+        # Create data directory
+        if [ ! -d ${INSTCFG[data]} ]
+        then
+            mkdir -p ${INSTCFG[data]}
+        fi
+        case ${ODISEE_OS} in
+            Darwin)
+                cd ${INSTCFG[home]}/Contents/MacOS # 1>/dev/null 2>&1
+            ;;
+            *)
+                cd ${INSTCFG[home]}/program # 1>/dev/null 2>&1
+            ;;
+        esac
+        bin=soffice
+        if [ -x ${bin} ]
+        then
+            # OpenOffice upto 3.4 ./${bin} -env:UserInstallation="file:///${INSTCFG[data]}" -accept="${sock}" ${opts} &
+            # LibreOffice
+            ./${bin} -env:UserInstallation="file:///${INSTCFG[data]}" --accept="${sock}" ${opts} &
+        else
+            echo "Odisee: Cannot start, soffice executable not found."
+        fi
+        cd ${OLDPWD} #popd 1>/dev/null
+    fi
+}
+
+#
+# Kill a running OpenOffice instance.
+#
+kill_instance() {
+    local inst=$1
+    local force=$2
+    get_inst_cfg ${inst}
+    kill ${INSTSTAT[pid]} 1>/dev/null 2>&1
+    sleep 5
+    get_inst_status ${inst}
+    if [ x"${INSTSTAT[status]}" = x"OFFLINE" ]
+    then
+        echo -n " OK"
+        # Check for .lock file
+        local lockfile="${INSTCFG[data]}/user/.lock"
+        if [ -f ${lockfile} ]
+        then
+            echo -n "(WARNING: removed lock file ${lockfile})"
+            rm -f ${lockfile}
+        fi
+    else
+        echo -n " FAILED"
+    fi
+    echo "."
+}
+
+#
+# Stop an OpenOffice instance.
+#
+stop_instance() {
+    local inst=$1
+    get_inst_cfg ${inst}
+    get_inst_status ${inst}
+    echo -n "Stopping OpenOffice instance '${inst}'"
+    [ x"${force}" = x"true" ] && echo -n " (FORCED)"
+    echo -n ":"
+    if [ x"${INSTSTAT[status]}" = x"OFFLINE" ]
+    then
+        echo " Odisee: Instance '${inst}' already stopped."
+        return
+    fi
+    if [ x"${cmdopt[z]}" =  x"true" ]
+    then
+        kill_instance ${inst} true
+    elif [ x"${INSTSTAT[status]}" = x"ONLINE, READY" ]
+    then
+        kill_instance ${inst} false
+    elif [[ x"${INSTSTAT[status]}" == xONLINE,* ]]
+    then
+        echo " Odisee: Cannot stop OpenOffice instance '${inst}': invalid instance status (${INSTSTAT[status]}). Use -z to force this operation."
+    fi
+}
+
+#
+# List an OpenOffice instance.
+#
+show_instance() {
+    local inst=$1
+    if [ x"$(inst_exists ${inst})" = x"true" ]
+    then
+        get_inst_cfg ${inst}
+        get_inst_status ${inst}
+        echo "Instance: ${inst}"
+        echo "  Status................. ${INSTSTAT[status]}"
+        echo "  Process ID............. ${INSTSTAT[pid]}"
+        echo "  Socket configuration... tcp://${INSTCFG[ipport]}"
+        echo "    #listening........... ${INSTSTAT[numlist]// /}"
+        echo "    #connections......... ${INSTSTAT[numconn]// /}"
+        echo "  Home................... ${INSTCFG[home]}"
+        echo "  Data................... ${INSTCFG[data]}"
+        echo "  Options................ ${INSTCFG[options]}"
+        echo "  Autostart.............. ${INSTCFG[autostart]}"
+    else
+        echo "Instance '${inst}' does not exist."
+    fi
+}
+
+#
+# List all instances.
+#
+list_instances() {
+    cat ${ODISEE_INST} | awk -F\| '{print $1}'
+}
+
+#
+# TODO Get informations about installed extensions.
+#
+get_extension_cfg() {
+    # List of extension identifier
+    local identifier=$(sudo ${OOO_UNOPKG} | grep Identifier | ${SED} "s/Identifier: //g")
+    for ident in ${identifier}
+    do
+        local tmp=OOO_UNOPKG$$
+        sudo ${OOO_UNOPKG} list ${ident} > ${tmp}
+    done
+}
+
+#
+# Remove an extension.
+#
+remove_extension() {
+    local ident=$1
+    local shared=$2
+    if [ x"${shared}" != x"" ]
+    then
+        opts="--shared"
+    else
+        opts=""
+    fi
+    echo "Removing extension ${oxt} (options: ${opts})"
+    echo sudo ${OOO_UNOPKG} remove ${opts} ${ident}
+}
+
+#
+# Install an extension.
+#
+install_extension() {
+    local oxt=$1
+    local shared=$2
+    if [ x"${shared}" != x"" ]
+    then
+        opts="--shared"
+    else
+        opts=""
+    fi
+    echo "Installing extension ${oxt} (options: ${opts})"
+    echo sudo ${OOO_UNOPKG} add ${opts} ${oxt}
+}
+
+#
+# Update extension installed in OpenOffice instance.
+# ATTENTION: Call when no OpenOffice instances are running!
+#
+update_extension() {
+    local inst=$1
+    local ident=$2
+    local oxt=$3
+    # Stop OpenOffice instance
+    stop_instance ${inst}
+    # Update extension
+    echo "Updating OpenOffice instance ${inst}"
+    setup_inst ${inst}
+    remove_extension ${ident} shared
+    install_extension ${oxt} shared
+    # Start OpenOffice instance
+    start_instance ${inst}
+}
+
+#
+# Update all installed OpenOffice extensions.
+#
+update_all_oxt() {
+    cd ${ODISEE_EXT}
+    for ext in *
+    do
+        echo -n "Building Odisee extension..."
+        ant -q -logfile=${ODISEE_LOG}/build_${ext}_oxt.log world
+        if [ $? -eq 0 ]
+        then
+            echo " OK."
+            update_extension ${ODISEE_EXT_VND} ${ODISEE_EXT}/Odisee/dist/Odisee.oxt
+        else
+            echo " FAILED."
+            exit 1
+        fi
+    done
+    for inst in $(get_names_of_uniq_inst_home)
+    do
+        echo $inst
+    done
+}
+
+#
+# Show copyright.
+#
+show_copyr() {
+    echo "Odisee(R)"
+    echo "Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt)."
+    echo "Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann."
+    echo "Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms."
+    echo ""
+    echo "Licenses for included software see \$ODISEE_HOME/LICENSE directory."
+    echo ""
+}

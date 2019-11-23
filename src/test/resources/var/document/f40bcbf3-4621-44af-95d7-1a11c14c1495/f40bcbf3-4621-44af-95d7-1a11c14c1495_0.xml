@@ -1,0 +1,28 @@
+<odisee><request id="20191123-141557_0035" name="HalloOdisee" xmlns="http://xmlns.odisee.de/v2/request">
+          
+  <!-- Template: name and desired output format -->
+          
+  <template name="HalloOdisee" outputFormat="odt" outputPath="/Users/rbe/project/odisee/odisee26/src/test/resources/var/document/f40bcbf3-4621-44af-95d7-1a11c14c1495" path="/Users/rbe/project/odisee/odisee26/src/test/resources/var/template/HalloOdisee.ott" revision="1"/>
+          
+  <!-- Archive generated files? Useful for debugging -->
+          
+  <archive files="false"/>
+          
+  <!-- Instructions executed against the template, order does matter! -->
+          
+  <instructions>
+                
+    <!-- Set userfield 'Hallo' -->
+                
+    <userfield name="Hallo">art of coding UG (haftungsbeschr&#xe4;nkt)</userfield>
+                
+    <!-- Set table cell 'A4' in table 'Tabelle1' -->
+                
+    <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+                
+    <userfield name="Tabelle1$1$4">support@odisee.de</userfield>
+            
+  </instructions>
+      
+</request>
+</odisee>

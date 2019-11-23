@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# 
+# Odisee(R)
+# Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt).
+# Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
+#
+# Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
+#
+
+#
+# PLEASE DON'T CHANGE LINES BELOW
+#
+
+SCRIPT_DIR=$(pushd $(dirname $0) >/dev/null ; pwd ; popd >/dev/null)
+
+#
+# Directories.
+#
+
+if [ x"${ODISEE_HOME}" = x"" ]
+then
+    echo "Please set ODISEE_HOME"
+    exit 1
+fi
+
+# Odisee
+ODISEE_LIBEXEC=${ODISEE_HOME}/libexec
+ODISEE_ETC=${ODISEE_HOME}/etc
+ODISEE_INST=${ODISEE_ETC}/odiinst
+ODISEE_VAR=${ODISEE_HOME}/var
+ODISEE_LOG=${ODISEE_VAR}/log
+ODISEE_USER=${ODISEE_VAR}
+ODISEE_USER_PROFILE=${ODISEE_VAR}/profile
+ODISEE_TMP=${ODISEE_VAR}/tmp
+ODISEE_BACKUP=${ODISEE_VAR}/backup
+ODISEE_SRC=${ODISEE_HOME}/src
+ODISEE_EXT=${ODISEE_SRC}/extension
+
+#
+# Operating system.
+#
+
+ODISEE_FQHN=$(uname -n)
+ODISEE_OS=$(uname -s)
+ODISEE_ARCH=$(uname -m)
+
+# OS-dependent
+case "${ODISEE_OS}" in
+    Darwin)
+        SED=$(which gsed)
+    ;;
+esac
+
+# Any OS
+NETSTAT=${NETSTAT:-$(which netstat)}
+AWK=${AWK:-$(which awk)}
+SED=${SED:-$(which sed)}
+RSYNC=${RSYNC:-$(which rsync)}
+SUDO=${SUDO:-$(which sudo)}
+CURL=${CURL:-$(which curl)}
+
+# Check needed executables
+_check_exeutable() {
+    local n=$1
+    local e=$2
+    local msg=""
+    if [ -n "${e}" ]
+    then
+        if [ ! -x ${e} ]
+        then
+            msg="ODI-xxx: Needed executable '${n}' not executable by $(whoami)."
+        fi
+    else
+        msg="ODI-xxx: Needed executable '${n}' not found"
+    fi
+    [ -n "${msg}" ] && echo ${msg}
+}
+_check_exeutable awk ${AWK}
+_check_exeutable sed ${SED}
+_check_exeutable rsync ${RSYNC}
+_check_exeutable sudo ${SUDO}
+_check_exeutable sudo ${CURL}
+unset -f _check_executable
+
+#
+# Check .fonts directory
+#
+fonts=${ODISEE_HOME}/.fonts
+if [ ! -h "${fonts}" ] # does not exist
+then
+    ln -s ${ODISEE_HOME}/var/deploy/font ${fonts} 
+fi
+
+#
+# Java
+#
+
+# Get JAVA_HOME
+if [ -z "${JAVA_HOME}" ]
+then
+    case "${ODISEE_OS}" in
+        Darwin)
+            JAVA_HOME=$(/usr/libexec/java_home)
+        ;;
+        *)
+            JAVA_HOME=$(readlink $(which java))
+            JAVA_HOME=${JAVA_HOME%/bin/java}
+        ;;
+    esac
+fi
+# Check if we can execute java
+[ ! -x ${JAVA_HOME}/bin/java ] && unset JAVA_HOME
+
+#
+# Watchdog.
+#
+
+# Watchdog timeout for checks
+ODISEE_WD_TIMEOUT=5
+
+#
+# Options.
+#
+
+# Odisee Extensions
+ODISEE_EXT_VND="vnd.artofcoding.odisee.Odisee"
+
+#
+# Exports.
+#
+
+# Odisee
+export ODISEE_ETC
+export ODISEE_INST
+export ODISEE_VAR
+export ODISEE_LOG
+export ODISEE_TMP
+export ODISEE_BACKUP
+export ODISEE_USER_PROFILE
+export ODISEE_EXT
+export ODISEE_WD_TIMEOUT
+# Java, Groovy, Grails
+export JAVA_HOME
+# The path
+PATH=${ODISEE_HOME}/bin:${JAVA_HOME}/bin:${PATH}
+export PATH
+
+# Include local configuration
+[[ -f ${ODISEE_ETC}/local.odienv ]] && . ${ODISEE_ETC}/local.odienv

@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# 
+# Odisee(R)
+# Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt).
+# Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
+#
+# Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
+#
+
+# Determine script directory
+SCRIPT_DIR=$(pushd $(dirname $0) >/dev/null ; pwd ; popd >/dev/null)
+# Read configuration
+. ${SCRIPT_DIR}/../etc/odienv
+# Odisee library
+. ${SCRIPT_DIR}/odilib
+
+set -o nounset
+
+# ---------------------------------------------------------------------------
+#
+# Watchdog.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Watch OpenOffice instance on certain port.
+#
+watch_instance() {
+    local inst=$1
+    get_inst_cfg ${inst}
+    # Watchdog running?
+    case "${ODISEE_OS}" in
+        FreeBSD)
+            watchdog_running=$(ps axww | grep -v grep | grep -c "odiwatchdog -i ${inst}")
+        ;;
+        *)
+            watchdog_running=$(ps -e | grep -v grep | grep -c "odiwatchdog -i ${inst}")
+        ;;
+    esac
+    if [ ${watchdog_running} -eq 0 ]; then
+        echo "Start watching instance '${inst}'."
+        while [ true ]
+        do
+            # TCP/IP port open and process running?
+            case "${ODISEE_OS}" in
+                FreeBSD)
+                    port_open=$(sockstat -46l | grep -c ${port}) # | grep LISTEN
+                ;;
+                *)
+                    port_open=$(netstat -nlt | grep -c ${port}) # | grep LISTEN
+                ;;
+            esac
+            # TCP/IP port not open, so instance should be restarted
+            if [ ${port_open} -eq 0 ]; then
+                echo "Odisee: Port ${port} closed, restarting instance '${inst}'."
+                # Restart instance
+                odictl -q start -i ${inst}
+            fi
+            # Wait some time before check
+            sleep ${WD_TIMEOUT}
+        done
+    else
+        echo "Odisee: There is a watchdog for instance '${inst}' already."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+#
+# Command Line.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Execute a command.
+#
+exec_cmdopt() {
+    # Create instance(s)
+    if [ x"$(is_cmdopt i)" = x"true" ]
+    then
+        # Only create non-existing instances
+        for i in $(_splitcmdopt i)
+        do
+            watch_instance $i
+        done
+    fi
+}
+
+#
+# Execute commands local.
+#
+_exec_local() {
+    if [ ${#cmdopt[*]} -gt 0 ]
+    then
+        check_cmdopt
+        if [ $BADENV = false -a $CMDOK = true ]
+        then
+            exec_cmdopt
+            cleanup
+        fi
+    elif [ $BADENV = false ]
+    then
+        show_help
+    fi
+}
+
+# ---------------------------------------------------------------------------
+#
+# Help.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Show help
+#
+show_help() {
+    show_copyr
+    cat <<EOF
+Instance operations
+  -i <instance>[,<instance>...]         Start watchdog for instance(s).
+
+Common options
+  -h                                    Show help.
+
+EOF
+}
+
+# ---------------------------------------------------------------------------
+#
+# Main.
+#
+# ---------------------------------------------------------------------------
+
+cleanup() {
+    exit 0
+}
+
+trap cleanup 1 2 3 5 9 15
+ORIG_CMD="$(basename ${0%%.sh}) $*"
+
+#
+# DECLARATIONS
+#
+
+# Operating system
+declare OS=$(uname -s)
+
+# Bad environment?
+declare BADENV=false
+# cmdopt is an array holding options from command line
+declare -A cmdopt
+#
+CMDOK=true
+
+# Parse command line
+while getopts ":i:" opt
+do
+    case "${opt}" in
+        i) _acceptopt i $OPTARG ;;
+        \?)
+            echo "Odisee: Unknown option -$OPTARG"
+        ;;
+        :)
+            case $OPTARG in
+                i)
+                    echo "Odisee: Option -$OPTARG needs an instance name as argument."
+                    echo "Odisee: e.g. $ORIG_CMD odi1"
+                ;;
+                *)
+                    echo "Odisee: Option -$OPTARG needs an argument."
+                ;;
+            esac
+            exit 1
+        ;;
+    esac
+done
+
+_exec_local
+exit 0

@@ -1,0 +1,335 @@
+#!/usr/bin/env bash
+# 
+# Odisee(R)
+# Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt).
+# Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
+#
+# Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
+#
+
+# Determine script directory
+SCRIPT_DIR=$(pushd $(dirname $0) >/dev/null ; pwd ; popd >/dev/null)
+# Read configuration
+. ${SCRIPT_DIR}/../etc/odienv
+# Odisee library
+. ${SCRIPT_DIR}/odilib
+
+if [[ -z "${JAVA_HOME}" ]]
+then
+    echo "Odisee: Please set JAVA_HOME"
+    exit 1
+fi
+
+#set -o nounset
+#set -o errexit
+
+# ---------------------------------------------------------------------------
+#
+# Command Line.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Execute a command.
+#
+exec_cmdopt() {
+    # Create instance(s)
+    if [ x"$(is_cmdopt c i)" = x"true" ]
+    then
+        # Only create non-existing instances
+        for i in $(_splitcmdopt i)
+        do
+            add_instance $i
+        done
+    fi
+    # Manage instance(s)
+    if [ x"$(is_cmdopt m i)" = x"true" ]
+    then
+        for i in $(_splitcmdopt i)
+        do
+            manage_instance $i
+        done
+    fi
+    # Watch instance(s)
+    if [ x"$(is_cmdopt w i)" = x"true" ]
+    then
+        for i in $(_splitcmdopt i)
+        do
+            nohup $0 watch_instance $i 1>${ODISEE_LOG}/watchdog_$i.log 2>&1 &
+        done
+    fi
+    # Remove instance(s)
+    if [ x"$(is_cmdopt r i)" = x"true" ]
+    then
+        for i in $(_splitcmdopt i)
+        do
+            remove_instance $i
+        done
+    fi
+    # List instances
+    if [ x"$(is_cmdopt L)" = x"true" ]
+    then
+        list_instances
+    fi
+    if [ x"$(is_cmdopt l)" = x"true" ]
+    then
+        for i in $(_splitcmdopt l)
+        do
+            show_instance $i
+        done
+    fi
+    # Show Odisee status: show status of all instances
+    if [ x"$(is_cmdopt s)" = x"true" ]
+    then
+        for i in $(list_instances)
+        do
+            show_instance $i
+        done
+    fi
+    # Maintenance operations
+    if [ x"$(is_cmdopt q)" = x"true" ]
+    then
+        # If no instance(s) were given with -i, look for autostart instance(s)
+        if [ x"$(is_cmdopt i)" = x"false" ]
+        then
+            cmdopt[i]=$(grep "true$" ${ODISEE_INST} | awk -F\| '{print $1}')
+            if [ ${#cmdopt[i]} -eq 0 ]
+            then
+                echo "Odisee: No instances configured for autostart."
+            fi
+        fi
+        for q in $(_splitcmdopt q)
+        do
+            case $q in
+                findooo)
+                    find_installation
+                    [ -n "${FOUND_HOME}" ] && echo "Found installation in ${FOUND_HOME}" || echo "No installation found"
+                ;;
+                start) # Start OOo instance(s) and application server
+                    for i in $(_splitcmdopt i)
+                    do
+                        start_instance $i
+                    done
+                ;;
+                stop) # Stop OOo instance(s) and application server
+                    for i in $(_splitcmdopt i)
+                    do
+                        stop_instance $i
+                    done
+                ;;
+                start-inst) # Start OOo instance(s)
+                    for i in $(_splitcmdopt i)
+                    do
+                        start_instance $i
+                    done
+                ;;
+                stop-inst) # Stop OOo instance(s)
+                    for i in $(_splitcmdopt i)
+                    do
+                        stop_instance $i
+                    done
+                ;;
+                restart) # Restart OOo instance(s) and application server
+                    stop_appsrv
+                    for i in $(_splitcmdopt i)
+                    do
+                        stop_instance $i
+                        start_instance $i
+                    done
+                    start_appsrv
+                ;;
+                updateoxt) # Update OOo extensions
+                    update_odisee_oxt
+                ;;
+                *)
+                    echo "Odisee: Unknown or missing command."
+                ;;
+            esac
+        done
+    fi
+}
+
+#
+# Execute commands local.
+#
+_exec_local() {
+    show_copyr
+    # Excecute commands local
+    if [ ${#cmdopt[*]} -gt 0 ]
+    then
+        check_cmdopt
+        if [ $BADENV = false -a $CMDOK = true ]
+        then
+            exec_cmdopt
+            cleanup
+        fi
+    elif [ $BADENV = false ]
+    then
+        show_help
+    fi
+}
+
+# ---------------------------------------------------------------------------
+#
+# Help.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Show help
+#
+show_help() {
+    cat <<EOF
+Modes
+  -c                                    Create something.
+  -d                                    Disable something.
+  -e                                    Enable something.
+  -r                                    Remove something.
+  -s                                    Show Odisee status.
+
+  Depending on operation
+  -t <type>                             Type of an operation.
+
+Instance operations
+  -L                                    List all instances.
+  -l <instance>[,<instance>...]         Show details of certain instance(s).
+  -g <group>                            Specify a group of instance(s). NOT IMPLEMENTED YET.
+  -i <instance>[,<instance>...]         Instance(s) to operate on.
+      -f <directory>                    OpenOffice installation directory for instance(s).
+      -p <ip>:<port>                    Set IP address and port of instance(s).
+      -m                                Manage (an) instance(s).
+      -o option=value                   Specify an option, see below.
+      -x <extension>[,<extension>...]   Manage extension(s).
+         -t install                       Install an extension.
+         -t remove                        Remove an extension.
+      -y <directory>                    Data store for instance(s).
+
+Options
+  -o option=value                       Specify an option for one or more instance(s).
+       autostart=<true|false>           Start/stop instance automatically? Default: true.
+       headless=<true|false>            Don't show a window? Default: true.
+       invisible=<true|false>
+       nocrashreport=<true|false>       Disable crashreport? Default: true.
+       nodefault=<true|false>           Don't open default document? Default: true.
+       nofirststartwizard=<true|false>  Disable first start wizard? Default: true.
+       nolockcheck=<true|false>         Don't do lock checks? Default: true.
+       nologo=<true|false>              Don't show logo at startup? Default: true.
+       norestart=<true|false>           No automatic restarts after a crash? Default: true.
+
+Maintenance
+  OpenOffice instance(s)
+  -q <operation>                        Execute maintenance command.
+       findooo                          Try to guess and find an installation home.
+       start                            Start one or more instance(s) given with -i. If no
+                                        instances are given, starts all with option autostart=true.
+       stop                             Same as above, but stops instance(s).
+       restart                          Restart instance(s).
+       updateoxt                        Update extensions under extensions/ and (re-)install them.
+
+Common options
+  -h                                    Show help.
+  -H                                    Show examples.
+  -z                                    Force an operation.
+
+EOF
+}
+
+# ---------------------------------------------------------------------------
+#
+# Main.
+#
+# ---------------------------------------------------------------------------
+
+#
+# Cleanup.
+#
+cleanup() {
+    exit 0
+}
+
+trap cleanup 1 2 3 5 9 15
+ORIG_CMD="$(basename ${0%%.sh}) $*"
+
+#
+# DECLARATIONS
+#
+
+DEFAULT_OPTION[autostart]=true
+DEFAULT_OPTION[headless]=true
+DEFAULT_OPTION[invisible]=true
+DEFAULT_OPTION[nocrashreport]=true
+DEFAULT_OPTION[nodefault]=true
+DEFAULT_OPTION[nofirststartwizard]=true
+DEFAULT_OPTION[nolockcheck]=true
+DEFAULT_OPTION[nologo]=true
+DEFAULT_OPTION[norestart]=true
+# Command line option dependencies
+CMD_DEPENDENCY_AND[c]="i"
+CMD_DEPENDENCY_AND[d]="i"
+CMD_DEPENDENCY_AND[e]="i"
+CMD_DEPENDENCY_AND[m]="i"
+CMD_DEPENDENCY_AND[o]="i m"
+CMD_DEPENDENCY_AND[p]="i m"
+CMD_DEPENDENCY_AND[r]="i"
+# Command line option no-goes
+CMD_DEPENDENCY_OR[i]="c f l m o p q r x"
+# Command line option no-goes
+#   -c, -d, -e and -r are mutually exclusive
+CMD_NOGO[c]="d e r"
+CMD_NOGO[d]="c e r"
+CMD_NOGO[e]="c d r"
+CMD_NOGO[r]="c d e"
+#
+CMDOK=true
+
+# Parse parameters
+while getopts ":cdehHmLrszf:i:l:o:p:q:t:u:x:y:" opt
+do
+    case $opt in
+        c) cmdopt[c]=true ;;
+        d) cmdopt[d]=true ;;
+        e) cmdopt[e]=true ;;
+        f) _acceptopt f $OPTARG ;;
+        h) show_help; exit 0 ;;
+        H) show_examples; exit 0 ;;
+        i) _acceptopt i $OPTARG ;;
+        l) _acceptopt l $OPTARG ;;
+        L) cmdopt[L]=true ;;
+        m) cmdopt[m]=true ;;
+        o)
+            n=$(echo $OPTARG | awk -F= '{print $1}')
+            v=$(echo $OPTARG | awk -F= '{print $2}')
+            option[$n]=$v
+        ;;
+        p) _acceptopt p $OPTARG ;;
+        q) _acceptopt q $OPTARG ;;
+        r) cmdopt[r]=true ;;
+        s) cmdopt[s]=true ;;
+        t) _acceptopt t $OPTARG ;;
+        u) _acceptopt u $OPTARG ;;
+        x) _acceptopt x $OPTARG ;;
+        y) _acceptopt y $OPTARG ;;
+        z) cmdopt[z]=true ;;
+        \?)
+            echo "Odisee: Unknown option -$OPTARG"
+        ;;
+        :)
+            case $OPTARG in
+                i)
+                    echo "Odisee: Option -$OPTARG needs an instance name as argument."
+                    echo "Odisee: e.g. $ORIG_CMD odi1"
+                ;;
+                *)
+                    echo "Odisee: Option -$OPTARG needs an argument."
+                ;;
+            esac
+            exit 1
+        ;;
+    esac
+done
+
+mkdir -p ${ODISEE_LOG}
+[ ! -f ${ODISEE_INST} ] && touch ${ODISEE_INST}
+_exec_local
+
+exit 0

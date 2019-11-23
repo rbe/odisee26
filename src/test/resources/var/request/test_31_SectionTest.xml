@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odisee xmlns="http://xmlns.odisee.de/v2/request">
+    <request name="TestSection">
+        <template name="SectionTest" outputFormat="odt,pdf,pdfa"/>
+        <archive files="true"/>
+        <instructions>
+            <userfield name="Section1">0</userfield>
+            <userfield name="Section2">1</userfield>
+            <userfield name="Section3">0</userfield>
+        </instructions>
+    </request>
+</odisee>

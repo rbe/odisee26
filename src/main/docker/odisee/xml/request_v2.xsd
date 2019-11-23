@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Odisee(R)
+  ~ Copyright (C) 2011-2015 art of coding UG (haftungsbeschränkt).
+  ~ Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
+  ~
+  ~ Alle Rechte vorbehalten. Nutzung unterliegt Lizenzbedingungen.
+  ~ All rights reserved. Use is subject to license terms.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+    xmlns:odisee="http://xmlns.odisee.de/v2/request"
+    targetNamespace="http://xmlns.odisee.de/v2/request"
+    elementFormDefault="qualified"
+    vc:maxVersion="1.1" vc:minVersion="1.0">
+    <xs:element name="odisee">
+        <xs:annotation>
+            <xs:documentation>
+                Root element, contains one or more requests to generate a document and maybe post processing actions.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="odisee:request" minOccurs="1" maxOccurs="unbounded"/>
+                <xs:element name="post-process" type="odisee:postProcessType" minOccurs="0"
+                    maxOccurs="1">
+                    <xs:annotation>
+                        <xs:documentation>
+                            Process result of all request(s): this are one or more generated documents.
+                        </xs:documentation>
+                    </xs:annotation>
+                </xs:element>
+                <xs:element ref="odisee:response" minOccurs="0" maxOccurs="1"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="request">
+        <xs:annotation>
+            <xs:documentation>A single request, a document to generate.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="odisee:group" minOccurs="0" maxOccurs="1"/>
+                <xs:element ref="odisee:template" minOccurs="1" maxOccurs="1"/>
+                <xs:element ref="odisee:archive" minOccurs="0" maxOccurs="1"/>
+                <xs:element ref="odisee:instructions" minOccurs="1" maxOccurs="unbounded"/>
+                <xs:element name="post-process" minOccurs="0" maxOccurs="1">
+                    <xs:annotation>
+                        <xs:documentation>Process result/the generated document.</xs:documentation>
+                    </xs:annotation>
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="action" type="odisee:actionType" minOccurs="1" maxOccurs="unbounded"/>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+            <xs:attribute name="name" use="optional" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>
+                        Name of request, used as filename when sending result back through HTTP.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="group">
+        <xs:annotation>
+            <xs:documentation>Odisee server group.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="name" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>Name of group as defined in config.xml.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="archive">
+        <xs:annotation>
+            <xs:documentation>Should result of request be archived?</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="database" use="optional" type="xs:boolean" default="false">
+                <xs:annotation>
+                    <xs:documentation>Archive in database as BLOB? Default is false.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="files" use="optional" type="xs:boolean" default="false">
+                <xs:annotation>
+                    <xs:documentation>
+                        Archive in filesystem ($ODISEE_HOME/var/user/USERNAME/document)?
+                        Default is false.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="template">
+        <xs:annotation>
+            <xs:documentation>Specify template to use.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="name" use="required" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>Its filename w/o extension (.ott).</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="outputFormat" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Save in what format? Specify file extension (odt, pdf, doc).</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="pre-save-macro" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Execute macro just before saving file.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="revision" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Use LATEST or certain revision (number).</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="instructions">
+        <xs:annotation>
+            <xs:documentation>These instructions are executed in order.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence minOccurs="1" maxOccurs="unbounded">
+                <xs:element ref="odisee:image" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element ref="odisee:autotext" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element ref="odisee:bookmark" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element ref="odisee:macro" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element ref="odisee:userfield" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element ref="odisee:texttable" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="userfield">
+        <xs:annotation>
+            <xs:documentation>Set value of userfield.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType mixed="true">
+            <xs:attribute name="name" use="required" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>Name of userfield.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="post-macro" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Execute macro after value was set.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="texttable">
+        <xs:annotation>
+            <xs:documentation>Insert text at table coordinate.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType mixed="true">
+            <xs:attribute name="name" use="required" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>
+                        Name of table.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="coordinate" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Name of table and position of cell: tablename!ColumnRow, e.g. tablename!A1.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="cell-align" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Set table cell alignments.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="cell-width" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Set table cell widths.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="post-macro" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Execute macro after value was set.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="image">
+        <xs:annotation>
+            <xs:documentation>Insert image at bookmark. The image muste be encoded as base64.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType mixed="true">
+            <xs:attribute name="type" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>MIME type of image.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="bookmark" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Name of bookmark.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="url" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Fetch image from this URL.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="width" use="optional" type="xs:int">
+                <xs:annotation>
+                    <xs:documentation>Desired width of image in document, in 1/100 mm.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="height" use="optional" type="xs:int">
+                <xs:annotation>
+                    <xs:documentation>Desired height of image in document, in 1/100 mm.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="post-macro" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Execute macro after value was set.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="autotext">
+        <xs:annotation>
+            <xs:documentation>Insert autotext at bookmark or end of document.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="group" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Name of autotext group, the autotext container.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="name" use="required" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>Name of autotext</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="bookmark" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Name of bookmark</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="atend" use="optional" type="xs:boolean">
+                <xs:annotation>
+                    <xs:documentation>Insert autotext at end of text/document?</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="bookmark">
+        <xs:annotation>
+            <xs:documentation>Insert text at bookmark.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType mixed="true">
+            <xs:attribute name="name" use="required" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>Name of bookmark.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="post-macro" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Execute macro after value was set.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="macro">
+        <xs:annotation>
+            <xs:documentation>Execute a macro.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="odisee:parameter" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+            <xs:attribute name="name" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        Name of the macro including its library, e.g. Standard.Module1.myMacro
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="language" use="optional" type="xs:string" default="Basic">
+                <xs:annotation>
+                    <xs:documentation>Language the macro is written in; e.g. Basic.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="location" use="optional" type="xs:string" default="document">
+                <xs:annotation>
+                    <xs:documentation>Location of the macro: document, application</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="parameter">
+        <xs:annotation>
+            <xs:documentation>List of parameters, ordered by arity.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="value" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Value for the parameter.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="result-placeholder">
+        <xs:annotation>
+            <xs:documentation>Placeholder for result of actual request.</xs:documentation>
+        </xs:annotation>
+    </xs:element>
+    <xs:element name="input">
+        <xs:annotation>
+            <xs:documentation>Specifies an already existing document as input for an action.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:attribute name="filename" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+                        A relative path, interpreted as $ODISEE_HOME/var/USERNAME/pdf/FILENAME
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="response">
+        <xs:annotation>
+            <xs:documentation>Control response of Odisee.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="base64" type="xs:boolean" default="false" minOccurs="0"
+                    maxOccurs="1">
+                    <xs:annotation>
+                        <xs:documentation>
+                            Should the response be encoded as base64? Default is false.
+                            The produced document will be sent back, this is a binary stream (a PDF or ODT or ...)
+                        </xs:documentation>
+                    </xs:annotation>
+                </xs:element>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <!--
+
+        Complex Types.
+
+    -->
+    <xs:complexType name="actionType">
+        <xs:annotation>
+            <xs:documentation>An action to perform.</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element ref="odisee:result-placeholder" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element ref="odisee:input" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="type" use="required" type="xs:string">
+            <xs:annotation>
+                <xs:documentation>
+                    merge-all-results: Merge result of all requests or previous instruction into one file.
+                    merge-with: Merge result of request or previous instruction with another file (PDF).
+                </xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+    </xs:complexType>
+    <xs:complexType name="postProcessType">
+        <xs:sequence>
+            <xs:element name="action" type="odisee:actionType" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <!--
+
+        Simple Types.
+
+    -->
+    <xs:simpleType name="name">
+        <xs:annotation>
+            <xs:documentation>Name</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string"/>
+    </xs:simpleType>
+</xs:schema>

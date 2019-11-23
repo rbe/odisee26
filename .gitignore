@@ -1,0 +1,26 @@
+# Odisee
+src/main/test/resources/var/deploy/
+src/main/test/resources/var/document/
+src/main/test/resources/var/tmp/
+
+# Gradle
+.gradle
+build/
+out/
+
+# IntelliJ IDEA
+.idea
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.project
+.settings
+.classpath
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db

@@ -1,0 +1,30 @@
+version: '3.7'
+
+services:
+  odisee:
+    image: odisee/odisee:${VERSION}
+    environment:
+      - TZ=Europe/Berlin
+      - LANG=en_US.UTF-8
+    volumes:
+      - odisee:/home/odisee:ro
+      - odiseevar:/home/odisee/var:rw
+    networks:
+      - odisee-backend
+      - odisee-outside
+
+volumes:
+  odisee:
+    driver: local
+  odiseevar:
+    driver: local
+
+networks:
+  odisee-backend:
+    driver: bridge
+    internal: true
+    external: false
+  odisee-outside:
+    driver: bridge
+    internal: false
+    external: false

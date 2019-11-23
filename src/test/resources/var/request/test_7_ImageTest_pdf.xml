@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odisee xmlns="http://xmlns.odisee.de/v2/request">
+    <request name="ImageTest">
+        <!-- Template: name and desired output format -->
+        <template name="ImageTest" outputFormat="odt"/>
+        <!-- Archive generated files? Useful for debugging -->
+        <archive files="true"/>
+        <!-- Instructions executed against the template, order does matter! -->
+        <instructions>
+            <!-- TODO A relative path is interpreted as $ODISEE_HOME/var -->
+            <image type="image/png" url="file://image/Odisee_Maskottchen_positiv.png" bookmark="ImageBookmark" height="1000"/>
+            <image type="image/png" url="file://image/Odisee_Logo.png" bookmark="Tabelle1ImageBookmark" height="1000"/>
+        </instructions>
+    </request>
+</odisee>

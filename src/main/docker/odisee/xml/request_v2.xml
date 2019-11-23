@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odisee:odisee xmlns:odisee="http://xmlns.odisee.de/v2/request">
+    <odisee:request name="my-request">
+        <odisee:group name="group0"/>
+        <odisee:template name="myDocument" revision="LATEST" outputFormat="pdf" pre-save-macro="Library.Module.Name"/>
+        <odisee:archive database="false" files="true"/>
+        <odisee:instructions>
+            <odisee:userfield name="hello">world</odisee:userfield>
+            <odisee:texttable name="Tabelle1" coordinate="A1" post-macro="">Tabelle 1, Zelle A1</odisee:texttable>
+            <odisee:texttable name="Tabelle1" coordinate="Tabelle1!A1" post-macro="">Tabelle 1, Zelle A1</odisee:texttable>
+            <odisee:texttable name="Tabelle1" cell-align="" cell-width="">Tabelle 1, Zelle A1</odisee:texttable>
+            <odisee:bookmark name="Bookmark1">Text at Bookmark1</odisee:bookmark>
+            <odisee:autotext group="" name="" bookmark="Bookmark1" atend="true"/>
+            <odisee:image type="" bookmark="" url="" post-macro=""/>
+            <odisee:image type="" bookmark="" width="4000" height="2000">abcdef=</odisee:image>
+            <odisee:image type="" bookmark="" post-macro="">abcdef=</odisee:image>
+            <odisee:macro name="MyMacro" location="document" language="Basic">
+                <!-- first parameter -->
+                <odisee:parameter value=""/>
+                <!-- second parameter -->
+                <odisee:parameter value=""/>
+            </odisee:macro>
+        </odisee:instructions>
+        <odisee:post-process>
+            <odisee:action type="merge-with">
+                <odisee:result-placeholder/>
+                <odisee:input filename=""/>
+            </odisee:action>
+        </odisee:post-process>
+    </odisee:request>
+    <odisee:post-process>
+        <odisee:action type="merge-all-results"/>
+        <odisee:action type="merge-with">
+            <odisee:result-placeholder/>
+            <odisee:input filename=""/>
+        </odisee:action>
+    </odisee:post-process>
+    <odisee:response>
+        <odisee:base64>false</odisee:base64>
+    </odisee:response>
+</odisee:odisee>

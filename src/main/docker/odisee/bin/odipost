@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# 
+# Odisee(R)
+# Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt).
+# Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
+#
+# Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
+#
+
+# Determine script directory
+SCRIPT_DIR=$(pushd $(dirname $0) >/dev/null ; pwd ; popd >/dev/null)
+# Read configuration
+. ${SCRIPT_DIR}/../etc/odienv
+# Odisee library
+. ${SCRIPT_DIR}/odilib
+
+set -o nounset
+
+declare curlrv
+declare requestfile
+declare tracefile
+declare outputfile
+declare host
+declare port
+declare user
+declare trace
+
+_odipost_do() {
+    # curl options
+    local curlopts
+    curlopts="-s"
+    # Trace file
+    if [ "${trace}" = "true" ]
+    then
+        tracefile="output/${requestfile}_trace.log"
+        curlopts="${curlopts} --trace-ascii ${tracefile}"
+    fi
+    # Request XML file
+    if [ -n "${requestfile}" ];
+    then
+        local rf
+        if [ "${requestfile}" != ^/* ]
+        then
+            rf=${ODISEE_HOME}/var/test/${requestfile}
+        else
+            rf=${requestfile}
+        fi
+        if [ ! -f ${rf} ]
+        then
+            echo "Request file ${rf} does not exist!"
+            exit 1
+        fi
+        if [ "${compress}" = "true" ]
+        then
+            gzip -c ${rf} > ${rf}.gz
+            rf=${rf}.gz
+            curlopts="${curlopts} -H \"Content-Encoding: gzip\" --data-binary @${rf}"
+        else
+            curlopts="${curlopts} -d @${rf}"
+        fi
+    fi
+    # Output
+    [ -n "${outputfile}" ] && curlopts="${curlopts} -o ${outputfile}"
+    # Host, port, URL, authentication
+    if [ -n "${user}" ];
+    then
+        [ "${authtype}" = "basic"  ] && curlopts="${curlopts} --basic -u \"${user}\""
+        [ "${authtype}" = "digest" ] && curlopts="${curlopts} --digest -u \"${user}\""
+    fi
+    local url="${host}:${port}/odisee/document/generate"
+    curlopts="${curlopts} -H \"Content-Type: text/xml\""
+    curlopts="${curlopts} -X POST ${url}"
+    # Execute curl
+    eval curl -v ${curlopts}
+    curlrv=$?
+}
+
+_odipost_usage() {
+    echo "usage: $0 [-h <host>] [-p <port>] [-t] [-a <basic|digest>] [-u <user:password>] -f <requestfile.xml> [-o <outputfile>] [-z]"
+    echo ""
+    echo "       defaults:"
+    echo "       -a authtype = basic"
+    echo "       -f uses file from \$ODISEE_HOME/var/request when path does not start with slash"
+    echo "       -h host = 127.0.0.1"
+    echo "       -p port = 8080"
+    echo "       -u user = odisee:odisee"
+    echo "       -t trace = false"
+    echo "       -o outputfile = <resultfile.xml>.bin"
+    echo "       -z compress = false"
+    exit 1
+}
+
+# Defaults
+compress=false
+trace=false
+host=127.0.0.1
+port=8080
+authtype=basic
+user="odisee:odisee"
+requestfile=
+outputfile=
+tracefile=
+
+# Parse command line options
+while getopts "a:f:h:o:p:tu:z" opt
+do
+    case "$opt" in
+        a) authtype=${OPTARG} ;;
+        f) requestfile=${OPTARG} ;;
+        h) host=${OPTARG} ;;
+        o) outputfile=${OPTARG} ;;
+        p) port=${OPTARG} ;;
+        t) trace=true ;;
+        u) user=${OPTARG} ;;
+        z) compress=true ;;
+        *)
+            echo "$0: unknown option ${OPTARG}"
+            exit 1
+        ;;
+    esac
+done
+
+#
+if [ -n "${requestfile}" ]
+then
+    # Output file
+    [ -z "${outputfile}" ] && outputfile="${requestfile}.bin"
+    _odipost_do
+    exit ${curlrv}
+else
+    _odipost_usage
+fi
