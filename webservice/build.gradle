@@ -1,6 +1,9 @@
 buildscript {
     repositories {
-        maven { url "https://repo.grails.org/grails/core" }
+        maven {
+            url "https://repo.grails.org/grails/core"
+            //url "https://repo1.maven.org/maven2"
+        }
     }
     dependencies {
         classpath "org.grails:grails-gradle-plugin:$grailsVersion"
@@ -27,10 +30,13 @@ apply plugin: 'de.undercouch.download'
 apply plugin: 'com.bmuschko.docker-remote-api'
 
 repositories {
-    maven { url "https://repo.grails.org/grails/core" }
+    maven {
+        url "https://repo.grails.org/grails/core"
+    }
 }
 
 configurations {
+    antlibs
     developmentOnly
     runtimeClasspath {
         extendsFrom developmentOnly
@@ -44,6 +50,8 @@ def libreOfficeVersion = '6.3.3'
 def libreOfficeVariant = 'still'
 
 dependencies {
+    antlibs 'org.apache.ant:ant-xz:1.10.7'
+    antlibs 'org.tukaani:xz:1.8'
     implementation fileTree(dir: "${buildDir}/lib/libreoffice-${libreOfficeVersion}", include: '**/*.jar')
     implementation 'org.apache.pdfbox:pdfbox:2.0.16'
     implementation 'org.codehaus.groovy:groovy-dateutil:2.5.8'
@@ -135,9 +143,13 @@ bootRun {
 // LibreOffice
 //
 
+ClassLoader antClassLoader = org.apache.tools.ant.Project.class.classLoader
+configurations.antlibs.each { File f ->
+    antClassLoader.addURL(f.toURI().toURL())
+}
 ext {
     def dldebx86_64 = 'https://download.documentfoundation.org/libreoffice/stable'
-    def mirrorEsslingen = "https://mirror1.hs-esslingen.de/pub/Mirrors/tdf/libreoffice/stable"
+    def mirrorEsslingen = 'https://mirror1.hs-esslingen.de/pub/Mirrors/tdf/libreoffice/stable'
     def dlarchive = 'https://downloadarchive.documentfoundation.org/libreoffice/old'
     downloadMap = [
             '6.3.3'  : "${mirrorEsslingen}/6.3.3/deb/x86_64/LibreOffice_6.3.3_Linux_x86-64_deb.tar.gz",
@@ -151,10 +163,10 @@ ext {
 task downloadAndUnpackLibreOffice {
     group = 'Odisee'
     doLast {
-        def unpack = file("${buildDir}/unpack")
+        File unpackDir = file("${buildDir}/unpack")
         // Download
-        def dl = downloadMap[libreOfficeVersion]
-        def archive = file("${buildDir}/libreoffice-${libreOfficeVersion}-deb.tar.gz")
+        String dl = downloadMap[libreOfficeVersion]
+        File archive = file("${buildDir}/libreoffice-${libreOfficeVersion}-deb.tar.gz")
         if (!archive.exists()) {
             println "Downloading LibreOffice ${libreOfficeVersion} from ${dl}"
             download {
@@ -165,9 +177,9 @@ task downloadAndUnpackLibreOffice {
             }
         }
         // Unpack
-        def unpacklo = file("${unpack}/libreoffice-${libreOfficeVersion}")
-        def unpack_debs = []
-        if (!unpacklo.exists()) {
+        File unpackLibreOfficeDir = file("${unpackDir}/libreoffice-${libreOfficeVersion}")
+        List unpack_debs = []
+        if (!unpackLibreOfficeDir.exists()) {
             println "Unpacking ${dl}"
             copy {
                 from(tarTree(archive)) {
@@ -178,18 +190,18 @@ task downloadAndUnpackLibreOffice {
                         unpack_debs << f.relativePath
                     }
                 }
-                into unpacklo
+                into unpackLibreOfficeDir
             }
         }
         for (deb in unpack_debs) {
             // deb
-            def absdeb = file("${unpacklo}/${deb}")
-            def debdirname = absdeb.name.replaceAll('[.]', '_')
-            def debdir = file("${unpacklo}/${debdirname}")
+            File absdeb = file("${unpackLibreOfficeDir}/${deb}")
+            String debdirname = absdeb.name.replaceAll('[.]', '_')
+            File debdir = file("${unpackLibreOfficeDir}/${debdirname}")
             if (!debdir.exists()) {
                 debdir.mkdirs()
                 println "Unpacking ${deb}"
-                def proc1 = "tar -C ${debdir} -xf ${absdeb}".execute()
+                Process proc1 = "tar -C ${debdir} -xf ${absdeb}".execute()
                 proc1.waitFor()
                 if (proc1.exitValue() > 0) println new String(proc1.err.readAllBytes())
             } else {
@@ -197,21 +209,33 @@ task downloadAndUnpackLibreOffice {
             }
             // data.tar.??
             def datadest = file("${debdir}/data")
-            if (!datadest.exists()) {
-                def dataar = file("${debdir}/data.tar.xz")
+            if (!datadest.exists() || datadest.list()?.length == 0) {
+                File dataar = file("${debdir}/data.tar.xz")
                 if (!dataar.exists()) dataar = file("${debdir}/data.tar.gz")
-                datadest.mkdirs()
                 println "Unpacking ${debdirname}/${dataar.name}"
-                def proc2 = "tar -C ${datadest} -xf ${dataar}".execute()
+                if (dataar.name.endsWith('.xz')) {
+                    ant.sequential {
+                        unxz(src: dataar)
+                    }
+                }
+                File datatar = file("${debdir}/data.tar")
+                datadest.mkdirs()
+                copy {
+                    from(tarTree(datatar))
+                    into datadest
+                }
+                /*
+                Process proc2 = "tar -C ${datadest} -xf ${dataar}".execute()
                 proc2.waitFor()
                 if (proc2.exitValue() > 0) println new String(proc2.err.readAllBytes())
+                */
             } else {
                 println "${debdirname}/data already exists"
             }
             // jar
-            def jars = file("${buildDir}/lib/libreoffice-${libreOfficeVersion}")
+            File jarDir = file("${buildDir}/lib/libreoffice-${libreOfficeVersion}")
             println "Copying Java libraries"
-            mkdir(jars)
+            mkdir(jarDir)
             copy {
                 from(datadest) {
                     include '**/juh.jar'
@@ -224,7 +248,7 @@ task downloadAndUnpackLibreOffice {
                     }
                 }
                 includeEmptyDirs(false)
-                into jars
+                into jarDir
             }
         }
     }
