@@ -1,1 +1,4 @@
-rootProject.name = 'odisee'
+rootProject.name = 'Odisee'
+include 'documentation'
+include 'docker'
+include 'webservice'

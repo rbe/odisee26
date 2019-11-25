@@ -1,0 +1,268 @@
+== Administrators Guide
+
+=== Quick Installation
+
+1. Software
++
+.Writer
+(Ubuntu 18.04)
+
+    apt-get install libreoffice-writer
++
+.German Localization
+(Ubuntu 18.04)
+
+    apt-get install libreoffice-l10n-de hunspell-de-de-frami mythes-de hyphen-de
+
+2. Create an user (`odisee`,  home = `$ODISEE_HOME`) and group (`odisee`)
+
+        sudo groupadd -n odisee -g 5000
+        sudo useradd -n odisee -u 5000 -g odisee -m -d ${ODISEE_HOME}
+        mkdir -p ${ODISEE_HOME}
+
+3. Unpack archive contents in `$ODISEE_HOME`
+
+        unzip -q odisee-*.zip
+
+4. Optional: login as `odisee`
+
+        su - odisee
+
+5. Check `etc/odiinst` for correct path to OpenOffice/LibreOffice installation
+6. Start Odisee `odictl -q start`
+
+=== Installation
+
+==== Prerequisites
+
+bash 4
+netstat
+sudo
+unzip
+awk
+sed
+rsync
+
+TIP: Create a separate user for Odisee.
+
+.Create user
+[source,bash,lineno]
+----
+ODISEE_HOME=/home/odisee
+sudo groupadd -n odisee
+sudo useradd -n odisee -g odisee -m -d $ODISEE_HOME
+sudo mkdir -p $ODISEE_HOME
+sudo chown odisee:odisee $ODISEE_HOME
+----
+
+.Login as odisee
+[source,bash,lineno]
+----
+sudo su - odisee
+----
+
+. Download distribution as ZIP archive for your platform
+[source,bash,lineno]
+----
+wget https://ci.art-of-coding.eu/guestAuth/odisee2_build/latest.lastSuccessful/distrib/odisee-PLATFORM.zip
+----
+
+Where PLATFORM is one of the following:
+
+.Supported Platforms
+[source,bash,lineno]
+----
+linux-x86_64
+----
+
+or
+
+.Unsupported Platforms
+[source,bash,lineno]
+----
+freebsd-amd64
+Darwin-x86_64
+Windows x64
+----
+
+.Unpack distribution in `$ODISEE_HOME`
+[source,bash,lineno]
+----
+unzip -q odisee-*.zip
+----
+
+=== Instance Configuration
+
+1. Check `etc/odiinst` for correct path to OpenOffice/LibreOffice installation
+2. Start Odisee `odictl -q start`
+
+[[configure-libreoffice-in-odisee]]
+=== Configure LibreOffice in Odisee
+
+Odisee can find LibreOffice installations by its own, just give it a
+try:
+
+[source,bash,linenums]
+----
+[odisee@linux ~]$ odictl -q find-inst
+Installation path: /usr/lib/libreoffice
+Java classpath: /usr/lib/libreoffice/ure-link/share/java/juh.jar:
+                /usr/lib/libreoffice/ure-link/share/java/jurt.jar:
+                /usr/lib/libreoffice/ure-link/share/java/ridl.jar:
+                /usr/lib/libreoffice/program/classes/unoil.jar
+----
+
+If the above command succeeds, you can easily add LibreOffice instances
+through `odictl`. A typical instance is named like `odi<N>` and listens
+on `localhost` with a port starting at `2001`:
+
+[source,bash,linenums]
+----
+[odisee@linux ~]$ odictl -c -i odi1
+Instance 'odi1' added.
+----
+
+[[manually-configure-libreoffice-instances]]
+Manually Configure LibreOffice Instances
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This is important when you need to tweak instance configuration. It is
+the case when your LibreOffice installation does not accept options
+(executable `soffice`) which are defined by default in Odisee.
+
+[[libreoffice-4.1]]
+LibreOffice 4.1
+^^^^^^^^^^^^^^^
+
+Example:
+
+LibreOffice 4.1 does not recognize the option `norestart` which is set
+by default when an instance is added through `odictl -c -i`.
+
+[source,bash,linenums]
+----
+[odisee@linux ~]$ odictl -q start-inst -i odi2
+Starting AOO/LO instance 'odi3' on 127.0.0.1:2003 using data directory /usr/local/odisee/var/profile/odi3
+LibreOffice 4.1.5.3 410m0(Build:3)
+
+Unknown option: --norestart
+
+Usage: soffice [options] [documents...]
+----
+
+You configure LibreOffice instances in `$ODISEE_HOME/etc/odiinst`. The
+file contains the following information, each separated by a pipe `|`:
+
+[source]
+----
+instance name|ip address|port|path to LibreOffice installation||options when starting LibreOffice executable|autostart?
+----
+
+Through this file distributed installations can be supported (Odisee and
+LibreOffice instances on different servers), but it should be optional
+in a future Odisee release.
+
+To configure two LibreOffice instances use this:
+
+[source]
+----
+odi1|127.0.0.1|2001|/usr/local/lib/libreoffice||nologo nodefault nolockcheck nocrashreport|true
+odi2|127.0.0.1|2002|/usr/local/lib/libreoffice||nologo nodefault nolockcheck nocrashreport|true
+----
+
+If you need more instances, just duplicate the last line and set a new
+instance name (`odi2` -> `odi3`) and increment the port number (`2002`
+-> `2003`).
+
+[[lifecycle]]
+=== Lifecycle
+
+Odisee can be controlled through `odictl`.
+
+[[start]]
+Start
+~~~~~
+
+There are two components that need to be started: LibreOffice
+instance(s) and Odisee — a Java Web Container,
+http://tomcat.apache.org[Apache Tomcat] by default. To start Odisee
+along with LibreOffice instances just use `odictl -q start`:
+
+[source,bash,linenums]
+----
+[odisee@linux ~]$ odictl -q start
+Odisee(R)
+...
+Starting OpenOffice instance 'odi1' on 127.0.0.1:2001 using data directory /home/odisee/var/profile/odi1
+Starting OpenOffice instance 'odi2' on 127.0.0.1:2002 using data directory /home/odisee/var/profile/odi2
+Starting OpenOffice instance 'odi3' on 127.0.0.1:2003 using data directory /home/odisee/var/profile/odi3
+Starting OpenOffice instance 'odi4' on 127.0.0.1:2004 using data directory /home/odisee/var/profile/odi4
+Starting Odisee Service
+----
+
+[[status]]
+Status
+~~~~~~
+
+Query the status of your instance(s) with `odictl -s`:
+
+[source,bash,linenums]
+----
+[odisee@linux ~]$ odictl -s
+Instance: odi1
+  Status................. ONLINE, READY
+  Process ID............. 23587
+  Socket configuration... tcp://127.0.0.1:2001
+    #listening........... 1
+    #connections......... 0
+  Home................... /usr/lib/libreoffice
+  UserInstallation....... /usr/local/odisee/var/profile/odi1
+  Options................ nologo nofirststartwizard invisible nodefault nolockcheck nocrashreport headless
+  Autostart.............. true
+----
+
+=== Web Server
+
+==== Apache httpd
+
+1. Enable modules: deflate, headers, proxy, proxy_ajp, ssl
+
+        a2enmod deflate headers proxy proxy_ajp ssl
+
+2. Edit `$ODISEE_HOME/etc/apache/odisee.conf` or `odisee_ssl.conf` and copy into your Apache configuration
+
+3. Enable modules: deflate, headers, proxy, proxy_ajp, ssl
++
+[source,bash,lineno]
+----
+a2enmod deflate headers proxy proxy_ajp ssl
+----
+
+4. Edit `$ODISEE_HOME/etc/apache/odisee.conf` or `odisee_ssl.conf` and copy into your Apache configuration
+
+=== Fonts
+
+==== Installing Fonts
+
+Put `.ttf` files in `$HOME/.fonts` and execute
+
+    fc-cache -f -v
+
+System installed fonts are located in `/usr/share/fonts`.
+
+==== Package Install Notes
+
+Fontconfig configuration is done via /etc/fonts/conf.avail and conf.d.
+Read /etc/fonts/conf.d/README for more information.
+
+Configuration via /etc/fonts/local.conf is still possible,
+but is no longer recommended for options available in conf.avail.
+
+Main systemwide configuration should be done by symlinks
+(especially for autohinting, sub-pixel and lcdfilter):
+
+cd /etc/fonts/conf.d
+ln -s ../conf.avail/XX-foo.conf
+
+Check also https://wiki.archlinux.org/index.php/Font_Configuration
+and https://wiki.archlinux.org/index.php/Fonts.

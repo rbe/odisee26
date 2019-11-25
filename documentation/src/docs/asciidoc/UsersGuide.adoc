@@ -1,0 +1,12 @@
+== Users Guide
+:toc: right
+:toc-levels: 2
+
+=== Clients
+
+There's a http://www.odisee.de/odisee/product/odisee-client.xhtml[Windows client]
+to test sending requests to Odisee. On the same page there are links to
+Odisee client libraries (http://git.odisee.de/client-java/src[Java],
+http://git.odisee.de/client-vbnet/src[VB.NET],
+http://git.odisee.de/client-php/src[PHP]) along with examples how to use
+the API.

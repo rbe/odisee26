@@ -1,0 +1,271 @@
+buildscript {
+    repositories {
+        maven { url "https://repo.grails.org/grails/core" }
+    }
+    dependencies {
+        classpath "org.grails:grails-gradle-plugin:$grailsVersion"
+        //classpath 'org.grails.plugins:hibernate5:7.0.0'
+        classpath 'gradle.plugin.com.github.erdi.webdriver-binaries:webdriver-binaries-gradle-plugin:2.0'
+        classpath 'com.bertramlabs.plugins:asset-pipeline-gradle:3.0.10'
+        classpath 'com.bmuschko:gradle-docker-plugin:6.0.0'
+    }
+}
+
+plugins {
+    id 'de.undercouch.download'
+}
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'java'
+//apply plugin: 'war'
+apply plugin: 'org.grails.grails-web'
+apply plugin: 'com.github.erdi.webdriver-binaries'
+//apply plugin: 'org.grails.grails-gsp'
+apply plugin: 'com.bertramlabs.asset-pipeline'
+apply plugin: 'de.undercouch.download'
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+repositories {
+    maven { url "https://repo.grails.org/grails/core" }
+}
+
+configurations {
+    developmentOnly
+    runtimeClasspath {
+        extendsFrom developmentOnly
+    }
+}
+
+// LibreOffice Version
+// See ext.downloadMap in section LibreOffice
+def libreOfficeVersion = '6.3.3'
+// Change variant in odisee/Dockerfile also (variable not usable in Docker FROM)
+def libreOfficeVariant = 'still'
+
+dependencies {
+    implementation fileTree(dir: "${buildDir}/lib/libreoffice-${libreOfficeVersion}", include: '**/*.jar')
+    implementation 'org.apache.pdfbox:pdfbox:2.0.16'
+    implementation 'org.codehaus.groovy:groovy-dateutil:2.5.8'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    implementation 'org.grails:grails-core'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-tomcat'
+    implementation 'org.grails:grails-web-boot'
+    implementation 'org.grails:grails-logging'
+    implementation 'org.grails:grails-plugin-rest'
+    implementation 'org.grails:grails-plugin-databinding'
+    implementation 'org.grails:grails-plugin-i18n'
+    implementation 'org.grails:grails-plugin-services'
+    implementation 'org.grails:grails-plugin-url-mappings'
+    implementation 'org.grails:grails-plugin-interceptors'
+    implementation 'org.grails.plugins:cache'
+    implementation 'org.grails.plugins:async'
+    implementation 'org.grails.plugins:scaffolding'
+    implementation 'org.grails.plugins:events'
+    implementation 'org.grails.plugins:hibernate5'
+    implementation 'org.hibernate:hibernate-core:5.4.0.Final'
+    implementation 'org.grails.plugins:gsp'
+    compileOnly 'io.micronaut:micronaut-inject-groovy'
+    console 'org.grails:grails-console'
+    profile 'org.grails.profiles:web'
+    runtimeOnly 'org.glassfish.web:el-impl:2.1.2-b03'
+    implementation 'com.h2database:h2'
+    implementation 'org.apache.tomcat:tomcat-jdbc'
+    implementation 'javax.xml.bind:jaxb-api:2.3.0'
+    implementation 'com.bertramlabs.plugins:asset-pipeline-grails:3.0.10'
+    testImplementation 'org.grails:grails-gorm-testing-support'
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.grails:grails-web-testing-support'
+    testImplementation 'org.grails.plugins:geb'
+    testImplementation 'org.seleniumhq.selenium:selenium-remote-driver:3.14.0'
+    testImplementation 'org.seleniumhq.selenium:selenium-api:3.14.0'
+    testImplementation 'org.seleniumhq.selenium:selenium-support:3.14.0'
+    testRuntimeOnly 'org.seleniumhq.selenium:selenium-chrome-driver:3.14.0'
+    testRuntimeOnly 'org.seleniumhq.selenium:selenium-firefox-driver:3.14.0'
+}
+
+bootRun {
+    jvmArgs(
+            '-Dspring.output.ansi.enabled=always',
+            '-noverify',
+            '-XX:TieredStopAtLevel=1',
+            '-Xmx1024m')
+    sourceResources sourceSets.main
+    String springProfilesActive = 'spring.profiles.active'
+    systemProperty springProfilesActive, System.getProperty(springProfilesActive)
+}
+
+webdriverBinaries {
+    chromedriver '2.45.0'
+    geckodriver '0.24.0'
+}
+
+tasks.withType(Test) {
+    systemProperty "geb.env", System.getProperty('geb.env')
+    systemProperty "geb.build.reportsDir", reporting.file("geb/integrationTest")
+    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
+    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
+}
+
+assets {
+    minifyJs = true
+    minifyCss = true
+}
+
+//
+// Odisee
+//
+
+sourceSets {
+    docker {
+        resources.srcDir file('src/main/docker')
+    }
+}
+
+bootRun {
+    System.setProperty('ODISEE_HOME', 'src/test/resources')
+    systemProperties = System.properties
+    println "ODISEE_HOME=${System.getProperty('ODISEE_HOME')}"
+}
+
+//
+// LibreOffice
+//
+
+ext {
+    def dldebx86_64 = 'https://download.documentfoundation.org/libreoffice/stable'
+    def mirrorEsslingen = "https://mirror1.hs-esslingen.de/pub/Mirrors/tdf/libreoffice/stable"
+    def dlarchive = 'https://downloadarchive.documentfoundation.org/libreoffice/old'
+    downloadMap = [
+            '6.3.3'  : "${mirrorEsslingen}/6.3.3/deb/x86_64/LibreOffice_6.3.3_Linux_x86-64_deb.tar.gz",
+            '6.2.8'  : "${mirrorEsslingen}/6.2.8/deb/x86_64/LibreOffice_6.2.8_Linux_x86-64_deb.tar.gz",
+            '6.3.3.2': "${dlarchive}/6.3.3.2/deb/x86_64/LibreOffice_6.3.3.2_Linux_x86-64_deb.tar.gz",
+            '5.4.7.2': "${dlarchive}/5.4.7.2/deb/x86_64/LibreOffice_5.4.7.2_Linux_x86-64_deb.tar.gz",
+            '4.4.7.2': "${dlarchive}/4.4.7.2/deb/x86_64/LibreOffice_4.4.7.2_Linux_x86-64_deb.tar.gz",
+            '3.6.7.2': "${dlarchive}/3.6.7.2/deb/x86_64/LibreOffice_3.6.7.2_Linux_x86-64_deb.tar.gz",
+    ]
+}
+task downloadAndUnpackLibreOffice {
+    group = 'Odisee'
+    doLast {
+        def unpack = file("${buildDir}/unpack")
+        // Download
+        def dl = downloadMap[libreOfficeVersion]
+        def archive = file("${buildDir}/libreoffice-${libreOfficeVersion}-deb.tar.gz")
+        if (!archive.exists()) {
+            println "Downloading LibreOffice ${libreOfficeVersion} from ${dl}"
+            download {
+                src dl
+                dest archive
+                onlyIfModified true
+                overwrite false
+            }
+        }
+        // Unpack
+        def unpacklo = file("${unpack}/libreoffice-${libreOfficeVersion}")
+        def unpack_debs = []
+        if (!unpacklo.exists()) {
+            println "Unpacking ${dl}"
+            copy {
+                from(tarTree(archive)) {
+                    include '*/DEBS/*ure*.deb'
+                    include '*/DEBS/*core*.deb'
+                    eachFile { f ->
+                        f.relativePath = new RelativePath(true, f.relativePath.segments.drop(2))
+                        unpack_debs << f.relativePath
+                    }
+                }
+                into unpacklo
+            }
+        }
+        for (deb in unpack_debs) {
+            // deb
+            def absdeb = file("${unpacklo}/${deb}")
+            def debdirname = absdeb.name.replaceAll('[.]', '_')
+            def debdir = file("${unpacklo}/${debdirname}")
+            if (!debdir.exists()) {
+                debdir.mkdirs()
+                println "Unpacking ${deb}"
+                def proc1 = "tar -C ${debdir} -xf ${absdeb}".execute()
+                proc1.waitFor()
+                if (proc1.exitValue() > 0) println new String(proc1.err.readAllBytes())
+            } else {
+                println "${debdirname} already exists"
+            }
+            // data.tar.??
+            def datadest = file("${debdir}/data")
+            if (!datadest.exists()) {
+                def dataar = file("${debdir}/data.tar.xz")
+                if (!dataar.exists()) dataar = file("${debdir}/data.tar.gz")
+                datadest.mkdirs()
+                println "Unpacking ${debdirname}/${dataar.name}"
+                def proc2 = "tar -C ${datadest} -xf ${dataar}".execute()
+                proc2.waitFor()
+                if (proc2.exitValue() > 0) println new String(proc2.err.readAllBytes())
+            } else {
+                println "${debdirname}/data already exists"
+            }
+            // jar
+            def jars = file("${buildDir}/lib/libreoffice-${libreOfficeVersion}")
+            println "Copying Java libraries"
+            mkdir(jars)
+            copy {
+                from(datadest) {
+                    include '**/juh.jar'
+                    include '**/jurt.jar'
+                    include '**/ridl.jar'
+                    include '**/unoil.jar'
+                    include '**/unoloader.jar'
+                    eachFile { f ->
+                        f.relativePath = new RelativePath(true, f.name)
+                    }
+                }
+                includeEmptyDirs(false)
+                into jars
+            }
+        }
+    }
+}
+compileJava.dependsOn += 'downloadAndUnpackLibreOffice'
+
+//
+// Docker
+//
+
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+
+// Odisee
+ext {
+    dockerTag = "odisee/${project.name}:${project.version}".toLowerCase()
+    dockerBuildDir = mkdir("${buildDir}/docker/odisee")
+}
+task prepareOdiseeDocker(type: Copy, dependsOn: assemble) {
+    group = 'Odisee'
+    description = 'Copy files from src/main/docker/odisee and application jar to Docker temporal build directory'
+    from 'src/main/docker'
+    from project.jar
+    into dockerBuildDir
+}
+/*
+task createDockerfile(type: Dockerfile, dependsOn: prepareOdiseeDocker) {
+    group = 'Odisee'
+    description = 'Create a Dockerfile file'
+    destFile = project.file("${dockerBuildDir}/Dockerfile")
+    from 'openjdk:12-jdk-oraclelinux7'
+    exposePort 8080
+    workingDir '/home/odisee'
+    copyFile jar.archiveFileName, 'application.jar'
+    copyFile 'entrypoint.sh', 'entrypoint.sh'
+    runCommand 'chmod +x entrypoint.sh'
+    entryPoint '/home/odisee/entrypoint.sh'
+}
+*/
+task buildOdiseeImage(type: DockerBuildImage, dependsOn: prepareOdiseeDocker) {
+    group = 'Odisee'
+    description = 'Create Docker image to run the Grails application'
+    inputDir = file(dockerBuildDir)
+    images.add(dockerTag)
+}

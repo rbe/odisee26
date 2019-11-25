@@ -1,0 +1,64 @@
+[[multitenancy]]
+Multitenancy
+~~~~~~~~~~~~
+
+Odisee is multitenant, so users should be able to access their templates
+and generated documents. To achieve that, I favor use of SSH, a user can
+provide a SSH public key and get access.
+
+Add this to your `/etc/ssh/sshd_config` to allow users in group `odisee`
+to access their data:
+
+[source]
+----
+Subsystem sftp internal-sftp
+
+Match User !odisee Group odisee
+    ChrootDirectory %h
+    ForceCommand internal-sftp
+----
+
+[[adding-odisee-users]]
+Adding Odisee Users
+^^^^^^^^^^^^^^^^^^^
+
+To add an Odisee user use `odictl -c -u <username>`:
+
+[source,bash,linenums]
+----
+[odisee@linux ~]$ odictl -c -u odiuser
+User 'odiuser' created.
+----
+
+Do not forget to put user’s SSH public key into
+`$ODISEE_HOME/var/user/odiuser/.ssh/authorized_keys`.
+
+[[permissions]]
+Permissions
+~~~~~~~~~~~
+
+Directory permissions must be set appropriately for proper operation and
+to support multi tenancy through SCP/SFTP. For sshd configuration
+directive `ChrootDirectory` all directories on the path to the user
+directory must be owned by root and not writable by `group` or `other`.
+The command `odictl -q set-perm` does this job for you.
+
+[[access-to-http-service]]
+Access to HTTP Service
+^^^^^^^^^^^^^^^^^^^^^^
+
+The user must have access to Odisee’s HTTP service which is secured by
+HTTP Basic Authentication. Edit
+`$ODISEE_HOME/libexec/tomcat/conf/odisee-users.xml` and add an entry for
+`odiuser`.
+
+The distribution comes preconfigured with a user `odisee` so you can
+start testing.
+
+[source,xml,linenums]
+----
+<?xml version='1.0' encoding='utf-8'?>
+<tomcat-users>
+    <user username="odisee" password="odisee" roles="odisee"/>
+</tomcat-users>
+----

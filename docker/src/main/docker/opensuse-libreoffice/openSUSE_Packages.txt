@@ -1,0 +1,270 @@
+  | libreoffice-l10n-af          | Afrikaans localization files for LibreOffice            | package
+  | libreoffice-l10n-am          | Amharic localization files for LibreOffice              | package
+  | libreoffice-l10n-ar          | Arabic localization files for LibreOffice               | package
+  | libreoffice-l10n-as          | Assamese localization files for LibreOffice             | package
+  | libreoffice-l10n-ast         | Asturian localization files for LibreOffice             | package
+  | libreoffice-l10n-be          | Belarusian localization files for LibreOffice           | package
+  | libreoffice-l10n-bg          | Bulgarian localization files for LibreOffice            | package
+  | libreoffice-l10n-bn          | Bengali localization files for LibreOffice              | package
+  | libreoffice-l10n-bn_IN       | Bengali_India localization files for LibreOffice        | package
+  | libreoffice-l10n-bo          | Tibetian localization files for LibreOffice             | package
+  | libreoffice-l10n-br          | Breton localization files for LibreOffice               | package
+  | libreoffice-l10n-brx         | Bodo localization files for LibreOffice                 | package
+  | libreoffice-l10n-bs          | Bosnian localization files for LibreOffice              | package
+  | libreoffice-l10n-ca          | Catalan localization files for LibreOffice              | package
+  | libreoffice-l10n-ca_valencia | Valencian localization files for LibreOffice            | package
+  | libreoffice-l10n-cs          | Czech localization files for LibreOffice                | package
+  | libreoffice-l10n-cy          | Welsh localization files for LibreOffice                | package
+  | libreoffice-l10n-da          | Danish localization files for LibreOffice               | package
+  | libreoffice-l10n-de          | German localization files for LibreOffice               | package
+  | libreoffice-l10n-dgo         | Dogri localization files for LibreOffice                | package
+  | libreoffice-l10n-dsb         | Lower_Sorbian localization files for LibreOffice        | package
+  | libreoffice-l10n-dz          | Dzongkha localization files for LibreOffice             | package
+  | libreoffice-l10n-el          | Greek localization files for LibreOffice                | package
+i | libreoffice-l10n-en          | English localization files for LibreOffice              | package
+  | libreoffice-l10n-en_GB       | English_GB localization files for LibreOffice           | package
+  | libreoffice-l10n-en_ZA       | English_ZA localization files for LibreOffice           | package
+  | libreoffice-l10n-eo          | Esperanto localization files for LibreOffice            | package
+  | libreoffice-l10n-es          | Spanish localization files for LibreOffice              | package
+  | libreoffice-l10n-et          | Estonian localization files for LibreOffice             | package
+  | libreoffice-l10n-eu          | Basque localization files for LibreOffice               | package
+  | libreoffice-l10n-fa          | Farsi localization files for LibreOffice                | package
+  | libreoffice-l10n-fi          | Finnish localization files for LibreOffice              | package
+  | libreoffice-l10n-fr          | French localization files for LibreOffice               | package
+  | libreoffice-l10n-fy          | Frisian localization files for LibreOffice              | package
+  | libreoffice-l10n-ga          | Irish localization files for LibreOffice                | package
+  | libreoffice-l10n-gd          | Gaelic localization files for LibreOffice               | package
+  | libreoffice-l10n-gl          | Galician localization files for LibreOffice             | package
+  | libreoffice-l10n-gu          | Gujarati localization files for LibreOffice             | package
+  | libreoffice-l10n-gug         | Paraguayan_Guaraní localization files for LibreOffice   | package
+  | libreoffice-l10n-he          | Hebrew localization files for LibreOffice               | package
+  | libreoffice-l10n-hi          | Hindi localization files for LibreOffice                | package
+  | libreoffice-l10n-hr          | Croatian localization files for LibreOffice             | package
+  | libreoffice-l10n-hsb         | Upper_Sorbian localization files for LibreOffice        | package
+  | libreoffice-l10n-hu          | Hungarian localization files for LibreOffice            | package
+  | libreoffice-l10n-id          | Indonesian localization files for LibreOffice           | package
+  | libreoffice-l10n-is          | Icelandic localization files for LibreOffice            | package
+  | libreoffice-l10n-it          | Italian localization files for LibreOffice              | package
+  | libreoffice-l10n-ja          | Japanese localization files for LibreOffice             | package
+  | libreoffice-l10n-ka          | Georgian localization files for LibreOffice             | package
+  | libreoffice-l10n-kab         | Kabyle localization files for LibreOffice               | package
+  | libreoffice-l10n-kk          | Kazakh localization files for LibreOffice               | package
+  | libreoffice-l10n-km          | Khmer localization files for LibreOffice                | package
+  | libreoffice-l10n-kmr_Latn    | Kurdish localization files for LibreOffice              | package
+  | libreoffice-l10n-kn          | Kannada localization files for LibreOffice              | package
+  | libreoffice-l10n-ko          | Korean localization files for LibreOffice               | package
+  | libreoffice-l10n-kok         | Konkani localization files for LibreOffice              | package
+  | libreoffice-l10n-ks          | Kashmiri localization files for LibreOffice             | package
+  | libreoffice-l10n-lb          | Luxembourgish localization files for LibreOffice        | package
+  | libreoffice-l10n-lo          | Lao localization files for LibreOffice                  | package
+  | libreoffice-l10n-lt          | Lithuanian localization files for LibreOffice           | package
+  | libreoffice-l10n-lv          | Latvian localization files for LibreOffice              | package
+  | libreoffice-l10n-mai         | Maithili localization files for LibreOffice             | package
+  | libreoffice-l10n-mk          | Macedonian localization files for LibreOffice           | package
+  | libreoffice-l10n-ml          | Malayalam localization files for LibreOffice            | package
+  | libreoffice-l10n-mn          | Monglolian localization files for LibreOffice           | package
+  | libreoffice-l10n-mni         | Manipuri localization files for LibreOffice             | package
+  | libreoffice-l10n-mr          | Marathi localization files for LibreOffice              | package
+  | libreoffice-l10n-my          | Burnese localization files for LibreOffice              | package
+  | libreoffice-l10n-nb          | Bokmal localization files for LibreOffice               | package
+  | libreoffice-l10n-ne          | Nepali localization files for LibreOffice               | package
+  | libreoffice-l10n-nl          | Dutch localization files for LibreOffice                | package
+  | libreoffice-l10n-nn          | Nynorsk localization files for LibreOffice              | package
+  | libreoffice-l10n-nr          | Southern_Ndebele localization files for LibreOffice     | package
+  | libreoffice-l10n-nso         | Northern_Sotho localization files for LibreOffice       | package
+  | libreoffice-l10n-oc          | Occitan localization files for LibreOffice              | package
+  | libreoffice-l10n-om          | Oromo localization files for LibreOffice                | package
+  | libreoffice-l10n-or          | Odia localization files for LibreOffice                 | package
+  | libreoffice-l10n-pa          | Punjabi localization files for LibreOffice              | package
+  | libreoffice-l10n-pl          | Polish localization files for LibreOffice               | package
+  | libreoffice-l10n-pt_BR       | Brazilian_Portuguese localization files for LibreOffice | package
+  | libreoffice-l10n-pt_PT       | Portuguese localization files for LibreOffice           | package
+  | libreoffice-l10n-ro          | Romanian localization files for LibreOffice             | package
+  | libreoffice-l10n-ru          | Russian localization files for LibreOffice              | package
+  | libreoffice-l10n-rw          | Kinyarwanda localization files for LibreOffice          | package
+  | libreoffice-l10n-sa_IN       | Sanskrit localization files for LibreOffice             | package
+  | libreoffice-l10n-sat         | Santali localization files for LibreOffice              | package
+  | libreoffice-l10n-sd          | Sindhi localization files for LibreOffice               | package
+  | libreoffice-l10n-si          | Sinhalese localization files for LibreOffice            | package
+  | libreoffice-l10n-sid         | Sidamo localization files for LibreOffice               | package
+  | libreoffice-l10n-sk          | Slovak localization files for LibreOffice               | package
+  | libreoffice-l10n-sl          | Slovenian localization files for LibreOffice            | package
+  | libreoffice-l10n-sq          | Albanian localization files for LibreOffice             | package
+  | libreoffice-l10n-sr          | Serbian localization files for LibreOffice              | package
+  | libreoffice-l10n-ss          | Swati localization files for LibreOffice                | package
+  | libreoffice-l10n-st          | Southern_Sotho localization files for LibreOffice       | package
+  | libreoffice-l10n-sv          | Swedish localization files for LibreOffice              | package
+  | libreoffice-l10n-sw_TZ       | Swahili localization files for LibreOffice              | package
+  | libreoffice-l10n-ta          | Tamil localization files for LibreOffice                | package
+  | libreoffice-l10n-te          | Telugu localization files for LibreOffice               | package
+  | libreoffice-l10n-tg          | Tajik localization files for LibreOffice                | package
+  | libreoffice-l10n-th          | Thai localization files for LibreOffice                 | package
+  | libreoffice-l10n-tn          | Tswana localization files for LibreOffice               | package
+  | libreoffice-l10n-tr          | Turkish localization files for LibreOffice              | package
+  | libreoffice-l10n-ts          | Tsonga localization files for LibreOffice               | package
+  | libreoffice-l10n-tt          | Tatar localization files for LibreOffice                | package
+  | libreoffice-l10n-ug          | Uyghur localization files for LibreOffice               | package
+  | libreoffice-l10n-uk          | Ukrainian localization files for LibreOffice            | package
+  | libreoffice-l10n-uz          | Uzbek localization files for LibreOffice                | package
+  | libreoffice-l10n-ve          | Venda localization files for LibreOffice                | package
+  | libreoffice-l10n-vec         | Venetian localization files for LibreOffice             | package
+  | libreoffice-l10n-vi          | Vietnamese localization files for LibreOffice           | package
+  | libreoffice-l10n-xh          | Xhosa localization files for LibreOffice                | package
+  | libreoffice-l10n-zh_CN       | Simplified_Chinese localization files for LibreOffice   | package
+  | libreoffice-l10n-zh_TW       | Traditional_Chinese localization files for LibreOffice  | package
+  | libreoffice-l10n-zu          | Zulu localization files for LibreOffice                 | package
+
+
+  | myspell-af_NA            | MySpell af_NA Dictionary                          | package
+  | myspell-af_ZA            | MySpell af_ZA Dictionary                          | package
+  | myspell-an               | MySpell an Dictionary                             | package
+  | myspell-an_ES            | MySpell an_ES Dictionary                          | package
+  | myspell-ar               | MySpell ar Dictionary                             | package
+  | myspell-ar_AE            | MySpell ar_AE Dictionary                          | package
+  | myspell-ar_BH            | MySpell ar_BH Dictionary                          | package
+  | myspell-ar_DZ            | MySpell ar_DZ Dictionary                          | package
+  | myspell-ar_EG            | MySpell ar_EG Dictionary                          | package
+  | myspell-ar_IQ            | MySpell ar_IQ Dictionary                          | package
+  | myspell-ar_JO            | MySpell ar_JO Dictionary                          | package
+  | myspell-ar_KW            | MySpell ar_KW Dictionary                          | package
+  | myspell-ar_LB            | MySpell ar_LB Dictionary                          | package
+  | myspell-ar_LY            | MySpell ar_LY Dictionary                          | package
+  | myspell-ar_MA            | MySpell ar_MA Dictionary                          | package
+  | myspell-ar_OM            | MySpell ar_OM Dictionary                          | package
+  | myspell-ar_QA            | MySpell ar_QA Dictionary                          | package
+  | myspell-ar_SA            | MySpell ar_SA Dictionary                          | package
+  | myspell-ar_SD            | MySpell ar_SD Dictionary                          | package
+  | myspell-ar_SY            | MySpell ar_SY Dictionary                          | package
+  | myspell-ar_TN            | MySpell ar_TN Dictionary                          | package
+  | myspell-ar_YE            | MySpell ar_YE Dictionary                          | package
+  | myspell-be_BY            | MySpell be_BY Dictionary                          | package
+  | myspell-bg_BG            | MySpell bg_BG Dictionary                          | package
+  | myspell-bn_BD            | MySpell bn_BD Dictionary                          | package
+  | myspell-bn_IN            | MySpell bn_IN Dictionary                          | package
+  | myspell-bo               | MySpell bo Dictionary                             | package
+  | myspell-bo_CN            | MySpell bo_CN Dictionary                          | package
+  | myspell-bo_IN            | MySpell bo_IN Dictionary                          | package
+  | myspell-br_FR            | MySpell br_FR Dictionary                          | package
+  | myspell-bs               | MySpell bs Dictionary                             | package
+  | myspell-bs_BA            | MySpell bs_BA Dictionary                          | package
+  | myspell-ca               | MySpell ca Dictionary                             | package
+  | myspell-ca_AD            | MySpell ca_AD Dictionary                          | package
+  | myspell-ca_ES            | MySpell ca_ES Dictionary                          | package
+  | myspell-ca_ES_valencia   | MySpell ca_ES_valencia Dictionary                 | package
+  | myspell-ca_FR            | MySpell ca_FR Dictionary                          | package
+  | myspell-ca_IT            | MySpell ca_IT Dictionary                          | package
+  | myspell-cs_CZ            | MySpell cs_CZ Dictionary                          | package
+  | myspell-da_DK            | MySpell da_DK Dictionary                          | package
+  | myspell-de               | MySpell de Dictionary                             | package
+  | myspell-de_AT            | MySpell de_AT Dictionary                          | package
+  | myspell-de_CH            | MySpell de_CH Dictionary                          | package
+  | myspell-de_DE            | MySpell de_DE Dictionary                          | package
+i | myspell-dictionaries     | A Source Package for Dictionaries Used by MySpell | package
+  | myspell-el_GR            | MySpell el_GR Dictionary                          | package
+i | myspell-en               | MySpell en Dictionary                             | package
+  | myspell-en_AU            | MySpell en_AU Dictionary                          | package
+  | myspell-en_BS            | MySpell en_BS Dictionary                          | package
+  | myspell-en_BZ            | MySpell en_BZ Dictionary                          | package
+  | myspell-en_CA            | MySpell en_CA Dictionary                          | package
+  | myspell-en_GB            | MySpell en_GB Dictionary                          | package
+  | myspell-en_GH            | MySpell en_GH Dictionary                          | package
+  | myspell-en_IE            | MySpell en_IE Dictionary                          | package
+  | myspell-en_IN            | MySpell en_IN Dictionary                          | package
+  | myspell-en_JM            | MySpell en_JM Dictionary                          | package
+  | myspell-en_MW            | MySpell en_MW Dictionary                          | package
+  | myspell-en_NA            | MySpell en_NA Dictionary                          | package
+  | myspell-en_NZ            | MySpell en_NZ Dictionary                          | package
+  | myspell-en_PH            | MySpell en_PH Dictionary                          | package
+  | myspell-en_TT            | MySpell en_TT Dictionary                          | package
+  | myspell-en_US            | MySpell en_US Dictionary                          | package
+  | myspell-en_ZA            | MySpell en_ZA Dictionary                          | package
+  | myspell-en_ZW            | MySpell en_ZW Dictionary                          | package
+  | myspell-es               | MySpell es Dictionary                             | package
+  | myspell-es_AR            | MySpell es_AR Dictionary                          | package
+  | myspell-es_BO            | MySpell es_BO Dictionary                          | package
+  | myspell-es_CL            | MySpell es_CL Dictionary                          | package
+  | myspell-es_CO            | MySpell es_CO Dictionary                          | package
+  | myspell-es_CR            | MySpell es_CR Dictionary                          | package
+  | myspell-es_CU            | MySpell es_CU Dictionary                          | package
+  | myspell-es_DO            | MySpell es_DO Dictionary                          | package
+  | myspell-es_EC            | MySpell es_EC Dictionary                          | package
+  | myspell-es_ES            | MySpell es_ES Dictionary                          | package
+  | myspell-es_GT            | MySpell es_GT Dictionary                          | package
+  | myspell-es_HN            | MySpell es_HN Dictionary                          | package
+  | myspell-es_MX            | MySpell es_MX Dictionary                          | package
+  | myspell-es_NI            | MySpell es_NI Dictionary                          | package
+  | myspell-es_PA            | MySpell es_PA Dictionary                          | package
+  | myspell-es_PE            | MySpell es_PE Dictionary                          | package
+  | myspell-es_PR            | MySpell es_PR Dictionary                          | package
+  | myspell-es_PY            | MySpell es_PY Dictionary                          | package
+  | myspell-es_SV            | MySpell es_SV Dictionary                          | package
+  | myspell-es_UY            | MySpell es_UY Dictionary                          | package
+  | myspell-es_VE            | MySpell es_VE Dictionary                          | package
+  | myspell-et_EE            | MySpell et_EE Dictionary                          | package
+  | myspell-fr_BE            | MySpell fr_BE Dictionary                          | package
+  | myspell-fr_CA            | MySpell fr_CA Dictionary                          | package
+  | myspell-fr_CH            | MySpell fr_CH Dictionary                          | package
+  | myspell-fr_FR            | MySpell fr_FR Dictionary                          | package
+  | myspell-fr_LU            | MySpell fr_LU Dictionary                          | package
+  | myspell-fr_MC            | MySpell fr_MC Dictionary                          | package
+  | myspell-gd_GB            | MySpell gd_GB Dictionary                          | package
+  | myspell-german-old       | Old German Dictionary for MySpell                 | package
+  | myspell-gl               | MySpell gl Dictionary                             | package
+  | myspell-gl_ES            | MySpell gl_ES Dictionary                          | package
+  | myspell-gu_IN            | MySpell gu_IN Dictionary                          | package
+  | myspell-gug              | MySpell gug Dictionary                            | package
+  | myspell-gug_PY           | MySpell gug_PY Dictionary                         | package
+  | myspell-he_IL            | MySpell he_IL Dictionary                          | package
+  | myspell-hi_IN            | MySpell hi_IN Dictionary                          | package
+  | myspell-hr_HR            | MySpell hr_HR Dictionary                          | package
+  | myspell-hu_HU            | MySpell hu_HU Dictionary                          | package
+  | myspell-id               | MySpell id Dictionary                             | package
+  | myspell-id_ID            | MySpell id_ID Dictionary                          | package
+  | myspell-is               | MySpell is Dictionary                             | package
+  | myspell-is_IS            | MySpell is_IS Dictionary                          | package
+  | myspell-it_IT            | MySpell it_IT Dictionary                          | package
+  | myspell-kmr_Latn         | MySpell kmr_Latn Dictionary                       | package
+  | myspell-kmr_Latn_SY      | MySpell kmr_Latn_SY Dictionary                    | package
+  | myspell-kmr_Latn_TR      | MySpell kmr_Latn_TR Dictionary                    | package
+  | myspell-lightproof-en    | Lightproof for en                                 | package
+  | myspell-lightproof-hu_HU | Lightproof for hu_HU                              | package
+  | myspell-lightproof-pt_BR | Lightproof for pt_BR                              | package
+  | myspell-lightproof-ru_RU | Lightproof for ru_RU                              | package
+  | myspell-lo_LA            | MySpell lo_LA Dictionary                          | package
+  | myspell-lt_LT            | MySpell lt_LT Dictionary                          | package
+  | myspell-lv_LV            | MySpell lv_LV Dictionary                          | package
+  | myspell-nb_NO            | MySpell nb_NO Dictionary                          | package
+  | myspell-ne_NP            | MySpell ne_NP Dictionary                          | package
+  | myspell-nl_BE            | MySpell nl_BE Dictionary                          | package
+  | myspell-nl_NL            | MySpell nl_NL Dictionary                          | package
+  | myspell-nn_NO            | MySpell nn_NO Dictionary                          | package
+  | myspell-no               | MySpell no Dictionary                             | package
+  | myspell-oc_FR            | MySpell oc_FR Dictionary                          | package
+  | myspell-pl_PL            | MySpell pl_PL Dictionary                          | package
+  | myspell-pt_AO            | MySpell pt_AO Dictionary                          | package
+  | myspell-pt_BR            | MySpell pt_BR Dictionary                          | package
+  | myspell-pt_PT            | MySpell pt_PT Dictionary                          | package
+  | myspell-ro               | MySpell ro Dictionary                             | package
+  | myspell-ro_RO            | MySpell ro_RO Dictionary                          | package
+  | myspell-ru_RU            | MySpell ru_RU Dictionary                          | package
+  | myspell-si_LK            | MySpell si_LK Dictionary                          | package
+  | myspell-sk_SK            | MySpell sk_SK Dictionary                          | package
+  | myspell-sl_SI            | MySpell sl_SI Dictionary                          | package
+  | myspell-sq_AL            | MySpell sq_AL Dictionary                          | package
+  | myspell-sr               | MySpell sr Dictionary                             | package
+  | myspell-sr_CS            | MySpell sr_CS Dictionary                          | package
+  | myspell-sr_Latn_CS       | MySpell sr_Latn_CS Dictionary                     | package
+  | myspell-sr_Latn_RS       | MySpell sr_Latn_RS Dictionary                     | package
+  | myspell-sr_RS            | MySpell sr_RS Dictionary                          | package
+  | myspell-sv_FI            | MySpell sv_FI Dictionary                          | package
+  | myspell-sv_SE            | MySpell sv_SE Dictionary                          | package
+  | myspell-sw_TZ            | MySpell sw_TZ Dictionary                          | package
+  | myspell-te               | MySpell te Dictionary                             | package
+  | myspell-te_IN            | MySpell te_IN Dictionary                          | package
+  | myspell-th_TH            | MySpell th_TH Dictionary                          | package
+  | myspell-tr               | MySpell tr Dictionary                             | package
+  | myspell-tr_TR            | MySpell tr_TR Dictionary                          | package
+  | myspell-uk_UA            | MySpell uk_UA Dictionary                          | package
+  | myspell-vi               | MySpell vi Dictionary                             | package
+  | myspell-vi_VN            | MySpell vi_VN Dictionary                          | package
+  | myspell-zu_ZA            | MySpell zu_ZA Dictionary                          | package

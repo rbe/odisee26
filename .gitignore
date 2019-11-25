@@ -3,6 +3,9 @@ src/main/test/resources/var/deploy/
 src/main/test/resources/var/document/
 src/main/test/resources/var/tmp/
 
+# Docker
+.env
+
 # Gradle
 .gradle
 build/
