@@ -266,7 +266,7 @@ ext {
     dockerTag = "odisee/${project.name}:${project.version}".toLowerCase()
     dockerBuildDir = mkdir("${buildDir}/docker/odisee")
 }
-task prepareOdiseeDocker(type: Copy, dependsOn: assemble) {
+task prepareOdiseeDocker(type: Copy, dependsOn: bootJar) {
     group = 'Odisee'
     description = 'Copy files from src/main/docker/odisee and application jar to Docker temporal build directory'
     from 'src/main/docker'
@@ -293,3 +293,5 @@ task buildOdiseeImage(type: DockerBuildImage, dependsOn: prepareOdiseeDocker) {
     inputDir = file(dockerBuildDir)
     images.add(dockerTag)
 }
+
+//assemble.dependsOn('buildOdiseeImage')

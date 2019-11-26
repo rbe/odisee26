@@ -10,9 +10,7 @@ buildscript {
 plugins {
 }
 
-group 'org.odisee'
-version '2.6'
-
+apply plugin: 'base'
 apply plugin: 'com.bmuschko.docker-remote-api'
 
 import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
@@ -20,10 +18,11 @@ import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 ext {
     dockerBuildDir = mkdir("${buildDir}/docker")
 }
-task clean(type: Delete) {
-    group 'build'
+task cleanDocker(type: Delete) {
+    group 'Odisee'
     delete dockerBuildDir
 }
+clean.dependsOn('cleanDocker')
 
 // ArchLinux LibreOffice
 def archLinuxVersion = '20191105-still'
@@ -58,7 +57,7 @@ ext {
     dockerTag = "odisee/opensuse-libreoffice:${openSuseVersion}".toLowerCase()
     dockerBuildDir = mkdir("${buildDir}/docker/opensuse-libreoffice")
 }
-task prepareOpenSUSELibreOfficeDocker(type: Copy) {
+task prepareOpenSuseLibreOfficeDocker(type: Copy) {
     group = 'Odisee'
     description = 'Copy files for openSUSE-LibreOffice to Docker temporal build directory'
     copy {
@@ -72,7 +71,7 @@ task prepareOpenSUSELibreOfficeDocker(type: Copy) {
         }
     }
 }
-task buildOpenSUSELibreOfficeImage(type: DockerBuildImage, dependsOn: prepareArchLinuxLibreOfficeDocker) {
+task buildOpenSuseLibreOfficeImage(type: DockerBuildImage, dependsOn: prepareOpenSuseLibreOfficeDocker) {
     group = 'Odisee'
     description = 'Create Docker image for openSUSE-LibreOffice'
     inputDir = file(dockerBuildDir)
@@ -82,5 +81,7 @@ task buildOpenSUSELibreOfficeImage(type: DockerBuildImage, dependsOn: prepareArc
 task buildAllDockerImages() {
     group = 'Odisee'
     dependsOn buildArchLinuxLibreOfficeImage
-    dependsOn buildOpenSUSELibreOfficeImage
+    dependsOn buildOpenSuseLibreOfficeImage
 }
+
+assemble.dependsOn('buildArchLinuxLibreOfficeImage')
