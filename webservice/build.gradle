@@ -253,7 +253,7 @@ task downloadAndUnpackLibreOffice {
         }
     }
 }
-compileJava.dependsOn += 'downloadAndUnpackLibreOffice'
+compileJava.dependsOn('downloadAndUnpackLibreOffice')
 
 //
 // Docker
@@ -294,4 +294,4 @@ task buildOdiseeImage(type: DockerBuildImage, dependsOn: prepareOdiseeDocker) {
     images.add(dockerTag)
 }
 
-//assemble.dependsOn('buildOdiseeImage')
+assemble.dependsOn('buildOdiseeImage')

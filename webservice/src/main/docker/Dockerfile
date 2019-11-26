@@ -1,4 +1,4 @@
-FROM odisee/archlinux-libreoffice:still AS base
+FROM odisee/archlinux-libreoffice:20191105-still AS base
 
 LABEL maintainer="Ralf Bensmann <ralf@art-of-coding.eu>"
 LABEL vendor="Art of Coding UG"
@@ -13,7 +13,7 @@ ENV ODISEE_HOME=/home/odisee
 RUN groupadd odisee \
     && useradd -g odisee -m -d ${ODISEE_HOME} -s /bin/bash odisee
 
-COPY webservice-*.jar ${ODISEE_HOME}/application.jar
+COPY webservice*.jar ${ODISEE_HOME}/application.jar
 
 WORKDIR ${ODISEE_HOME}
 RUN mkdir var \
