@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Toolbar" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Toolbar
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; A com.sun.star.ui.ItemDescriptor is an array of property values. This example
+&apos; does not set all supported  values, such as &quot;Style&quot;, which uses values 
+&apos; from com.sun.star.ui.ItemStyle. For menu items, the &quot;ItemDescriptorContainer&quot;
+&apos; is usually set as well.
+&apos;
+Function createSimpleToolbarItem(command$, label$) as Variant
+	&apos;
+	Dim oItem(3) As New com.sun.star.beans.PropertyValue
+	&apos;
+	oItem(0).Name = &quot;CommandURL&quot;
+	oItem(0).Value = command
+	&apos;
+	oItem(1).Name = &quot;Label&quot;
+	oItem(1).Value = label
+	&apos;
+	oItem(2).Name = &quot;Type&quot;
+	oItem(2).Value = com.sun.star.ui.ItemType.DEFAULT
+	&apos;
+	oItem(3).Name = &quot;Visible&quot;
+	oItem(3).Value = True
+	&apos;
+	createSimpleToolbarItem() = oItem()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function createToolbarItem(command$, label$) As Variant
+	Dim aToolbarItem(3) As New com.sun.star.beans.PropertyValue
+	&apos;
+	aToolbarItem(0).Name = &quot;CommandURL&quot;
+	aToolbarItem(0).Value = command
+	&apos;
+	aToolbarItem(1).Name = &quot;Label&quot;
+	aToolbarItem(1).Value = label
+	&apos;
+	aToolbarItem(2).Name = &quot;Type&quot;
+	aToolbarItem(2).Value = com.sun.star.ui.ItemType.DEFAULT
+	&apos;
+	aToolbarItem(3).Name = &quot;Visible&quot;
+	aToolbarItem(3).Value = True
+	&apos;
+	createToolbarItem() = aToolbarItem()
+End Function
+
+&apos;
+&apos; This example creates a new basic macro toolbar button on 
+&apos; the Writer standard bar. It doesn&apos;t add the button twice. 
+&apos; It uses the Writer image manager to set an external image 
+&apos; for the macro toolbar button.
+&apos;
+Sub addButtonToToolbar 
+	&apos; Retrieve the module configuration manager from the
+	&apos; central module configuration manager supplier
+	Dim sSupplier$ : sSupplier = &quot;com.sun.star.ui.ModuleUIConfigurationManagerSupplier&quot;
+	Dim oSupplier As Object : oSupplier = getProcessServiceManager().createInstance(sSupplier)
+	&apos; Retrieve the module configuration manager with module identifier
+	&apos; See com.sun.star.frame.ModuleManager for more information
+	Dim sDocType$ : sDocType = &quot;com.sun.star.text.TextDocument&quot;
+	Dim oModuleCfgMgr As Object : oModuleCfgMgr = oSupplier.getUIConfigurationManager(sDocType)
+	Dim oImageMgr : oImageMgr = oModuleCfgMgr.getImageManager()
+	&apos;
+	Dim sToolbar$ : sToolbar = &quot;private:resource/toolbar/standardbar&quot;
+	Dim oToolbarSettings As Object : oToolbarSettings = oModuleCfgMgr.getSettings(sToolbar, True)
+	&apos; Look for our button with the CommandURL property.
+	Dim bHasButton As Boolean : bHasButton = False
+	Dim nCount% : nCount = oToolbarSettings.getCount()
+	Dim sCmdID$ : sCmdID = &quot;macro:///Standard.Module1.Test()&quot;
+	Dim oToolbarButton()
+	Dim i%, j%, nToolbarButtonCount%
+	For i = 0 To nCount - 1
+		oToolbarButton() = oToolbarSettings.getByIndex(i)
+		nToolbarButtonCount = ubound(oToolbarButton())
+		For j = 0 To nToolbarButtonCount
+			If oToolbarButton(j).Name = &quot;CommandURL&quot; Then
+				If oToolbarButton(j).Value = sCmdID Then 
+					bHasButton = True 
+				End If 
+			End If 
+		Next
+	Next
+	&apos; Add button
+	Dim oImageCmds(0)
+	Dim oImages(0)
+	Dim oImage As Object
+	&apos; Check if image has already been added
+	If Not oImageMgr.hasImage(0, sCmdID) Then
+		&apos; Try to load the image from the file URL
+		oImage = getImageFromURL(&quot;file:///tmp/test.bmp&quot;)
+		If Not isNull(oImage) Then
+			&apos; Insert new image into the Writer image manager
+			oImageCmds(0) = sCmdID
+			oImages(0) = oImage
+			oImageMgr.insertImages(0, oImageCmds(), oImages())
+		End If
+	End If
+	&apos;
+	If Not bHasButton Then
+		oToolbarItem = createToolbarItem(sCmdID, &quot;Standard.Module1.Test&quot;)
+		oToolbarSettings.insertByIndex(nCount, oToolbarItem)
+		oModuleCfgMgr.replaceSettings(sToolbar, oToolbarSettings)
+	End If
+End Sub
+
+&apos;
+&apos;
+&apos;
+Function removeToolbar(docType$, toolbarUrl$) As Boolean
+	&apos; Retrieve the module configuration manager from the central module configuration manager supplier
+	&apos; ModuleUIConfigurationManagerSupplier
+	Dim sSupplier$ : sSupplier = &quot;com.sun.star.ui.ModuleUIConfigurationManagerSupplier&quot;
+	Dim oSupplier As Object : oSupplier = getProcessServiceManager().createInstance(sSupplier)
+	&apos; Retrieve the module configuration manager with module identifier
+	&apos; See com.sun.star.frame.ModuleManager for more information.
+	Dim oModuleCfgMgr As Object : oModuleCfgMgr = oSupplier.getUIConfigurationManager(docType)
+	&apos; To remove a toolbar, you can use something like the following:
+	If oModuleCfgMgr.hasSettings(toolbarURL) Then
+		oModuleCfgMgr.removeSettings(toolbarURL)
+	End If
+	removeToolbar() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Sub createBasicIDEToolbar
+	&apos; Name of the custom toolbar; must start with &quot;custom_&quot;.
+	&apos; URL of the custom toolbar.
+	Dim sToolbarURL$ : sToolbarURL = &quot;private:resource/toolbar/custom_test2&quot;
+	&apos; Retrieve the module configuration manager from the central module configuration manager supplier
+	&apos; ModuleUIConfigurationManagerSupplier
+	Dim sSupplier$ : sSupplier = &quot;com.sun.star.ui.ModuleUIConfigurationManagerSupplier&quot;
+	Dim oSupplier As Object : oSupplier = getProcessServiceManager().createInstance(sSupplier)
+	&apos; Component type that will containt the toolbar.
+	&apos; Specify the document type associated with this toolbar.
+	Dim sDocType$ : sDocType = &quot;com.sun.star.script.BasicIDE&quot;
+	&apos; Retrieve the module configuration manager with module identifier
+	&apos; See com.sun.star.frame.ModuleManager for more information.
+	Dim oModuleCfgMgr As Object : oModuleCfgMgr = oSupplier.getUIConfigurationManager(sDocType)
+	&apos; Create a settings container to define the structure of the custom toolbar.
+	Dim oTBSettings As Object : oTBSettings = oModuleCfgMgr.createSettings()
+	&apos;Set a title for our new custom toolbar
+	oTBSettings.UIName = &quot;My little custom toolbar2&quot;
+	&apos; Create a button for our new custom toolbar
+	&apos; Command for a single toolbar button.
+	Dim sCmdID$ : sCmdID = &quot;macro:///Odisee.Test.test()&quot;
+	&apos; Label for a single toolbar button.
+	Dim sCmdLable : sCmdLable = &quot;Test2&quot;
+	&apos; Single toolbar button.
+	Dim oToolbarItem As Object : oToolbarItem = createSimpleToolbarItem(sCmdID, sCmdLable)
+	&apos;
+	Dim nCount% : nCount = 0
+	oTBSettings.insertByIndex(nCount, oToolbarItem)
+	&apos; To add a second item, increment nCount, create a new toolbar item, and insert it.
+	&apos; Set the settings for our new custom toolbar. (replace/insert)
+	If (oModuleCfgMgr.hasSettings(sToolbarURL)) Then
+		oModuleCfgMgr.replaceSettings(sToolbarURL, oTBSettings)
+	Else
+		oModuleCfgMgr.insertSettings(sToolbarURL, oTBSettings)
+	End If
+End Sub
+
+&apos;
+&apos; Array of OOo toolbar URLs
+&apos;
+Function getStandardToolbarNames() As Array
+	getStandardToolbarNames() = Array( _
+		&quot;private:resource/toolbar/alignmentbar&quot;, _
+		&quot;private:resource/toolbar/arrowshapes&quot;, _
+		&quot;private:resource/toolbar/basicshapes&quot;, _
+		&quot;private:resource/toolbar/bezierobjectbar&quot;, _
+		&quot;private:resource/toolbar/calloutshapes&quot;, _
+		&quot;private:resource/toolbar/colorbar&quot;, _
+		&quot;private:resource/toolbar/drawbar&quot;, _
+		&quot;private:resource/toolbar/drawingobjectbar&quot;, _
+		&quot;private:resource/toolbar/drawtextobjectbar&quot;, _
+		&quot;private:resource/toolbar/extrusionobjectbar&quot;, _
+		&quot;private:resource/toolbar/flowchartshapes&quot;, _
+		&quot;private:resource/toolbar/fontworkobjectbar&quot;, _
+		&quot;private:resource/toolbar/fontworkshapetype&quot;, _
+		&quot;private:resource/toolbar/formcontrols&quot;, _
+		&quot;private:resource/toolbar/formdesign&quot;, _
+		&quot;private:resource/toolbar/formsfilterbar&quot;, _
+		&quot;private:resource/toolbar/formsnavigationbar&quot;, _
+		&quot;private:resource/toolbar/formtextobjectbar&quot;, _
+		&quot;private:resource/toolbar/frameobjectbar&quot;, _
+		&quot;private:resource/toolbar/fullscreenbar&quot;, _
+		&quot;private:resource/toolbar/graffilterbar&quot;, _
+		&quot;private:resource/toolbar/graphicobjectbar&quot;, _
+		&quot;private:resource/toolbar/insertbar&quot;, _
+		&quot;private:resource/toolbar/insertobjectbar&quot;, _
+		&quot;private:resource/toolbar/mediaobjectbar&quot;, _
+		&quot;private:resource/toolbar/moreformcontrols&quot;, _
+		&quot;private:resource/toolbar/numobjectbar&quot;, _
+		&quot;private:resource/toolbar/oleobjectbar&quot;, _
+		&quot;private:resource/toolbar/optimizetablebar&quot;, _
+		&quot;private:resource/toolbar/previewobjectbar&quot;, _
+		&quot;private:resource/toolbar/standardbar&quot;, _
+		&quot;private:resource/toolbar/starshapes&quot;, _
+		&quot;private:resource/toolbar/symbolshapes&quot;, _
+		&quot;private:resource/toolbar/tableobjectbar&quot;, _
+		&quot;private:resource/toolbar/textobjectbar&quot;, _
+		&quot;private:resource/toolbar/toolbar&quot;, _
+		&quot;private:resource/toolbar/viewerbar&quot;, _
+		&quot;private:resource/menubar/menubar&quot; _
+	)
+End Function
+
+</script:module>

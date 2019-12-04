@@ -18,11 +18,7 @@ import java.nio.file.Paths
 
 class StorageService {
 
-    /**
-     * The scope. See http://www.grails.org/Services.
-     * prototype request flash flow conversation session singleton
-     */
-    def scope = 'prototype'
+    static scope = 'singleton'
 
     /**
      * Create a document with 'name' from path. If the document does not exist, revision 1 is created
@@ -64,7 +60,7 @@ class StorageService {
             document.bytes = arg.bytes
             document
         } else {
-            log.error 'Odisee: Failed to create instance of Document, got no bytes'
+            log.error 'Failed to create instance of Document, got no bytes'
             null
         }
     }

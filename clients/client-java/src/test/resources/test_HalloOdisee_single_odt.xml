@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odisee>
+    <request name="HalloOdisee">
+        <!-- Odisee server group, fixed value is group0 -->
+        <ooo group="group0"/>
+        <!-- Template: name and desired output format -->
+        <template name="HalloOdisee" outputFormat="odt"/>
+        <!-- Archive generated files? Useful for debugging -->
+        <archive files="false"/>
+        <!-- Instructions executed against the template, order does matter! -->
+        <instructions>
+            <!-- Set userfield 'Hallo' -->
+            <userfield name="Hallo">art of coding UG (haftungsbeschränkt)</userfield>
+            <!-- Set table cell 'A4' in table 'Tabelle1' -->
+            <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+        </instructions>
+    </request>
+</odisee>

@@ -1,18 +1,21 @@
 # Odisee
-src/main/test/resources/var/deploy/
-src/main/test/resources/var/document/
-src/main/test/resources/var/tmp/
+webservice/src/main/docker/var/deploy/**
+webservice/src/main/docker/var/document/**
+webservice/src/main/docker/var/tmp/
+clients/client-vbnet/src/.vs/
+clients/client-vbnet/src/vb/OdiseeClient/bin/
+clients/client-vbnet/src/vb/OdiseeClient/obj/
 
 # Docker
 .env
 
 # Gradle
-.gradle
+.gradle/
 build/
 out/
 
 # IntelliJ IDEA
-.idea
+.idea/
 *.iml
 *.ipr
 *.iws
@@ -21,6 +24,9 @@ out/
 .project
 .settings
 .classpath
+
+# Visual Studio
+*.suo
 
 # macOS
 .DS_Store

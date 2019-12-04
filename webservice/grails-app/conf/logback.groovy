@@ -12,13 +12,11 @@ conversionRule 'wex', WhitespaceThrowableProxyConverter
 appender('STDOUT', ConsoleAppender) {
     encoder(PatternLayoutEncoder) {
         charset = StandardCharsets.UTF_8
-
-        pattern =
-                '%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} ' + // Date
-                        '%clr(%5p) ' + // Log level
-                        '%clr(---){faint} %clr([%15.15t]){faint} ' + // Thread
-                        '%clr(%-40.40logger{39}){cyan} %clr(:){faint} ' + // Logger
-                        '%m%n%wex' // Message
+        pattern = '%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} ' + // Date
+                '%clr(%5p) ' + // Log level
+                '%clr(---){faint} %clr([%15.15t]){faint} ' + // Thread
+                '%clr(%-40.40logger{39}){cyan} %clr(:){faint} ' + // Logger
+                '%m%n%wex' // Message
     }
 }
 
@@ -34,4 +32,6 @@ if (Environment.isDevelopmentMode() && targetDir != null) {
     }
     logger("StackTrace", ERROR, ['FULL_STACKTRACE'], false)
 }
-root(ERROR, ['STDOUT'])
+
+root(INFO, ['STDOUT'])
+logger('org.odisee', DEBUG, ['STDOUT'], false)

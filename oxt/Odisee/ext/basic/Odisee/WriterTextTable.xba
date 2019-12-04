@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterTextTable" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterTextTable
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Do a search and replace in a text table.
+&apos;
+&apos; @param oDoc Document to work with.
+&apos; @param strSearch The text to search for.
+&apos; @param strReplace The test to replace with.
+&apos; @param tableName The text table to search in.
+&apos; @param rowIdx Optional; in which row should text be replaced?
+&apos;
+Function rangeReplace(oDoc As Object, strSearch$, strReplace$, tableName$, Optional rowIdx%) As com.sun.star.text.XTextTable
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		Dim i%
+		&apos; In which cells should we replace text?
+		Dim cellsToReplace() As String
+		&apos; All or in a certain row?
+		If IsMissing(rowIdx) Then
+			cellsToReplace() = oTable.CellNames
+		Else
+			&apos; Build array with all cells in a row
+			Dim maxColIdx% : maxColIdx = oTable.Columns.Count - 1
+			ReDim cellsToReplace(maxColIdx) As String
+			For i = 0 To maxColIdx
+				cellsToReplace(i) = Chr(65 + i) &amp; CStr(rowIdx)
+			Next
+		End If
+		&apos; Replace text in cells
+		Dim oCell As Object, cellText$
+		For i = LBound(cellsToReplace()) To UBound(cellsToReplace())
+			oCell = oTable.getCellByName(cellsToReplace(i))
+			If Not IsNull(oCell) Then
+				&apos; Get cell content
+				&apos; THIS COULD BE ANOTHER TABLE/CELL!
+				cellText = oCell.Text.String
+				If InStr(cellText, strSearch) Then
+					&apos; Replace text
+					oCell.Text.String = Odisee.Basic.replace(cellText, strSearch, strReplace)
+				End If
+			End If
+		Next
+		&apos;
+		rangeReplace() = oTable
+	End If
+End Function
+
+&apos;
+&apos; Duplicate a row in a text table.
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos; @param rowIdx Index of row; 0-based.
+&apos;
+Function duplicateRow(oDoc As Object, tableName$, rowIdx%) As com.sun.star.text.XTextTable
+	&apos; Get table
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	&apos; Find table...
+	If Not IsNull(oTable) Then
+		&apos; Copy row to clipboard
+		copyTableRowToClipboard(oDoc, tableName, rowIdx)
+		&apos; Extend table
+		oTable.Rows.insertByIndex(oTable.Rows.Count, 1)
+		&apos; Paste row
+		pasteTableRowFromClipboard(oDoc, tableName, rowIdx + 1)
+		&apos;
+		duplicateRow() = oTable
+	End If
+End Function
+
+&apos;
+&apos; Paste a row of a text table from the clipboard, copied before through copyTableRowToClipboard().
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos; @param rowIdx Index of row; 0-based.
+&apos;
+Function pasteTableRowFromClipboard(oDoc As Object, tableName$, Optional rowIdx%) As com.sun.star.text.XTextTable
+	&apos; Get table
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	&apos; Find table...
+	If Not IsNull(oTable) Then
+		&apos;
+		If IsMissing(rowIdx) Then
+			rowIdx = oTable.Rows.Count
+		End If
+		&apos; Get view cursor
+		Dim oViewCur As Object : oViewCur = oDoc.CurrentController.ViewCursor
+		&apos; Position view cursor in new row, first column
+		Dim oNewCell As Object : oNewCell = oTable.getCellByName(&quot;A&quot; + CStr(rowIdx))
+		Dim oNewCellTextCur As Object : oNewCellTextCur = oNewCell.createTextCursor()
+		oViewCur.gotoRange(oNewCellTextCur, False)
+		&apos; Extend view cursor to end of row, selecting contents
+		oViewCur.gotoEnd(True)
+		&apos;&apos;oDoc.CurrentController.Frame.ContainerWindow.SetFocus()
+		&apos; Paste from clipboard
+		Dim oDispatcher As Object : oDispatcher = getProcessServiceManager().createInstance(&quot;com.sun.star.frame.DispatchHelper&quot;)
+		oDispatcher.executeDispatch(oDoc.CurrentController.Frame, &quot;.uno:Paste&quot;, &quot;&quot;, 0, array())
+		&apos;
+		oViewCur.gotoEnd(False)
+		&apos;
+		pasteTableRowFromClipboard() = oTable
+	End If
+End Function
+
+&apos;
+&apos; Copy a row of a text table to the clipboard.
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos; @param rowIdx Index of row; 0-based.
+&apos;
+Function copyTableRowToClipboard(oDoc As Object, tableName$, rowIdx%) As com.sun.star.text.XTextTable
+	&apos; Find table...
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		Dim rowNum% : rowNum = rowIdx + 1
+		&apos; Create cursor by name of cell; XTextTableCursor
+		Dim oCellCur As Object : oCellCur = oTable.createCursorByCellName(&quot;A&quot; &amp; CStr(rowNum))
+		&apos; Move cursor to the last cell in the table
+		Dim lastCell$ : lastCell = Chr(65 + oTable.Columns.Count - 1) &amp; CStr(rowNum)
+		oCellCur.gotoCellByName(lastCell, True)
+		&apos; Create the cell range using the table cursor
+		Dim oCellRange As Object : oCellRange = oTable.getCellRangeByName(oCellCur.RangeName)
+		&apos; Select the cell range constructed above; XSelectionSupplier
+		Dim selected As Boolean : selected = oDoc.CurrentController.select(oCellRange)
+		&apos; Copy to clipboard
+		Dim oDispatcher As Object : oDispatcher = getProcessServiceManager().createInstance(&quot;com.sun.star.frame.DispatchHelper&quot;)
+		oDispatcher.executeDispatch(oDoc.CurrentController.Frame, &quot;.uno:Copy&quot;, &quot;&quot;, 0, array())
+		&apos;
+		copyTableRowToClipboard() = oTable
+	End If
+End Function
+
+&apos;
+&apos; Copy a row of a text table to the clipboard.
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos; @param rowIdx Index of row; 0-based.
+&apos;
+Function copyTableRowToClipboard_1(oDoc As Object, tableName$, rowIdx%) As com.sun.star.text.XTextTable
+	&apos; Find table...
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		&apos; Number of columns
+		Dim oCellCount% : oCellCount = oTable.Columns.Count
+		&apos; Get view cursor
+		Dim oViewCur As Object : oViewCur = oDoc.CurrentController.ViewCursor
+		&apos; Position view cursor in first column of row
+		Dim oFirstCell As Object : oFirstCell = oTable.getCellByName(&quot;A&quot; + CStr(rowIdx))
+		Dim oFirstCellTextCur As Object : oFirstCellTextCur = oFirstCell.createTextCursor()
+		oViewCur.gotoRange(oFirstCellTextCur, False)
+		&apos;&apos;oDoc.CurrentController.Frame.ContainerWindow.SetFocus()
+		&apos; Extend view cursor to end of row, selecting contents
+		Dim i%
+		For i = 0 To oCellCount - 1
+			oViewCur.goRight(oCellCount, True)
+		Next
+		oViewCur.gotoEnd(True)
+		&apos; Copy to clipboard
+		Dim oDispatcher As Object : oDispatcher = getProcessServiceManager().createInstance(&quot;com.sun.star.frame.DispatchHelper&quot;)
+		oDispatcher.executeDispatch(oDoc.CurrentController.Frame, &quot;.uno:Copy&quot;, &quot;&quot;, 0, array())
+		&apos;
+		copyTableRowToClipboard_1() = oTable
+	End If
+End Function
+
+&apos;
+&apos; Change a table depending on values of userfields in its cells.
+&apos; @param oDoc Document
+&apos; @param tableName Name of TextTable to work on
+&apos; @param removeEntireRow Array with userfields, the entire row is removed, when the userfield contains its name as value or is empty
+&apos;
+Sub removeRows(oDoc As Object, tableName$, removeEntireRow() As String)
+	GlobalScope.BasicLibraries.loadLibrary(&quot;Tools&quot;)
+	&apos; Find table...
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		&apos; Remember rows that should be removed
+		Dim rowsToRemove() As String, rowIdx%, nextIdx%
+		&apos; Walk through all cells
+		Dim i%, cellNameIdx%
+		Dim oCell As Object, oCellStr$
+		Dim cellNames() : cellNames() = oTable.CellNames
+		For cellNameIdx = LBound(cellNames()) To UBound(cellNames())
+			oCell = Odisee.WriterTextTable.getCellByName(oTable, cellNames(cellNameIdx))
+			If Not IsNull(oCell) Then
+				&apos; Remove entire row?
+				For i = LBound(removeEntireRow()) To UBound(removeEntireRow())
+					&apos;
+					If oCell.String = removeEntireRow(i) Or oCell.String = &quot;{&quot; &amp; removeEntireRow(i) &amp; &quot;}&quot; Then
+						&apos; Remember row to remove
+						nextIdx = UBound(rowsToRemove()) - LBound(rowsToRemove()) + 1
+						ReDim Preserve rowsToRemove(nextIdx)
+						rowsToRemove(nextIdx) = cellNames(cellNameIdx)
+						Exit For
+					End If
+				Next
+			End If
+		Next
+		&apos; Remove rows
+		Dim subtract% : subtract = 0
+		Dim rowNum%
+		For rowIdx = LBound(rowsToRemove()) To UBound(rowsToRemove())
+			&apos; Get row number: remove column from coordinate
+			rowNum = Odisee.WriterTextTable.getRowIndexFromCoordinate(rowsToRemove(rowIdx))
+			&apos; Remove row and take care of changing row index
+			oTable.Rows.removeByIndex(rowNum - subtract, 1)
+			subtract = subtract + 1
+		Next
+	End If
+End Sub
+
+&apos;
+&apos;
+&apos;
+Function getRowIndexFromCoordinate(coord$) As Integer
+	Dim temp$, c$, ci%, chars$ : chars = &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;
+	temp = coord
+	For ci = 1 To Len(chars)
+		c = Mid(chars, ci, 1)
+		temp = Tools.Strings.DeleteStr(temp, c)
+	Next
+	getRowIndexFromCoordinate() = CInt(temp) - 1
+End Function
+
+&apos;
+&apos; Call removeRows() for all tables.
+&apos; @param oDoc Document
+&apos; @param removeEntireRow Array with userfields, the entire row is removed, when the userfield contains its name as value or is empty
+&apos;
+Sub removeRowsInAllTables(oDoc As Object, removeEntireRow() As String)
+	&apos; Table count
+	Dim ttCount% : ttCount = oDoc.TextTables.Count - 1
+	Dim i%, tableName$
+	For i = 0 To ttCount
+		tableName = oDoc.TextTables.getByIndex(i).Name
+		Odisee.WriterTextTable.removeRows(oDoc, tableName, removeEntireRow())
+		&apos; Refresh table count as tables can disappear when they get empty
+		&apos;&apos;MsgBox CStr(oDoc.TextTables.Count - 1) &amp; &quot; == &quot; &amp; CStr(ttCount)
+		ttCount = oDoc.TextTables.Count - 1
+	Next
+End Sub
+
+&apos;
+&apos; Change a table depending on values of userfields in its cells.
+&apos; @param coDoc Document
+&apos; @param tableName Name of TextTable to work on
+&apos; @param removeCell com.sun.star.beans.PropertySet with userfield name as .Name and a command as .Value
+&apos;
+Sub clearCells(oDoc As Object, tableName$, removeCell() As com.sun.star.beans.PropertyValue)
+	&apos; Find table...
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		&apos; Walk through all cells
+		Dim i%, cellNameIdx%
+		Dim oCell As Object, oCellStr$
+		Dim moveDirection$, moveCount%, oCellCursor As Object, rangeName$, nCell As Object
+		Dim cellNames() : cellNames() = oTable.CellNames
+		For cellNameIdx = LBound(cellNames()) To UBound(cellNames())
+			oCell = Odisee.WriterTextTable.getCellByName(oTable, cellNames(cellNameIdx))
+			If Not IsNull(oCell) Then
+				oCellStr = oCell.String
+				&apos; Remove cells?
+				For i = LBound(removeCell()) To UBound(removeCell())
+					&apos;If oCellStr = removeCell(i).Name Or oCellStr = &quot;{&quot; &amp; removeCell(i).Name &amp; &quot;}&quot; Then
+					If oCellStr = &quot;&quot; Or oCellStr = removeCell(i).Name Or oCellStr = &quot;{&quot; &amp; removeCell(i).Name &amp; &quot;}&quot; Then
+						oCell.String = &quot;&quot;
+						&apos; Get cell to modify: removeCell(i).Value is an action like &quot;L1&quot;, &quot;R1&quot;, &quot;U1&quot;, &quot;D1&quot;
+						&apos; describing how to move the cursor starting from the actual cell
+						moveDirection = Left(removeCell(i).Value, 1)
+						moveCount = Mid(removeCell(i).Value, 2)
+						oCellCursor = oTable.createCursorByCellName(cellNames(cellNameIdx)) &apos; XTextTableCursor
+						Select Case moveDirection
+							Case &quot;L&quot;: oCellCursor.goLeft(moveCount, False)
+							Case &quot;R&quot;: oCellCursor.goRight(moveCount, False)
+							Case &quot;U&quot;: oCellCursor.goUp(moveCount, False)
+							Case &quot;D&quot;: oCellCursor.goDown(moveCount, False)
+						End Select
+						&apos; Get desired cell and remove content
+						rangeName = oCellCursor.RangeName
+						nCell = Odisee.WriterTextTable.getCellByName(oTable, rangeName)
+						nCell.String = &quot;&quot;
+					End If
+				Next
+			End If
+		Next
+	End If
+End Sub
+
+&apos;
+&apos; Call clearCells() for all tables.
+&apos; @param oDoc Document
+&apos; @param removeCell com.sun.star.beans.PropertySet with userfield name as .Name and a command as .Value
+&apos;
+Sub clearCellsInAllTables(oDoc As Object, removeCell() As com.sun.star.beans.PropertyValue)
+	&apos; Table count
+	Dim ttCount% : ttCount = oDoc.TextTables.Count - 1
+	Dim i%, tableName$
+	For i = 0 To ttCount
+		If i &lt; oDoc.TextTables.Count - 1 Then
+		tableName = oDoc.TextTables.getByIndex(i).Name
+		Odisee.WriterTextTable.clearCells(oDoc, tableName, removeCell())
+		End If
+	Next
+End Sub
+
+&apos;
+&apos; Safely get a cell by checking row and column count first.
+&apos; @param oTable The text table.
+&apos; @param columnIdx Index of column.
+&apos; @param rowIdx Indoex of the row.
+&apos; @return com.sun.star.table.XCell
+&apos;
+Function getCellByPosition(oTable As com.sun.star.text.XTextTable, columnIdx%, rowIdx%) As com.sun.star.table.XCell
+	If Not IsNull(oTable) Then
+		&apos; If table has more than or equal to columns/rows get cell
+		Dim c% : c = oTable.Columns.Count - 1
+		Dim r% : r = oTable.Rows.Count - 1
+		If c &gt;= columnIdx And r &gt;= rowIdx Then
+			getCellByPosition() = oTable.getCellByPosition(columnIdx, rowIdx)
+		End If
+	End If
+End Function
+
+&apos;
+&apos; Safely get a cell by checking its coordinate first.
+&apos; @param oTable The text table.
+&apos; @param cellName Name of cell, e.g. A1.
+&apos; @return com.sun.star.table.XCell
+&apos;
+Function getCellByName(oTable As com.sun.star.text.XTextTable, cellName$) As com.sun.star.table.XCell
+	If Not IsNull(oTable) Then
+		getCellByName() = oTable.getCellByName(cellName)
+	End If
+End Function
+
+&apos;
+&apos; Get column count in a certain row. Important for dealing with split/merged cells.
+&apos;
+Function getColumnCount(oTable As com.sun.star.text.XTextTable, rowIdx%) As Integer
+	If Not IsNull(oTable) Then
+		Dim oTCS() : oTCS = oTable.Rows.getByIndex(rowIdx).TableColumnSeparators
+		If Not IsNull(oTCS()) And Not IsEmpty(oTCS()) Then
+			getColumnCount() = Odisee.Basic.aLen(oTCS)
+		Else
+			getColumnCount() = -1
+		End If
+	End If
+End Function
+
+&apos;
+&apos; Return all text table names in oDoc.Text in order of appearance.
+&apos;
+Function getTextTableNamesInOrder(oDoc As Array) As Array
+	Dim oEnum : oEnum = oDoc.Text.createEnumeration()
+	Dim obj As Object, ttable$(0), i% : i = 0
+	While oEnum.hasMoreElements()
+		obj = oEnum.nextElement()
+		If obj.supportsService(&quot;com.sun.star.text.TextTable&quot;) Then
+			ReDim Preserve ttable$(i)
+			ttable(i) = obj.Name
+			i = i + 1
+		End If
+	Wend
+	getTextTableNamesInOrder() = ttable()
+End Function
+
+&apos;
+&apos; Lookup all user fields with prefix align_&lt;tableName&gt; and set
+&apos; the width of all columns to the value of the user field (given in mm).
+&apos; E.g.: align_Table1 = L,R,C
+&apos;
+Function adjustColumnAligns(oDoc As Object) As Boolean
+	&apos; Get all text fields beginning with prefix align_
+	Dim oTextFieldMaster As Object : oTextFieldMaster = oDoc.TextFieldMasters
+	Dim elts : elts = oTextFieldMaster.ElementNames
+	Dim oField As Object, tableName$, aligns() As String
+	For i% = LBound(elts()) To UBound(elts())
+		If InStr(elts(i), &quot;align_&quot;) Then
+			&apos; Get field
+			oField = oTextFieldMaster.getByName(elts(i))
+			&apos; Break up field name for tableName
+			tableName = Mid(elts(i), InStr(elts(i), &quot;_&quot;) + 1)
+			&apos; Convert comma separated content of user field into array
+			aligns() = splitString(oField.Content, &quot;,&quot;)
+			&apos; Set column align
+			Dim where%
+			For j% = 0 To UBound(aligns())
+				Select Case aligns(j)
+					case &quot;L&quot;: adjustColumnAlign(oDoc, tableName, j, com.sun.star.style.ParagraphAdjust.LEFT)
+					case &quot;C&quot;: adjustColumnAlign(oDoc, tableName, j, com.sun.star.style.ParagraphAdjust.CENTER)
+					case &quot;R&quot;: adjustColumnAlign(oDoc, tableName, j, com.sun.star.style.ParagraphAdjust.RIGHT)
+				End Select
+			Next
+		End If
+	Next
+	adjustColumnAligns() = True
+End Function
+
+&apos;
+&apos; where = com.sun.star.style.ParagraphAdjust
+&apos;
+Function adjustColumnAlign(oDoc As Object, tableName$, columnIndex%, where%) As Boolean
+	If oDoc.TextTables.hasByName(tableName) Then
+		Dim oTable As Object : oTable = oDoc.TextTables.getByName(tableName)
+		Dim rowCount% : rowCount = oTable.Rows.Count
+		&apos; Get cell cursor; parameter columnIndex is 0-based; cell ranges are 1-based
+		Dim cellCursor : cellCursor = oTable.createCursorByCellName(Chr(65 + columnIndex) &amp; &quot;1&quot;)
+		For i% = 0 To rowCount
+			cellCursor.ParaAdjust = where
+			cellCursor.goDown(1, False)
+		Next
+		adjustColumnAlign() = True
+	Else
+		adjustColumnAlign() = False
+	End If
+End Function
+
+&apos;
+&apos; Lookup all user fields with prefix setwidth_&lt;tableName&gt; and set
+&apos; the width of all columns to the value of the user field (given in mm).
+&apos; E.g.: setwidth_Table1 = 40,20,10,5
+&apos;
+Function adjustColumnWidths(oDoc As Object) As Boolean
+	&apos; Get all text fields beginning with prefix setwidth_
+	Dim oTextFieldMaster As Object : oTextFieldMaster = oDoc.TextFieldMasters
+	Dim elts : elts = oTextFieldMaster.ElementNames
+	Dim oField As Object, tableName$
+	For i% = LBound(elts()) To UBound(elts())
+		If InStr(elts(i), &quot;setwidth_&quot;) Then
+			&apos; Get field
+			oField = oTextFieldMaster.getByName(elts(i))
+			&apos; Break up field name for tableName
+			tableName = Mid(elts(i), InStr(elts(i), &quot;_&quot;) + 1)
+			&apos; Convert comma separated content of user field into array and set column width
+			adjustColumnWidth(oDoc, tableName, splitString(oField.Content, &quot;,&quot;))
+		End If
+	Next
+	adjustColumnWidths() = True
+End Function
+
+&apos;
+&apos; Set table column to certain width (in mm).
+&apos; columnWidth = Array of Integer
+&apos;
+Function adjustColumnWidth(oDoc As Object, tableName$, columnWidth As Array) As Boolean
+	If oDoc.TextTables.hasByName(tableName) Then
+		&apos; Get table
+		Dim oTable As Object : oTable = oDoc.TextTables.getByName(tableName)
+		&apos; Get actual separator positions from table
+		Dim oTCS : oTCS = oTable.TableColumnSeparators
+		Dim position% : position = 0
+		Dim relativeWidth As Double : relativeWidth = 0.0
+		If Not IsNull(oTCS) Then
+			For i% = LBound(columnWidth()) To UBound(columnWidth())
+				&apos; Get relative width of column
+				relativeWidth = convertMmToColumnRelativeWidth(oTable, oTCS, CInt(columnWidth(i)))
+				&apos; Position of separators are absolute: add calculated relative width of column
+				position = position + relativeWidth
+				&apos; Set new width
+				oTCS(i).Position = position
+			Next
+			&apos; Write new separators back into table
+			oTable.TableColumnSeparators = oTCS
+			adjustColumnWidth() = True
+		Else
+			adjustColumnWidth() = False
+		End If
+	End If
+End Function
+
+&apos;
+&apos; Calculate mm -&gt; relative width
+&apos;
+Function convertMmToColumnRelativeWidth(oTable As com.sun.star.text.XTextTable, oTCS As Array, mm%) As Double
+	If Not IsNull(oTCS) Then
+		Dim relSum As Double : relSum = oTable.TableColumnRelativeSum
+		Dim width As Double : width = oTable.Width
+		&apos; HACK If user didn&apos;t open table /columnsettings, width == 115596!
+		If width &gt; 18000 Then
+			width = 18000
+		End If
+		Dim ratio As Double : ratio = relSum / width
+		Dim relativeWidth As Double : relativeWidth = (mm * 100) * ratio
+		convertMmToColumnRelativeWidth() = relativeWidth
+	End If
+End Function
+
+&apos;
+&apos; Insert a new table with a name
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos; @param rows Row count of new table.
+&apos; @param cols Column count of new table.
+&apos;
+Function insertTable(oDoc As Object, tableName$, rows%, cols%) As com.sun.star.text.XTextTable
+	Dim oTextTable As Object : oTextTable = oDoc.createInstance(&quot;com.sun.star.text.TextTable&quot;)
+	oTextTable.initialize(rows, cols)
+	oTextTable.setName(Odisee.Basic.Replace(tableName, &quot; &quot;, &quot;&quot;)) &apos; No spaces allowed...
+	Dim oTextCur As Object : oTextCur = oDoc.Text.createTextCursor()
+	oTextCur.gotoEnd(false)
+	oDoc.Text.insertTextContent(oTextCur, oTextTable, false)
+	insertTable() = oTextTable
+End Function
+
+&apos;
+&apos; Get last inserted table(s).
+&apos; @param oDoc The document.
+&apos; @param count Number of last tables.
+&apos;
+Function getLastTable(oDoc As Object, Optional count%) As Array &apos;com.sun.star.text.XTextTable
+	&apos; Number of tables?
+	If IsMissing(count) Then
+		count = 1
+	End If
+	&apos;
+	If oDoc.TextTables.Count &gt; 0 Then
+		&apos; Max table index
+		Dim maxTableIdx% : maxTableIdx = oDoc.TextTables.Count - 1
+		&apos; Where should we start?
+		Dim startTableIdx% : startTableIdx = oDoc.TextTables.Count - count - 1
+		&apos; Difference
+		Dim n% : n = maxTableIdx - startTableIdx
+		Dim i%, arr(n) As Object &apos;com.sun.star.text.XTextTable
+		For i = startTableIdx To maxTableIdx
+			arr(i) = oDoc.TextTables.getByIndex(i)
+		Next
+		getLastTable() = arr
+	End If
+End Function
+
+&apos;
+&apos; Get a table by name
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos;
+Function getTable(oDoc As Object, tableName$) As com.sun.star.text.XTextTable
+	If oDoc.TextTables.hasByName(tableName) Then
+		getTable() = oDoc.TextTables.getByName(tableName)
+	End If
+End Function
+
+&apos;
+&apos; Remove a row from a table.
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos; @param rowIdx Index of row to remove; 0-based.
+&apos;
+Function removeRow(oDoc As Object, tableName$, rowIdx%, Optional rowCount%) As com.sun.star.text.XTextTable
+	Dim oTable As Object : oTable = getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		&apos; Default value for rows to remove is 1
+		If IsMissing(rowCount) Then
+			rowCount = 1
+		End If
+		&apos; Remove the row if it exists
+		Dim maxRowIdx% : maxRowIdx = oTable.Rows.Count - 1
+		If maxRowIdx &gt;= rowIdx Then
+			&apos; Remove up to rowCount rows
+			oTable.Rows.removeByIndex(rowIdx, rowCount)
+		End If
+		&apos; Set return value to table
+		removeRow() = oTable
+	End If
+End Function
+
+&apos;
+&apos; Remove a table by name
+&apos; @param oDoc The document.
+&apos; @param tableName Name of table.
+&apos;
+Function removeTable(oDoc As Object, tableName$) As Boolean
+	&apos;oTable.Anchor.Text.removeTextContent(oTable)
+	Dim oTable As Object : oTable = getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		oTable.dispose()
+		removeTable() = True
+	Else
+		removeTable() = False
+	End If
+End Function
+
+&apos;
+&apos; Format a table cell
+&apos;
+Sub formatCell(textTable As com.sun.star.text.XTextTable, row%, column%, n$)
+	textTable.getCellByPosition(row, column).createTextCursor().ParaStyleName = n
+End Sub
+
+</script:module>

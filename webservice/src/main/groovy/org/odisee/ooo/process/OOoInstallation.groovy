@@ -26,7 +26,6 @@ class OOoInstallation {
     /**
      * Recurse a directory and look for all files with a certain name.
      */
-
     private List look(String pat, File dir, List result = []) {
         dir.listFiles().each {
             if (it.isDirectory() /* JDK7 && !it.isSymbolicLink()*/) {
@@ -100,7 +99,6 @@ class OOoInstallation {
                     }
                     break
             }
-            //println "result=${result?.dump()}"
             result ? result.parentFile : null
         }
     }

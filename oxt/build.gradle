@@ -1,0 +1,35 @@
+group rootProject.group
+version rootProject.version
+
+configurations {
+    antlibs
+}
+dependencies {
+    antlibs fileTree(dir: "antlib", include: '**/*.jar')
+}
+
+apply plugin: 'base'
+
+ext {
+    libs = [
+            'https://sourceforge.net/projects/ant-contrib/files/ant-contrib/1.0b3/ant-contrib-1.0b3-bin.zip/download',
+            'https://sourceforge.net/projects/xmltask/files/xmltask/1.16/xmltask.jar/download'
+    ]
+}
+
+ClassLoader antClassLoader = org.apache.tools.ant.Project.class.classLoader
+configurations.antlibs.each { File f ->
+    antClassLoader.addURL(f.toURI().toURL())
+}
+ant.importBuild('Odisee/build.xml') { String oldTargetName ->
+    //return oldTargetName == 'build' ? 'ant_build' : oldTargetName  // (1)
+    return "ant_${oldTargetName}" as String
+}
+task buildExtension(dependsOn: 'ant_world') {
+    group 'Odisee'
+    doLast {
+        def antTargetsNames = ant.references.get("ant.targets").collect { it.name }
+        println "Ant Targets: ${antTargetsNames}"
+    }
+}
+assemble.dependsOn 'buildExtension'

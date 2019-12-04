@@ -21,9 +21,9 @@ class OdiseeBootStrap {
            _ \\      |_)               
           |   |  _` | |  __|  _ \\  _ \\
           |   | (   | |\\__ \\  __/  __/
-         \\___/ \\__,_|_|____/\\___|\\___| ${version}
+         \\___/ \\__,_|_|____/\\___|\\___|
          
-         Server initialized.
+         Server ${version} initialized.
 """
         OdiseePath.dumpEnv()
     }
@@ -35,9 +35,9 @@ class OdiseeBootStrap {
           / __ \\____/ (_)_______  ___ 
          / / / / __  / / ___/ _ \\/ _ \\
         / /_/ / /_/ / (__  )  __/  __/
-        \\____/\\__,_/_/____/\\___/\\___/ ${version}
+        \\____/\\__,_/_/____/\\___/\\___/
          
-         Server stopped.
+         Server ${version} stopped.
 """
     }
 

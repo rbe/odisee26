@@ -18,11 +18,14 @@ import com.sun.star.script.provider.XScriptProviderSupplier
 import com.sun.star.util.CloseVetoException
 import com.sun.star.util.XCloseable
 import com.sun.star.util.XRefreshable
+import groovy.util.logging.Log
 import org.odisee.api.OdiseeException
-import org.odisee.io.OdiseePath
 import org.odisee.debug.Profile
+import org.odisee.io.OdiseePath
 import org.odisee.ooo.connection.OfficeConnection
 import org.odisee.uno.UnoCategory
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -30,13 +33,14 @@ import java.nio.file.Path
 /**
  * Things we can do with any OpenOffice.org document.
  */
+@Log
 class OOoDocumentCategory {
 
     /**
      * Standard properties for opening a document.
      */
     public static final Map STD_LOAD_PROP = [
-            Hidden: Boolean.TRUE,
+            Hidden            : Boolean.TRUE,
             MacroExecutionMode: 'com.sun.star.document.MacroExecMode.ALWAYS_EXECUTE_NO_WARN'
     ]
 
@@ -81,7 +85,7 @@ class OOoDocumentCategory {
     static XComponent open(Path file, OfficeConnection oooConnection, props = null) {
         // Add connection to template's File object
         file.metaClass._oooConnection = oooConnection
-        file.metaClass.getOooConnection = {-> _oooConnection }
+        file.metaClass.getOooConnection = { -> _oooConnection }
         // Properties for loading component
         List properties = []
         // Is this a template?
@@ -118,9 +122,9 @@ class OOoDocumentCategory {
         }
         XComponent xComponent = xComponentLoader.loadComponentFromURL(sURL, '_blank', 0, (properties ?: null) as com.sun.star.beans.PropertyValue[])
         xComponent.metaClass._oooConnection = oooConnection
-        xComponent.metaClass.getOooConnection = {-> _oooConnection }
+        xComponent.metaClass.getOooConnection = { -> _oooConnection }
         xComponent.metaClass._file = file
-        xComponent.metaClass.getFile = {-> _file }
+        xComponent.metaClass.getFile = { -> _file }
         // Return component
         xComponent
     }
@@ -324,7 +328,7 @@ class OOoDocumentCategory {
         Profile.time "OOoDocumentCategory.executeDispatch($name)", {
             use(UnoCategory) {
                 // Get XMultiComponentFactory
-                //OOoConnection oooConnection = (OOoConnection) component.oooConnection
+                // TODO ? OOoConnection oooConnection = (OOoConnection) component.oooConnection
                 OfficeConnection oooConnection = (OfficeConnection) component.oooConnection
                 if (oooConnection) {
                     Object o = oooConnection.xMultiComponentFactory.createInstanceWithContext('com.sun.star.frame.DispatchHelper', oooConnection.xOfficeComponentContext)
@@ -343,7 +347,7 @@ class OOoDocumentCategory {
                     XDispatchProvider xDispatchProvider = (XDispatchProvider) xFrame.uno(XDispatchProvider)
                     dispatchHelper.executeDispatch(xDispatchProvider, name, '', 0, props)
                 } else {
-                    println "${this}.executeDispatch(${name}): No connection!"
+                    log.debug "Cannot execute dispatch ${name}: no connection!"
                 }
             }
         }
@@ -368,7 +372,7 @@ class OOoDocumentCategory {
             // Ensure a java.lang.String and replace HTML entities
             name = name.toString().replaceAll('&amp;', '&')
             if (OdiseePath.ODISEE_DEBUG) {
-                println "Odisee: Processing macro '${name}'"
+                log.debug "Processing macro '${name}'"
             }
             try {
                 use(UnoCategory) {
@@ -379,7 +383,7 @@ class OOoDocumentCategory {
                     xScript.invoke(params/* as Object[]*/, outParamIndex, outParam)
                 }
             } catch (e) {
-                println "Odisee: Cannot execute macro: ${name}: ${e}"
+                log.debug "Cannot execute macro: ${name}", e
             }
         }
     }

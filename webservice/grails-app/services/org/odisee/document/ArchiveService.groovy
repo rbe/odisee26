@@ -16,6 +16,8 @@ import groovy.xml.dom.DOMCategory
 
 class ArchiveService {
 
+    static scope = 'singleton'
+
     StorageService storageService
 
     PostProcessService postProcessService
@@ -25,9 +27,9 @@ class ArchiveService {
             def request = arg.xml.request[arg.activeIndex]
             def archive = request.archive[0]
             if (log.debugEnabled && archive) {
-                log.debug "Odisee: archive: files=${archive.'@files'}, database=${archive.'@database'}"
+                log.debug "archive: files=${archive.'@files'}, database=${archive.'@database'}"
             } else {
-                log.debug 'Odisee: No archive tag found'
+                log.debug 'No archive tag found'
             }
             Document document = null
             arg.result.output.each { k, v ->
@@ -41,13 +43,13 @@ class ArchiveService {
                     if (document) {
                         arg.document << document
                         if (log.debugEnabled) {
-                            log.debug "Odisee: Document archived: ${document}"
+                            log.debug "Document archived: ${document}"
                         }
                     } else {
-                        log.error "Odisee: Couldn't archive document from request ${request.'@name'}"
+                        log.error "Couldn't archive document from request ${request.'@name'}"
                     }
                 } catch (e) {
-                    log.error "Odisee: Couldn't archive document ${document}", e
+                    log.error "Couldn't archive document ${document}", e
                 }
             }
         }
@@ -70,7 +72,7 @@ class ArchiveService {
                 }
             }
         } else {
-            throw new OdiseeException('Odisee: No result!')
+            throw new OdiseeException('No result!')
         }
     }
 

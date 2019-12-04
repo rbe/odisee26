@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Document" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Document
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Choose a filename.
+&apos;
+Function chooseFilename(oDoc As Object, Optional initialPath$, Optional initialName$) As String 
+	&apos; Note: The following services MUST be called in the following order or Basic will not remove the FileDialog Service
+	Dim oFilePicker As Object : oFilePicker = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.dialogs.FilePicker&quot;)
+	Dim oFileAccess As Object : oFileAccess = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	&apos; The intial path
+	Dim path$
+	If Not IsMissing(initialPath) Then
+		path = initialPath
+	End If
+	&apos; The initial filename
+	Dim filename$
+	If Not IsMissing(initialName) Then
+		filename = initialName
+	Else
+		filename = &quot;Unbenannt.odt&quot;
+	End If
+	&apos; Set the Dialog Arguments to a Template for a FILESAVE Dialog Box 
+	Dim filePickerArgs() : filePickerArgs = Array(com.sun.star.ui.dialogs.TemplateDescription.FILESAVE_AUTOEXTENSION_PASSWORD)
+	If oFileAccess.Exists(path) Then
+		oFilePicker.setDisplayDirectory(path)
+	End If
+	With oFilePicker
+		.initialize(filePickerArgs())
+		.setDefaultName(filename)
+		.appendFilter(&quot;OpenDocument Text (.odt)&quot;, &quot;*.odt&quot; )
+		.appendFilter(&quot;OpenDocument Text Template (.ott)&quot;, &quot;*.ott&quot; )
+		.setCurrentFilter(&quot;OpenDocument Text (.odt)&quot;)
+		.setValue(com.sun.star.ui.dialogs.ExtendedFilePickerElementIds.CHECKBOX_AUTOEXTENSION, 0, True)
+	End With
+	If oFilePicker.execute() = 1 Then
+		&apos; Set file name if it was not canceled
+		chooseFilename() = oFilePicker.Files(0)
+	End If
+	&apos; Dispose of the dialog
+	oFilePicker.dispose()
+End Function
+
+&apos;
+&apos; Set DocumentInfo if not existant.
+&apos;
+Function setDocumentPropertyIfAbsent(oDoc As Object, n$, v$) As Boolean
+	Dim oDocInfo As Object : oDocInfo = oDoc.getDocumentInfo()
+	If Not oDocInfo.getPropertySetInfo().hasPropertyByName(n) Then
+		oDocInfo.addProperty(n, com.sun.star.beans.PropertyAttribute.OPTIONAL, v)
+		setDocumentPropertyIfAbsent() = True
+	Else
+		setDocumentPropertyIfAbsent() = False
+	End If
+End Function
+
+&apos;
+&apos; Get value of a DocumentInfo property.
+&apos;
+Function getDocumentPropertyValue(oDoc As Object, n$) As String
+	Dim oDocInfo As Object : oDocInfo = oDoc.getDocumentInfo()
+	If oDocInfo.getPropertySetInfo().hasPropertyByName(n) Then
+		getDocumentPropertyValue() = oDocInfo.getPropertyValue(n)
+	End If
+End Function
+
+&apos;
+&apos; Save document as PDF
+&apos;	z.B. makePDF(&quot;Rechnung1.ods&quot;)
+&apos;		 makePDF(&quot;Rechnung1.ods&quot;, filterData, &quot;/another/path/Rechnung1.pdf&quot;, true)
+&apos;
+Function _makePDF(source As Variant, Optional filterData As Object, Optional target$, Optional bClose As Boolean) As String
+	Dim oDoc As Object
+	If TypeName(source) = &quot;String&quot; Then
+		oDoc = StarDesktop.loadComponentFromUrl(convertToUrl(source), &quot;_blank&quot;, 0, Array())
+	Else
+		oDoc = source
+	End If
+	If Not isNull(oDoc) Then
+		&apos; Make properties for PDF export
+		Dim mediaDesc(3) As New com.sun.star.beans.PropertyValue
+		mediaDesc(0).Name = &quot;FilterName&quot;
+		mediaDesc(0).Value = getPdfFilter(oDoc)
+		mediaDesc(1).Name = &quot;InteractionHandler&quot;
+		mediaDesc(1).Value = &quot;&quot;
+		mediaDesc(2).Name = &quot;Overwrite&quot;
+		mediaDesc(2).Value = True
+		mediaDesc(3).Name = &quot;FilterData&quot;
+		mediaDesc(3).Value = filterData
+		If mediaDesc(0).Value &lt;&gt; &quot;&quot; Then
+			If Not isMissing(target$) Then
+				oDoc.storeToUrl(convertToUrl(target), mediaDesc)
+				_makePDF() = target
+			Else
+				&apos; Get filename: source may be a String or XDocument
+				Dim pdfFilename$
+				If TypeName(source) = &quot;String&quot; Then
+					pdfFilename = convertToUrl(Left(source, Len(source) - 4) &amp; &quot;.pdf&quot;)
+				Else
+					pdfFilename = Left(source.URL, Len(source.URL) - 4) &amp; &quot;.pdf&quot;
+				End If
+				oDoc.storeToUrl(pdfFilename, mediaDesc)
+				_makePDF() = pdfFilename
+			End If
+		End If
+		&apos; Close?
+		If isMissing(bClose) Then
+			bClose = False
+		End If
+		If bClose Then
+			oDoc.setModified(False)
+			oDoc.close(False)
+		End If
+	End If
+End Function
+
+&apos;
+&apos; Save document as PDF
+&apos;	z.B. makePDF(&quot;Rechnung1.ods&quot;)
+&apos;		 makePDF(&quot;Rechnung1.ods&quot;, &quot;/another/path/Rechnung1.pdf&quot;, true)
+&apos;
+Function makePDF(source As Variant, Optional target$, Optional bClose As Boolean) As String
+	&apos; Make filter data
+	Dim filterData(0) As New com.sun.star.beans.PropertyValue
+	filterData(0).Name = &quot;IsSkipEmptyPages&quot;
+	filterData(0).Value = True
+	&apos; Make PDF
+	makePDF() = _makePDF(source, filterData)
+End Function
+
+&apos;
+&apos; Save document as PDF
+&apos;
+Function makeRestrictedPDF(source As Variant) As String
+	&apos; Make filter data
+	Dim filterData() : filterData = makeRestrictedFilterData()
+	&apos; Make PDF
+	makeRestrictedPDF() = _makePDF(source, filterData)
+End Function
+
+&apos;
+&apos; Save document as PDF
+&apos;
+Function makePDFwFilterData(source As Variant, filterData())
+	makePDFwFilterData() = _makePDF(source, filterData)
+End Function
+
+&apos;
+&apos; Make array of PropertyValue for restricted PDF
+&apos;
+Function makeRestrictedFilterData() As Array
+	&apos; Make filter data
+	Dim filterData(3) As New com.sun.star.beans.PropertyValue
+	filterData(0).Name = &quot;Changes&quot;
+	filterData(0).Value = 0
+	filterData(1).Name = &quot;EnableCopyingOfContent&quot;
+	filterData(1).Value = False
+	filterData(2).Name = &quot;RestrictPermissions&quot;
+	filterData(2).Value = True
+	filterData(3).Name = &quot;PermissionPassword&quot;
+	filterData(3).Value = &quot;Odisee&quot;
+	makeRestrictedFilterData() = filterData
+End Function
+
+&apos;
+&apos; DEPRECATED Use Document.makePDF()
+&apos;
+Function saveAsPdf(oDoc As Object, Optional filename$) As String
+	saveAsPdf() = makePDF(oDoc, filename)
+End Function
+
+&apos;
+&apos; Get type of document.
+&apos;
+Function getDocType(oDoc) As String
+	Const sCalc = &quot;com.sun.star.sheet.SpreadsheetDocument&quot;
+	Const sImpress = &quot;com.sun.star.presentation.PresentationDocument&quot;
+	Const sDraw = &quot;com.sun.star.drawing.DrawingDocument&quot;
+	Const sBase = &quot;com.sun.star.sdb.DatabaseDocument&quot;
+	Const sMath = &quot;com.sun.star.formula.FormulaProperties&quot;
+	Const sWrite = &quot;com.sun.star.text.TextDocument&quot;
+	&apos; Error handler
+	On Error Goto NODOCTYPE
+	If oDoc.SupportsService(sCalc) Then
+		getDocType() = &quot;scalc&quot;
+	ElseIf  oDoc.SupportsService(sWrite) Then
+		getDocType() = &quot;swriter&quot;
+	ElseIf  oDoc.SupportsService(sDraw) Then
+		getDocType() = &quot;sdraw&quot;
+	ElseIf  oDoc.SupportsService(sMath) Then
+		getDocType() = &quot;smath&quot;
+	ElseIf  oDoc.SupportsService(sImpress) Then
+		getDocType() = &quot;simpress&quot;
+	ElseIf  oDoc.SupportsService(sBase) Then
+		getDocType() = &quot;sbase&quot;
+	End If
+	&apos; Error handler
+	Exit Function
+	NODOCTYPE:
+	If err &lt;&gt; 0 Then
+		getDocType() = &quot;&quot;
+	End If
+End Function
+
+&apos;
+&apos; Which export filter to use for a certain document type?
+&apos; E.g.: getPdfFilter(ThisComponent), getPdfFilter(&quot;swriter&quot;)
+&apos;
+Function getPdfFilter(doc As Variant) As String
+	Dim sDocType$
+	If TypeName(doc) = &quot;String&quot; Then
+		sDocType = doc
+	Else
+		sDocType = getDocType(doc)
+	End If
+	Select Case(sDocType)
+		Case &quot;swriter&quot;:  getPdfFilter() = &quot;writer_pdf_Export&quot;
+		Case &quot;scalc&quot;:    getPdfFilter() = &quot;calc_pdf_Export&quot;
+		Case &quot;sdraw&quot;:    getPdfFilter() = &quot;draw_pdf_Export&quot;
+		Case &quot;simpress&quot;: getPdfFilter() = &quot;impress_pdf_Export&quot;
+		Case Else:       getPdfFilter() = &quot;&quot;
+	End Select
+End Function
+
+&apos;
+&apos; Is oDoc an Office document?
+&apos;
+Function isOfficeDocument(oDoc As Object) As Boolean
+	isOfficeDocument() = False
+	If Not isNull(oDoc) Then
+		isOfficeDocument() = oDoc.supportsService(&quot;com.sun.star.document.OfficeDocument&quot;)
+	End If
+End Function
+
+&apos;
+&apos; Is oDoc an Writer document?
+&apos;
+Function isWriterDocument(oDoc As Object) As Boolean
+	isWriterDocument() = False
+	If Not isNull(oDoc) Then
+		isWriterDocument() = oDoc.supportsService(&quot;com.sun.star.text.TextDocument&quot;)
+	End If
+End Function
+
+&apos;
+&apos; Is oDoc a template?
+&apos;
+Function isTemplate(oDoc As Object) As Boolean
+	isTemplate() = False
+	If isOfficeDocument(oDoc) Then
+		Dim oProps() : oProps = oDoc.getArgs()
+		Dim i%
+		For i = 0 To UBound(oProps())
+			If oProps(i).Name = &quot;FilterName&quot; And TypeName(oProps(i).Value) = &quot;String&quot; Then
+				If InStr(UCase(oProps(i).Value), &quot;TEMPLATE&quot;) &gt; 0 Then
+					isTemplate() = True
+					Exit For
+				End If
+			End If
+		Next
+	End If
+End Function
+
+&apos;
+&apos; Open a Writer document.
+&apos;
+Function openWriter(Optional path$, Optional mediaDesc As Array, Optional executeMacro As Boolean) As com.sun.star.text.XTextDocument
+	&apos; If path is missing open new, empty document
+	If IsMissing(path) Then
+		path = &quot;private:factory/swriter&quot;
+	Else
+		&apos; Convert to URL?
+		If Left(path, 4) &lt;&gt; &quot;file&quot; Then
+			path = convertToUrl(path)
+		End If
+	End If
+	&apos; Execute macros?
+	If IsMissing(executeMacro) Then
+		executeMacro = True
+	End If
+	&apos; Media descriptor
+	If IsMissing(mediaDesc) Then
+	 	Dim mediaDesc(0) As New com.sun.star.beans.PropertyValue
+	Else
+		ReDim Preserve mediaDesc(UBound(mediaDesc()) + 1)
+	End If
+	&apos; Set macro execution mode
+	Dim u% : u = UBound(mediaDesc())
+	mediaDesc(u).Name = &quot;MacroExecutionMode&quot;
+	If executeMacro Then
+		mediaDesc(u).Value = com.sun.star.document.MacroExecMode.ALWAYS_EXECUTE_NO_WARN
+	Else
+		mediaDesc(u).Value = com.sun.star.document.MacroExecMode.NEVER_EXECUTE
+	End If
+	&apos; Open Writer document
+	openWriter() = StarDesktop.loadComponentFromURL(convertToUrl(path), &quot;_blank&quot;, 0, mediaDesc())
+End Function
+
+&apos;
+&apos;
+&apos;
+Function openWriter_New(Optional mediaDesc As Array) As com.sun.star.text.XTextDocument
+	openWriter_New() = openWriter(&quot;private:factory/swriter&quot;, mediaDesc())
+End Function
+
+&apos;
+&apos;
+&apos;
+Function openWriter_UTF8(path$, Optional mediaDesc As Array) As com.sun.star.text.XTextDocument
+	&apos; Media descriptor
+	If IsMissing(mediaDesc) Then
+	 	Dim mediaDesc(0) As New com.sun.star.beans.PropertyValue
+	Else
+		ReDim Preserve mediaDesc(UBound(mediaDesc()) + 2)
+	End If
+	Dim u% : u = UBound(mediaDesc())
+	mediaDesc(u).Name = &quot;FilterName&quot;
+	mediaDesc(u).Value = &quot;Text (encoded)&quot;
+	mediaDesc(u + 1).Name = &quot;FilterOptions&quot;
+	mediaDesc(u + 1).Value = &quot;UTF8&quot;
+	openWriter_UTF8() = openWriter(path, mediaDesc())
+End Function
+
+&apos;
+&apos;
+&apos;
+Function openWriter_WebDAV(hostname$, port%, path$) As com.sun.star.text.XTextDocument
+	Dim url$ : url = &quot;vnd.sun.star.webdav://&quot; &amp; hostname &amp; &quot;:&quot; &amp; port &amp; path
+	openWriter_WebDAV() = openWriter(url, array())
+End Function
+
+&apos;
+&apos; Open Calc document
+&apos;
+Function openCalc(Optional path$, Optional mediaDesc As Array) As com.sun.star.presentation.PresentationDocument
+	If IsMissing(path) Then
+		path = &quot;private:factory/scalc&quot;
+	Else
+		If Left(path, 4) &lt;&gt; &quot;file&quot; Then
+			path = convertToUrl(path)
+		End If
+	End If
+	If IsMissing(mediaDesc) Then
+		Dim mediaDesc()
+	End If
+	openCalc() = StarDesktop.loadComponentFromURL(path, &quot;_blank&quot;, 0, mediaDesc())
+End Function
+
+&apos;
+&apos; Open Impress document
+&apos;
+Function openImpress(Optional path$, Optional mediaDesc As Array) As com.sun.star.sheet.SpreadsheetDocument
+	If IsMissing(path) Then
+		path = &quot;private:factory/simpress&quot;
+	Else
+		If Left(path, 4) &lt;&gt; &quot;file&quot; Then
+			path = convertToUrl(path)
+		End If
+	End If
+	If IsMissing(mediaDesc) Then
+		Dim mediaDesc()
+	End If
+	openImpress() = StarDesktop.loadComponentFromURL(path, &quot;_blank&quot;, 0, mediaDesc())
+End Function
+
+&apos;
+&apos; Open a template from &quot;template&quot; directory within an extension.
+&apos;
+Function openTemplateFromExtension(platform As Array, tmpl$) As com.sun.star.lang.XComponent
+	Select Case Right(tmpl, 3)
+		Case &quot;ott&quot;: openWriter(platform(1).Value &amp; tmpl)
+		Case &quot;ots&quot;: openCalc(platform(1).Value &amp; tmpl)
+		Case &quot;otp&quot;: openImpress(platform(1).Value &amp; tmpl)
+	End Select
+End Function
+
+&apos;
+&apos; Open a template: download and open it.
+&apos;
+Function openTemplateFromWeb(httpBase$, tmpl$) As com.sun.star.lang.XComponent
+	&apos;On Error Goto ErrorHandler
+	&apos; Get user&apos;s working directory
+	Dim oPS As Object : oPS = getProcessServiceManager().createInstance(&quot;com.sun.star.comp.framework.PathSettings&quot;)
+	Dim temp$ : temp = oPS.Temp
+	&apos; Setup profile for downloading templates
+	Dim profile(1) As String
+	profile(0) = httpBase
+	profile(1) = temp &amp; &quot;/&quot;
+	openTemplateFromWeb() = Odisee.DynTmpl.openTextTemplate(profile(), tmpl)
+	&apos; Error handler
+	Exit Function
+	ErrorHandler:
+		MsgBox(&quot;Konnte die Vorlage &quot; &amp; tmpl &amp; &quot; nicht finden!&quot;)
+		Exit Function
+End Function
+
+&apos;
+&apos; Refresh everything.
+&apos;
+Function refresh(oDoc As Object) As Boolean
+	If isWriterDocument(oDoc) Then
+		&apos; Refresh textfields
+		oDoc.TextFields.refresh()
+		&apos; Refresh
+		oDoc.refresh()
+	End If
+End Function
+
+</script:module>

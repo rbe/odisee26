@@ -35,10 +35,12 @@ import com.sun.star.uno.Any;
 import com.sun.star.uno.XComponentContext;
 import com.sun.star.util.CloseVetoException;
 import com.sun.star.util.XCloseable;
-import org.odisee.ooo.process.OfficeProcess;
 import org.odisee.document.OfficeDocument;
 import org.odisee.document.OfficeDocumentType;
+import org.odisee.ooo.process.OfficeProcess;
 import org.odisee.uno.UnoHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -50,6 +52,8 @@ import java.util.List;
 import static com.sun.star.uno.UnoRuntime.queryInterface;
 
 public class OfficeConnection {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OfficeConnection.class);
 
     /**
      * Was this instance already successfully bootstraped?
@@ -149,7 +153,7 @@ public class OfficeConnection {
     /**
      * Bootstrap local office as a TCP/IP server.
      * @param socketAddress TCP/IP address, host and port.
-     * @param start         If true we try to start the Office instance.
+     * @param start If true we try to start the Office instance.
      * @throws OdiseeServerException
      */
     private void bootstrap(InetSocketAddress socketAddress, boolean start) throws OdiseeServerException {
@@ -344,7 +348,7 @@ public class OfficeConnection {
         // Cleanup all managed documents
         for (OfficeDocument officeDocument : managedDocuments) {
             try {
-                closeDocument(officeDocument,true);
+                closeDocument(officeDocument, true);
                 //officeDocument.closeDocument(true);
             } catch (OdiseeServerException e) {
                 // ignore
@@ -476,11 +480,11 @@ public class OfficeConnection {
                 XEnumeration xEnumeration = xEnumerationAccess.createEnumeration();
                 while (xEnumeration.hasMoreElements()) {
                     try {
-                        System.out.println(action + " [" + unoURL + "] Found " + xEnumeration.nextElement());
+                        LOGGER.debug("{} [{}] Found {}", action, unoURL, xEnumeration.nextElement());
                         /*
                         Any any = (Any) xEnumeration.nextElement();
                         xComponent = (XComponent) any.getObject();
-                        System.out.println("Closing " + xComponent.toString());
+                        LOGGER.debug("Closing {}", xComponent.toString());
                         close(xComponent);
                         */
                     } catch (NoSuchElementException e) {

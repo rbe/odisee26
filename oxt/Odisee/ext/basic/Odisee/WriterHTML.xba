@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterHTML" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterHTML
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Format whole text of a document according to HTML tags.
+&apos;
+Function htmlFormat(oDoc As Object) As Boolean
+	htmlFormatTag(oDoc, &quot;b&quot;)
+	htmlFormatTag(oDoc, &quot;u&quot;)
+	htmlFormatTag(oDoc, &quot;i&quot;)
+	htmlFormat() = True
+End Function
+
+&apos;
+&apos; Format text: discover HTML tags and apply formatting.
+&apos;
+Function htmlFormatTag(oDoc As Object, tag$) As Boolean
+	&apos; Get text
+	Dim oText As Object : oText = oDoc.Text
+	&apos; Search for tag
+	Dim oSearchDesc As Object : oSearchDesc = oDoc.createSearchDescriptor()
+	oSearchDesc.SearchString = &quot;&lt;&quot; &amp; tag &amp; &quot;&gt;([:print:]|[:cntrl:])*&lt;/&quot; &amp; tag &amp; &quot;&gt;&quot;
+	oSearchDesc.SearchRegularExpression = True
+	Dim oFoundAll As Object : oFoundAll = oDoc.findAll(oSearchDesc)
+	Dim oFound As Object, oCursor As Object
+	For n = 0 To oFoundAll.Count - 1
+		oFound = oFoundAll(n)
+		Select Case tag
+			Case &quot;b&quot;: oFound = formatBold(oFound)
+			Case &quot;i&quot;: oFound = formatItalic(oFound)
+			Case &quot;u&quot;: oFound = formatUnderline(oFound)
+		End Select
+		oFound = removeTag(oFound, tag)
+	Next
+	htmlFormatTag() = True
+End Function
+
+&apos;
+&apos; Apply formatting on text ranges.
+&apos;
+Function formatBold(oTextRange As com.sun.star.text.XTextRange) As com.sun.star.text.XTextRange
+	oTextRange.CharWeight = com.sun.star.awt.FontWeight.BOLD
+	formatBold() = oTextRange
+End Function
+Function formatItalic(oTextRange As com.sun.star.text.XTextRange) As com.sun.star.text.XTextRange
+	oTextRange.CharPosture = com.sun.star.awt.FontSlant.ITALIC
+	formatItalic() = oTextRange
+End Function
+Function formatUnderline(oTextRange As com.sun.star.text.XTextRange) As com.sun.star.text.XTextRange
+	oTextRange.CharUnderline = com.sun.star.awt.FontUnderline.SINGLE
+	formatUnderline() = oTextRange
+End Function
+
+&apos;
+&apos; Remove a tag.
+&apos;
+Function removeTag(oTextRange As com.sun.star.text.XTextRange, tag$) As com.sun.star.text.XTextRange
+	Dim beginTag$ : beginTag = &quot;&lt;&quot; &amp; tag &amp; &quot;&gt;&quot;
+	Dim endTag$ : endTag = &quot;&lt;/&quot; &amp; tag &amp; &quot;&gt;&quot;
+	Dim s$ : s = Mid(oTextRange.String, Len(beginTag) + 1, Len(oTextRange.String) - Len(endTag) - Len(beginTag))
+	oTextRange.String = s
+	removeTag() = oTextRange
+End Function
+
+</script:module>

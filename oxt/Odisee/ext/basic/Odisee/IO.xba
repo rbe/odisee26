@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="IO" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.IO
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Is URL a directory?
+&apos;
+Function isDirectory(n$) As Boolean
+	If Not fileExists(n) Then
+		isDirectory() = False
+	End If
+	isDirectory() = (GetAttr(n) AND 16) = 16
+End Function
+
+&apos;
+&apos; Select a directory.
+&apos;
+Function pickDirectory(Optional sInPath$) As String
+	Rem You can also use com.sun.star.ui.dialogs.OfficeFolderPicker
+	Dim oDialog As Object : oDialog = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.dialogs.FolderPicker&quot;)
+	Dim oSFA As Object : oSFA = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	If IsMissing(sInPath) Then
+		oDialog.setDisplayDirectory(GetWorkDir())
+	ElseIf oSFA.Exists(sInPath) Then
+		oDialog.setDisplayDirectory(sInPath)
+	Else
+		Dim s$ : s = &quot;Directory &apos;&quot; &amp; sInPath &amp; &quot;&apos; does not exist&quot;
+		If MsgBox(s, 33, &quot;Error&quot;) = 2 Then
+			Exit Function
+		End If
+	End If
+	If oDialog.execute() = 1 Then
+		pickDirectory() = oDialog.getDirectory()
+	End If
+End Function
+
+&apos;
+&apos; Select one or more file(s).
+&apos;
+Function pickFile(Optional multiSelection As Boolean) As Array
+	Dim oDlg As Object
+	If IsWindows() Then
+		oDlg = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.dialogs.FilePicker&quot;)
+	Else
+		oDlg = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.dialogs.OfficeFilePicker&quot;)
+	End If
+	If IsMissing(multiSelection) Then
+		multiSelection = false
+	End If
+	oDlg.setMultiSelectionMode(multiSelection)
+	oDlg.execute()
+	Dim oFiles : oFiles = oDlg.getFiles()
+	Dim r()
+	&apos; Single file selected
+	If aLen(oFiles) = 1 Then
+		pickFile() = array(oFiles(0))
+	&apos; Multiselection
+	ElseIf aLen(oFiles) &gt; 1 Then
+		&apos; Path is index 0, filenames are stored in index 1..
+		path = oFiles(0)
+		For i = 1 To UBound(oFiles)
+			ReDim Preserve r(i - 1)
+			r(i - 1) = path + oFiles(i)
+		Next
+		pickFile() = r()
+	Else
+		pickFile() = Null
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Function copyFile(src$, dest$, Optional overwrite As Boolean) As Boolean
+	Dim oUcb As Object
+	oSFA = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	If IsMissing(overwrite) Then
+		overwrite = False
+	End If
+	If overwrite Or Not oSFA.Exists(dest) Then
+		oSFA.copy(src, dest)
+		copyFile() = True
+	Else
+		copyFile() = False
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Function zip(file$, fileNameInZip$, zipFile$) As Boolean
+	On Error Goto ErrorHandler
+	&apos;
+	Dim filestreamService As Variant
+	filestreamService = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	Dim inputStream As Variant
+	inputStream = FilestreamService.OpenFileRead(file)
+	&apos;
+	Dim zipService As Variant
+	zipService = getProcessServiceManager().createInstance(&quot;com.sun.star.packages.Package&quot;)
+	zipService.initialize(array(zipFile))
+	Dim theZipper As Variant
+	theZipper = zipService.createInstance()
+	theZipper.SetInputStream(inputStream)
+	&apos;
+	Dim outputStream As Variant
+	outputStream = zipService.getByHierarchicalName(&quot;&quot;)
+	outputStream.replaceByName(fileNameInZip, theZipper)
+	zipService.commitChanges()
+	&apos;
+	zip() = True
+	Exit Function
+	ErrorHandler:
+		zip() = False
+End Function
+
+&apos;
+&apos;
+&apos; Test: unzip(userAutoCorrDat, &quot;DocumentList.xml&quot;, &quot;file:///Users/rbe/bla.xml&quot;)
+&apos;
+Function unzip(zip$, file$, dest$) As Boolean
+	On Error Goto ErrorHandler
+	&apos;
+	Dim zipService As Variant
+	zipService = getProcessServiceManager().createInstance(&quot;com.sun.star.packages.Package&quot;)
+	zipService.initialize(array(zip))
+	&apos;
+	Dim theZipper As Variant
+	theZipper = ZipService.getByHierarchicalName(file)
+	Dim inputStream As Variant
+	inputStream = TheZipper.getInputStream()
+	&apos;
+	Dim outputStream As Variant
+	outputStream = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	outputStream.WriteFile(dest, inputStream)
+	&apos;
+	unzip() = True
+	Exit Function
+	ErrorHandler:
+		unzip() = False
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getDirectoryOfDocument(oDoc As Object) As String
+	Dim url$ : url = oDoc.URL
+	If url &lt;&gt; &quot;&quot; Then
+		Dim i% : i = Len(url)
+		Do While Mid(url, i, 1) &lt;&gt; &quot;/&quot;
+			i = i - 1
+		Loop
+		getDirectoryOfDocument() = Left(url, i - 1)
+	Else
+		Dim oPS As Object : oPS = getProcessServiceManager().createInstance(&quot;com.sun.star.comp.framework.PathSettings&quot;)
+		getDirectoryOfDocument() = oPS.Temp
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Function listFiles(dir$, Optional extension() As String, Optional recursive As Boolean) As Array
+	Dim sUrl$
+	&apos; Convert to URL?
+	If Left(sUrl, 4) &lt;&gt; &quot;file&quot; Then
+		sUrl = convertToUrl(dir)
+	Else
+		sUrl = dir
+	End If
+	&apos; Recursive?
+	If isMissing(recursive) Then
+		recursive = False
+	End If
+	&apos;
+	Dim list()
+	Dim oSFA : oSFA = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	If oSFA.isFolder(sUrl) Then
+		&apos; List folders when recursive mode is requested
+		list = oSFA.getFolderContents(sUrl, recursive)
+	End If
+	Dim filename$, found(), ok As Boolean
+	Dim e%, i%, j% : j = 0
+	For i = LBound(list()) To UBound(list())
+		filename = convertFromURL(list(i))
+		&apos; Check for directory
+		If recursive And oSFA.isFolder(filename) Then
+			&apos; Skip hidden directories, beginning with a dot
+			If Left(filename, 1) = &quot;.&quot; Then
+				Continue
+			End If
+			Dim subDir() : subDir() = listFiles(filename, extension(), recursive)
+			If UBound(subDir()) &gt; -1 Then
+				Dim z%, c% : c = Odisee.Basic.aLen(subDir()) - 1
+				For z = 0 To c
+					ReDim Preserve found(j)
+					found(j) = subDir(z)
+					j = j + 1
+				Next
+			End If
+		End If
+		&apos; Check extension
+		If Not isMissing(extension) Then
+			For e = LBound(extension()) To UBound(extension())
+				ok = False
+				If LCase(Right(filename, 3)) = LCase(extension(e)) Then
+					ok = True
+					Exit For
+				End If
+			Next
+			If Not ok Then
+				filename = &quot;&quot;
+			End If
+		End If
+		&apos; Add filename?
+		If filename &lt;&gt; &quot;&quot; Then
+			ReDim Preserve found(j)
+			found(j) = list(i)
+			j = j + 1
+		End If
+	Next
+	listFiles() = found()
+End Function
+
+</script:module>

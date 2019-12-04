@@ -46,7 +46,7 @@ systemProp.https.nonProxyHosts=localhost|127.0.0.1|example.com
 
 === Copyright
 
-Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt). +
+Copyright (C) 2011-2019 art of coding UG (haftungsbeschr√§nkt). +
 Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
 
 Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.

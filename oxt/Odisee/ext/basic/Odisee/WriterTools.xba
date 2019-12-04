@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterTools" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterTools
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos;
+&apos;
+Function getDateAsIsoFromField(oDoc As Object, textField$) As String
+	&apos;
+	Dim oField As Object : oField = oDoc.TextFields.getByName(textField)
+	&apos;
+	Dim y$ : y = oField.DateTimeValue.Year
+	Dim m$ : m = oField.DateTimeValue.Month
+	Dim d$ : d = oField.DateTimeValue.Day
+	Dim h$ : h = oField.DateTimeValue.Hours
+	Dim mi$ : mi = oField.DateTimeValue.Minutes
+	Dim s$ : s = oField.DateTimeValue.Seconds
+	Dim hs$ : hs = oField.DateTimeValue.HundredthSeconds
+	&apos;
+	getDateAsIsoFromField() = y &amp; &quot;-&quot; &amp; m &amp; &quot;-&quot; &amp; d &amp; &quot; &quot; &amp; h &amp; &quot;:&quot; &amp; mi &amp; &quot;:&quot; &amp; s &amp; &quot;.&quot; &amp; hs
+End Function
+
+&apos;
+&apos; Include all .odt files from a directory
+&apos;
+Sub includeAllOdts(oDoc As Object)
+	&apos; Get all .odt files
+	Dim odts(): odts = listAllFiles(getDirOfDocument())
+	&apos; Text cursor
+	Dim viewCursor As Object : viewCursor = oDoc.CurrentController.getViewCursor()
+	Dim textCursor As Object : textCursor = viewCursor.getText().createTextCursor()
+	&apos; Insert all odt files
+	Dim prop() As new com.sun.star.beans.PropertyValue
+	Dim len% : len = UBound(odts) - LBound(odts) + 1
+	For i% = 0 To UBound(odts)
+		&apos; Go to end of document
+		viewCursor.jumpToLastPage()
+		viewCursor.jumpToEndOfPage()
+		&apos; Append page break
+		textCursor.breakType = com.sun.star.style.BreakType.PAGE_BEFORE
+		&apos; Insert document
+		textCursor.insertDocumentFromURL(odts(i), prop)
+	Next
+	&apos; Refresh table of contents
+	&apos;oDoc.getDocumentIndexes().getByName(&quot;Inhaltsverzeichnis1&quot;).update()
+End Sub
+
+&apos;
+&apos;
+&apos;
+Sub FalzMarkenSetzen
+	dim aNamen() as string
+	aNamen = array(&quot;Falzmarke1&quot;, &quot;Falzmarke2&quot;, &quot;Lochermarke&quot;)
+	oDoc = thisComponent
+	dim oFalz1 as object, oFalz2 as object
+	REM zunächst evt. Objekte entfernen:
+	oGrafiken = oDoc.Drawpage
+	For i = oGrafiken.count-1 to 0 step -1
+		oGrafik = oGrafiken.getByIndex(i)
+		For j = 0 to uBound(aNamen())
+		  if oGrafik.Name = aNamen(j) then 
+		  	oGrafiken.remove(oGrafik)
+		  	exit for
+		  end if
+		next
+	next
+	REM Größe der Falzmarken
+	dim oFalzSize as new com.sun.star.awt.Size
+	oFalzSize.Width = 400   &apos;4 mm lang
+	oFalzSize.Height = 0
+	REM Größe der Lochermarke
+	dim oLocherSize as new com.sun.star.awt.Size
+	oLocherSize.Width = 500  &apos;5 mm lang
+	oLocherSize.Height = 0
+	REM erste Falzmarke
+	oFalz1 = oDoc.createInstance(&quot;com.sun.star.drawing.LineShape&quot;)
+	dim oPos1 as new com.sun.star.awt.Point
+	oPos1.X = 300    &apos;3 mm Randabstand
+	oPos1.Y = 10000   &apos;10 ca, von oben
+	with oFalz1
+		.name = &quot;Falzmarke1&quot;
+		.lineColor = RGB(0, 0, 0)
+		.lineWidth = 1
+		.position = oPos1
+		.Size = oFalzSize
+		.AnchorType = com.sun.star.text.TextContentAnchorType.AT_PAGE
+		.MoveProtect = true
+	end with
+	oDoc.Drawpage.add(oFalz1)	
+	REM zweite Falzmarke
+	oFalz2 = oDoc.createInstance(&quot;com.sun.star.drawing.LineShape&quot;)
+	dim oPos2 as new com.sun.star.awt.Point
+	oPos2.X = 300      &apos;3 mm Randabstand
+	oPos2.Y = 19800    &apos;19,8 cm von oben
+	with oFalz2
+		.name = &quot;Falzmarke2&quot;
+		.lineColor = RGB(0, 0, 0)
+		.lineWidth = 1
+		.position = oPos2
+		.Size = oFalzSize
+		.AnchorType = com.sun.star.text.TextContentAnchorType.AT_PAGE
+		.MoveProtect = true
+	end with
+	oDoc.Drawpage.add(oFalz2)	
+	REM Lochermarke
+	oAbheft = oDoc.createInstance(&quot;com.sun.star.drawing.LineShape&quot;)
+	dim oPos3 as new com.sun.star.awt.Point
+	oPos3.X = 300    &apos;3 mm Randabstand
+	oPos3.Y = 14800   &apos;14,8 cm von oben
+	with oAbheft
+		.name = &quot;Lochermarke&quot;
+		.lineColor = RGB(0, 0, 0)
+		.lineWidth = 1
+		.position = oPos3
+		.Size = oLocherSize
+		.AnchorType = com.sun.star.text.TextContentAnchorType.AT_PAGE
+		.MoveProtect = true
+	end with
+	oDoc.Drawpage.add(oAbheft)
+End Sub
+
+Function Falzmarken_loeschen(oDoc As Object)
+	Dim aNamen() As String
+	aNamen = array(&quot;Falzmarke1&quot;, &quot;Falzmarke2&quot;, &quot;Lochermarke&quot;)
+	oGrafiken = oDoc.Drawpage
+	For i = oGrafiken.count-1 To 0 Step -1
+		oGrafik = oGrafiken.getByIndex(i)
+		For j = 0 to uBound(aNamen())
+		  if oGrafik.Name = aNamen(j) then 
+		  	oGrafiken.remove(oGrafik)
+		  	exit for
+		  end if
+		next
+	Next
+End Function
+
+</script:module>

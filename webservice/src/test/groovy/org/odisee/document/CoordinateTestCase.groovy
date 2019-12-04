@@ -13,7 +13,6 @@ package org.odisee.document
 class CoordinateTestCase extends GroovyTestCase {
 
     void testSimpleCoordinate() {
-        println Coordinate.A1
         // Z3 = column #26, 0-based index 25, row #3, 0-based index 2
         assertEquals([table: null, sheet: null,
                       column: 'Z', columnIndex: 25,

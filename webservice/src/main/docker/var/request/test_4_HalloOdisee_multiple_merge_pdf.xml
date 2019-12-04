@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odisee xmlns="http://xmlns.odisee.de/v2/request">
+    <!--
+        First request.
+    -->
+    <request name="HalloOdisee1">
+        <!-- Template: name and desired output format -->
+        <template name="HalloOdisee" outputFormat="pdf"/>
+        <!-- Archive generated files? Useful for debugging -->
+        <archive files="false"/>
+        <!-- Instructions executed against the template, order does matter! -->
+        <instructions>
+            <!-- Set userfield 'Hallo' -->
+            <userfield name="Hallo">Hallo Odisee 1</userfield>
+            <!-- Set table cell 'A4' in table 'Tabelle1' -->
+            <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+        </instructions>
+    </request>
+    <!--
+        Second request.
+    -->
+    <request name="HalloOdisee2">
+        <template name="HalloOdisee" outputFormat="pdf"/>
+        <archive files="false"/>
+        <instructions>
+            <userfield name="Hallo">Hallo Odisee 2</userfield>
+            <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+        </instructions>
+    </request>
+    <!--
+        Third request with merging a PDF.
+    -->
+    <request name="HalloOdisee3">
+        <template name="HalloOdisee" outputFormat="pdf"/>
+        <archive files="false"/>
+        <instructions>
+            <userfield name="Hallo">Hallo Odisee 3</userfield>
+            <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+        </instructions>
+        <!-- The generated document is post-processed -->
+        <post-process>
+            <!-- The action is 'merge document with...' -->
+            <action type="merge-with">
+                <!--
+                    When merging documents we need to know the order:
+                    'result-placeholder' refers to the previously generated document,
+                    'input filename' refers to an existing document (filesystem) to include.
+                -->
+                <result-placeholder/>
+                <!-- TODO A relative path is interpreted as $ODISEE_HOME/var -->
+                <input filename="merge/AGB.pdf"/>
+            </action>
+        </post-process>
+    </request>
+</odisee>

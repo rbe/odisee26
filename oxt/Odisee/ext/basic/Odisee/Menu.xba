@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Menu" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Menu
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+Global gMenuBarUrl$
+
+&apos;
+&apos;
+&apos;
+Function initMenu() As Boolean
+	gMenuBarUrl = &quot;private:resource/menubar/menubar&quot;
+	initMenu() = True
+End Function
+
+&apos;
+&apos; Add menubar in all main services
+&apos;
+Function createMenuInAllMainServices(menuName$, menuItems()) As Boolean
+	Dim mainServices() : mainServices = getMainServices()
+	Dim i%
+	For i = 0 To UBound(mainServices())
+		createTopMenu(mainServices(i), menuName$, menuItems())
+	Next
+	&apos;
+	createMenuInAllMainServices() = True
+End Function
+
+&apos;
+&apos; Remove menubar from all main services
+&apos;
+Function removeMenuFromAllMainServices(menuName$) As Boolean
+	Dim mainServices() : mainServices = getMainServices()
+	Dim i%
+	For i = 0 To UBound(mainServices())
+		removeTopMenu(mainServices(i), menuName)
+	Next
+	&apos;
+	removeMenuFromAllMainServices() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Function createTopMenu(moduleName$, menuName$, oMenuItems()) As Boolean
+	&apos;
+	Dim oModuleCfgMgrSupplier As Object : oModuleCfgMgrSupplier = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.ModuleUIConfigurationManagerSupplier&quot;)
+	Dim oModuleCfgMgr As Object : oModuleCfgMgr = oModuleCfgMgrSupplier.getUIConfigurationManager(moduleName)
+	Dim oMenuBarSettings As Object : oMenuBarSettings = oModuleCfgMgr.getSettings(gMenuBarUrl, True)
+	&apos;
+	Dim menuId$ : menuId = &quot;vnd.openoffice.org:&quot; + menuName + &quot;Menu&quot; &apos; TODO Normalize/flatten string?
+	Dim bHasAlreadyPopupMenu As Boolean : bHasAlreadyPopupMenu = hasTopLevelMenu(moduleName, menuId)
+	&apos;
+	If Not bHasAlreadyPopupMenu Then
+		&apos; Create new menu
+		Dim oPopupMenu() : oPopupMenu = createPopupMenu(menuId, menuName, oMenuBarSettings)
+		Dim oPopupMenuContainer As Object : oPopupMenuContainer = oPopupMenu(3).Value
+		&apos; Insert menu items
+		Dim i%
+		For i = 0 To UBound(oMenuItems())
+			oPopupMenuContainer.insertByIndex(oPopupMenuContainer.Count, oMenuItems(i))
+		Next
+		oMenuBarSettings.insertByIndex(oMenuBarSettings.Count, oPopupMenu)
+		oModuleCfgMgr.replaceSettings(gMenuBarUrl, oMenuBarSettings)
+	End If
+	&apos;
+	createTopMenu() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Function removeTopMenu(moduleName$, menuName$) As Boolean
+	&apos;
+	Dim oModuleCfgMgrSupplier As Object : oModuleCfgMgrSupplier = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.ModuleUIConfigurationManagerSupplier&quot;)
+	Dim oModuleCfgMgr As Object : oModuleCfgMgr = oModuleCfgMgrSupplier.getUIConfigurationManager(moduleName)
+	&apos;
+	Dim oMenuBarSettings As Object : oMenuBarSettings = oModuleCfgMgr.getSettings(gMenuBarUrl, True)
+	&apos;
+	Dim menuId$ : menuId = &quot;vnd.openoffice.org:&quot; + menuName + &quot;Menu&quot; &apos; TODO Normalize/flatten string?
+	If hasTopLevelMenu(moduleName, menuId) Then
+		oModuleCfgMgr.removeSettings(gMenuBarUrl)
+		removeMenu() = True
+	End If
+	&apos;
+	removeTopMenu() = False
+End Function
+
+&apos;
+&apos;
+&apos;
+Function hasTopLevelMenu(moduleName$, menuId$) As Boolean
+	&apos;
+	Dim oModuleCfgMgrSupplier As Object : oModuleCfgMgrSupplier = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.ModuleUIConfigurationManagerSupplier&quot;)
+	Dim oModuleCfgMgr As Object : oModuleCfgMgr = oModuleCfgMgrSupplier.getUIConfigurationManager(moduleName)
+	Dim oMenuBarSettings As Object : oMenuBarSettings = oModuleCfgMgr.getSettings(gMenuBarUrl, True)
+	&apos;
+	Dim nCount% : nCount = oMenuBarSettings.Count
+	Dim menuIndex%, oPopupMenu(), oItemDescriptor As Object
+	Dim j%, z%
+	For menuIndex = 0 To nCount - 1
+		oPopupMenu() = oMenuBarSettings.getByIndex(menuIndex)
+		&apos; Get menu items; ItemDescriptorContainer
+		oItemDescriptor = oPopupMenu(2).Value
+		Dim p As Object
+		For z = 0 To oItemDescriptor.Count - 1
+			p = oItemDescriptor.getByIndex(z)
+			If aLen(p) &gt; 0 Then
+				msgbox oPopupMenu(0).Value &amp; &quot; is a submenu&quot;
+			End If
+		Next
+		For j = 0 To UBound(oPopupMenu())
+			If oPopupMenu(j).Name = &quot;CommandURL&quot; Then
+				If oPopupMenu(j).Value = menuId Then
+				    hasTopLevelMenu() = True
+				End If
+			End If
+		Next j
+	Next menuIndex
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getMenuBarSettings(moduleName$, gMenuBarUrl$) As Object
+	&apos;
+	Dim oModuleCfgMgrSupplier As Object : oModuleCfgMgrSupplier = getProcessServiceManager().createInstance(&quot;com.sun.star.ui.ModuleUIConfigurationManagerSupplier&quot;)
+	Dim oModuleCfgMgr As Object : oModuleCfgMgr = oModuleCfgMgrSupplier.getUIConfigurationManager(moduleName)
+	Dim oMenuBarSettings As Object : oMenuBarSettings = oModuleCfgMgr.getSettings(gMenuBarUrl, True)
+	&apos;
+	getMenuBarSettings() = oMenuBarSettings
+End Function
+
+&apos;
+&apos;
+&apos;
+Function createPopupMenu(commandId$, label$, factory As Object) As Variant
+	&apos;
+	Dim aPopupMenu(3) As New com.sun.star.beans.PropertyValue
+	&apos; The command
+	aPopupMenu(0) = makePropertyValue(&quot;CommandURL&quot;, commandId)
+	&apos; Label and type
+	aPopupMenu(1) = makePropertyValue(&quot;Label&quot;, label)
+	aPopupMenu(2) = makePropertyValue(&quot;Type&quot;, com.sun.star.ui.ItemType.DEFAULT)
+	&apos;
+	aPopupMenu(3).Name = &quot;ItemDescriptorContainer&quot;
+	aPopupMenu(3).Value = factory.createInstanceWithContext(getDefaultContext())
+	&apos;
+	createPopupMenu() = aPopupMenu()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function createOpenUrlMenuItem(command$, label$) As Variant
+	&apos;
+	Dim aMenuItem(2) As New com.sun.star.beans.PropertyValue
+	&apos; The command
+	aMenuItem(0) = makePropertyValue(&quot;CommandURL&quot;, &quot;.uno:Open?URL:string=&quot; + command + &quot;&amp;FrameName:string=_default&quot;)
+	&apos; Label and type
+	aMenuItem(1) = makePropertyValue(&quot;Label&quot;, label)
+	aMenuItem(2) = makePropertyValue(&quot;Type&quot;, com.sun.star.ui.ItemType.DEFAULT)
+	&apos;
+	createOpenUrlMenuItem() = aMenuItem()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function createSeparatorMenuItem() As Variant
+	&apos;
+	Dim aMenuItem(0) As New com.sun.star.beans.PropertyValue
+	&apos; Type
+	aMenuItem(0) = makePropertyValue(&quot;Type&quot;, com.sun.star.ui.ItemType.SEPARATOR_LINE)
+	&apos;
+	createSeparatorMenuItem() = aMenuItem()
+End Function
+
+&apos;
+&apos;
+&apos;
+Sub __testMenu
+	&apos;removeToolbar(&quot;com.sun.star.script.BasicIDE&quot;, &quot;private:resource/toolbar/custom_test2&quot;)
+	&apos;createBasicIDEToolbar()
+	initMenu()
+	&apos;
+	Dim items(2)
+	items(0) = createOpenUrlMenuItem(&quot;file:///Users/rbe/Documents/Planung.odt&quot;, &quot;AZUL Planung&quot;)
+	items(1) = createSeparatorMenuItem()
+	items(2) = createOpenUrlMenuItem(&quot;file:///Users/rbe/Documents/Ideen und Todo 20091109.odt&quot;, &quot;Ideen und Todo 20091109&quot;)
+	&apos;createMenuInAllMainServices(&quot;Ralf&quot;, items())
+	removeMenuFromAllMainServices(&quot;Ralf&quot;)
+End Sub
+
+</script:module>

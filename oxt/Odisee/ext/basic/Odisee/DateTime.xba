@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="DateTime" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.DateTime
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Datumsumwandlung
+&apos;
+Function makeDateFromDateTimeString(sDateTimeString$) As String
+	&apos;2002-01-28 00:00:00.0
+	Const pt = &quot;.&quot;
+	makeDateFromDateTimeString() = Mid(sDateTimeString, 9, 2) &amp; pt &amp; Mid(sDateTimeString, 6, 2) &amp; pt &amp; Mid(sDateTimeString, 1, 4)
+End Function
+
+&apos;
+&apos; Convert date into string: YYYY-MM-DD.
+&apos;
+Function dateToIsoString(datum)
+	Const sep = &quot;-&quot;
+	Dim y$ : y = CStr(Year(datum))
+	Dim m$ : m = CStr(Month(datum))
+	If Len(m) = 1 Then
+		m = &quot;0&quot; &amp; m
+	End If
+	Dim d$ : d = CStr(Day(datum))
+	If Len(d) = 1 Then
+		d = &quot;0&quot; &amp; d
+	End If
+	dateToIsoString() = y &amp; sep &amp; m &amp; sep &amp; d
+End Function
+
+</script:module>

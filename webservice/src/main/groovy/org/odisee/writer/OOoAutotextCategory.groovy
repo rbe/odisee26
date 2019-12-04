@@ -11,38 +11,55 @@
  */
 package org.odisee.writer
 
-import org.odisee.api.OdiseeException
+import com.sun.star.container.NoSuchElementException
+import com.sun.star.container.XNameAccess
+import com.sun.star.lang.XComponent
+import com.sun.star.text.AutoTextContainer
+import com.sun.star.text.XAutoTextEntry
+import com.sun.star.text.XAutoTextGroup
+import com.sun.star.text.XBookmarksSupplier
+import com.sun.star.text.XText
+import com.sun.star.text.XTextContent
+import com.sun.star.text.XTextCursor
+import com.sun.star.text.XTextDocument
+import com.sun.star.text.XTextRange
+import groovy.util.logging.Log
 import org.odisee.uno.UnoCategory
 
 /**
  * Writer Autotexts.
  */
+@Log
 class OOoAutotextCategory {
 
     /**
      * Get an autotext.
      */
-    static com.sun.star.text.XAutoTextEntry getAutotext(com.sun.star.lang.XComponent component, String autotextGroup, String autotext) {
+    static XAutoTextEntry getAutotext(XComponent component, String autotextGroup, String autotext) {
         use(UnoCategory) {
             // Create service
-            def oAutotextContainer = component.oooConnection.xMultiComponentFactory.createInstanceWithContext('com.sun.star.text.AutoTextContainer', component.oooConnection.xOfficeComponentContext)
-            // Get autotext group: com.sun.star.text.XAutoTextGroup
-            def xAutotextGroup = null
+            def connection = component.oooConnection
+            AutoTextContainer oAutotextContainer = connection.xMultiComponentFactory
+                    .createInstanceWithContext('com.sun.star.text.AutoTextContainer',
+                            connection.xOfficeComponentContext)
+            XAutoTextGroup xAutotextGroup = null
             try {
-                xAutotextGroup = oAutotextContainer.uno(com.sun.star.container.XNameAccess).getByName(autotextGroup)
-            } catch (com.sun.star.container.NoSuchElementException e) {
-                println "Odisee: Could not find autotext group ${autotextGroup}"
+                XNameAccess xNameAccess = oAutotextContainer.uno(XNameAccess)
+                xAutotextGroup = (XAutoTextGroup) xNameAccess.getByName(autotextGroup)
+            } catch (NoSuchElementException e) {
+                log.error "Could not find autotext group ${autotextGroup}"
             }
             if (xAutotextGroup) {
                 try {
                     // Get autotext entry: com.sun.star.text.XAutoTextEntry
-                    def theAutotext = xAutotextGroup.uno(com.sun.star.container.XNameAccess).getByName(autotext).uno(com.sun.star.text.XAutoTextEntry)
-                    return theAutotext
-                } catch (e) {
-                    throw new OdiseeException("Cannot find autotext ${autotextGroup}.${autotext}", e)
+                    XNameAccess xNameAccess = xAutotextGroup.uno(XNameAccess)
+                    XAutoTextEntry autoTextEntry = xNameAccess.getByName(autotext)
+                    return autoTextEntry.uno(XAutoTextEntry)
+                } catch (NoSuchElementException e) {
+                    log.error "Cannot find autotext ${autotextGroup}.${autotext}", e
                 }
             }
-        }
+        } as XAutoTextEntry
     }
 
     /**
@@ -59,18 +76,20 @@ class OOoAutotextCategory {
      *     oEntry.applyTo(oTextCursor)
      * End Sub
      */
-    static void insertAutotextAtBookmark(com.sun.star.lang.XComponent component, String autotextGroup, String autotext, String bookmark) {
-        com.sun.star.text.XAutoTextEntry theAutotext = component.getAutotext(autotextGroup, autotext)
+    static void insertAutotextAtBookmark(XComponent component, String autotextGroup, String autotext, String bookmark) {
+        XAutoTextEntry theAutotext = component.getAutotext(autotextGroup, autotext)
         if (theAutotext) {
             use(UnoCategory) {
                 try {
                     // Goto bookmark and insert text
-                    def bm = component.uno(com.sun.star.text.XBookmarksSupplier).bookmarks.getByName(bookmark).uno(com.sun.star.text.XTextContent)
+                    XBookmarksSupplier xBookmarksSupplier = component.uno(XBookmarksSupplier)
+                    XNameAccess bookmarks = xBookmarksSupplier.bookmarks
+                    XTextContent textContent = bookmarks.getByName(bookmark).uno(XTextContent)
                     // Apply autotext at cursor position
-                    def anchor = bm.anchor
+                    XTextRange anchor = textContent.anchor
                     theAutotext.applyTo(anchor)
-                } catch (com.sun.star.container.NoSuchElementException e) {
-                    println "Odisee: Could not find bookmark ${bookmark}"
+                } catch (NoSuchElementException e) {
+                    log.info "Could not find bookmark ${bookmark}"
                 }
             }
         }
@@ -79,18 +98,17 @@ class OOoAutotextCategory {
     /**
      * Insert an autotext at the end of the document.
      */
-    static void insertAutotextAtEnd(com.sun.star.lang.XComponent component, String autotextGroup, String autotext) {
-        com.sun.star.text.XAutoTextEntry theAutotext = component.getAutotext(autotextGroup, autotext)
+    static void insertAutotextAtEnd(XComponent component, String autotextGroup, String autotext) {
+        XAutoTextEntry theAutotext = component.getAutotext(autotextGroup, autotext)
         if (theAutotext) {
             use(UnoCategory) {
                 // Create cursor and put it at end of document
-                /*com.sun.star.text.XText*/
-                def sup = component.uno(com.sun.star.text.XTextDocument).text
-                /*com.sun.star.text.XTextCursor*/
-                def cur = sup.createTextCursor()
-                cur.gotoEnd(false)
+                XTextDocument xTextDocument = component.uno(XTextDocument)
+                XText sup = xTextDocument.text
+                XTextCursor cursor = sup.createTextCursor()
+                cursor.gotoEnd(false)
                 // Apply autotext at cursor position
-                theAutotext.applyTo(cur)
+                theAutotext.applyTo(cursor)
             }
         }
     }

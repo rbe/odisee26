@@ -1,0 +1,6 @@
+POST http://localhost:8080/odisee/document/generate
+Accept: */*
+
+< ../../../main/docker/var/request/test_4_HalloOdisee_multiple_merge_pdf.xml
+
+###

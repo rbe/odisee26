@@ -1,3 +1,7 @@
+import static org.apache.tools.ant.taskdefs.condition.Os.FAMILY_MAC
+import static org.apache.tools.ant.taskdefs.condition.Os.FAMILY_WINDOWS
+import static org.apache.tools.ant.taskdefs.condition.Os.isFamily
+
 plugins {
     id 'de.undercouch.download' version '3.4.0'
     //id 'io.freefair.compress.ar' version '4.1.4'
@@ -5,3 +9,17 @@ plugins {
 
 group 'org.odisee'
 version '2.6'
+
+task osInfo {
+    group 'Odisee'
+    description 'Show information about the operating system'
+    //onlyIf { isFamily(FAMILY_MAC) }
+    doLast {
+        if (isFamily(FAMILY_WINDOWS)) {
+            println "*** Windows"
+        }
+        if (isFamily(FAMILY_MAC)) {
+            println "*** macOS"
+        }
+    }
+}

@@ -26,14 +26,15 @@ public final class UnoHelper {
     }
 
     public static String makeUnoUrl(InetSocketAddress socketAddress) {
-        return "socket,host=" + socketAddress.getHostName() + ",port=" + socketAddress.getPort() + ";urp;StarOffice.ServiceManager";
+        return String.format("socket,host=%s,port=%d;urp;StarOffice.ServiceManager",
+                socketAddress.getHostName(), socketAddress.getPort());
     }
 
     public static int getHost(String unoURL) throws OdiseeServerException {
         HashMap connectionParameters = null;
         try {
             connectionParameters = UnoUrl.parseUnoUrl(unoURL).getConnectionParameters();
-            return Integer.valueOf((String) connectionParameters.get("host"));
+            return Integer.parseInt((String) connectionParameters.get("host"));
         } catch (com.sun.star.lang.IllegalArgumentException e) {
             throw new OdiseeServerException("Cannot extract host from UNOHelper URL", e);
         }
@@ -43,7 +44,7 @@ public final class UnoHelper {
         HashMap connectionParameters = null;
         try {
             connectionParameters = UnoUrl.parseUnoUrl(unoURL).getConnectionParameters();
-            return Integer.valueOf((String) connectionParameters.get("port"));
+            return Integer.parseInt((String) connectionParameters.get("port"));
         } catch (com.sun.star.lang.IllegalArgumentException e) {
             throw new OdiseeServerException("Cannot extract port from UNOHelper URL", e);
         }

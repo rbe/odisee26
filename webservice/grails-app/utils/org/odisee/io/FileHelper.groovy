@@ -28,6 +28,7 @@ final class FileHelper {
      * Decompose a filename in name and extension.
      * @param file
      * @return Map Keys: name, ext.
+     * @deprecated Use {@link java.nio.file.Path}
      */
     public static Map decomposeFilename(final String filename) {
         final Map<String, String> map = [:]

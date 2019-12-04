@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterTextFrame" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterTextFrame
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Set text frame&apos;s print property
+&apos;
+Function printTextFrame(oDoc As Object, frameName$, bPrint As Boolean) As Boolean
+	If oDoc.TextFrames.hasByName(frameName) Then
+		Dim oFrame As Object : oFrame = oDoc.TextFrames.getByName(frameName)
+		oFrame.Print = bPrint
+		printTextFrame() = bPrint
+	Else
+		printTextFrame() = False
+	End If
+End Function
+
+&apos;
+&apos; Set all given text frame&apos;s print property
+&apos;
+Function printTextFrames(oDoc As Object, frameName As Array, bPrint As Boolean) As Boolean
+	Dim i%
+	For i = LBound(frameName()) To UBound(frameName())
+		printTextFrames() = printTextFrame(oDoc, frameName(i), bPrint)
+	Next
+End Function
+
+</script:module>

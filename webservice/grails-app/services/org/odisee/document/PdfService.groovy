@@ -10,6 +10,7 @@
  */
 package org.odisee.document
 
+import org.apache.pdfbox.io.MemoryUsageSetting
 import org.apache.pdfbox.multipdf.PDFMergerUtility
 
 import java.nio.file.Path
@@ -18,6 +19,14 @@ import java.nio.file.Path
  * Provide services for dealing with PDF files.
  */
 class PdfService {
+
+    static scope = 'singleton'
+
+    def memoryUsageSetting
+
+    PdfService() {
+        memoryUsageSetting = MemoryUsageSetting.setupMainMemoryOnly()
+    }
 
     /**
      * Merge multiple PDF files into a single one.
@@ -32,7 +41,7 @@ class PdfService {
                 merger.addSource(p.toFile())
             }
             merger.destinationFileName = target.toAbsolutePath().toString()
-            merger.mergeDocuments()
+            merger.mergeDocuments(memoryUsageSetting)
             target
         } catch (e) {
             log.error "Could not merge ${pdfFiles.join(', ')} into ${target}", e

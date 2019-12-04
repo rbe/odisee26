@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterAutoText" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterAutoText
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+&apos; http://wiki.services.openoffice.org/wiki/Documentation/DevGuide/Text/Auto_Text
+
+Option Explicit
+
+&apos; TODO: Insert auto text at bookmark
+
+&apos;
+&apos; Insert an autotext
+&apos;
+Function insertAutoText(oDoc As Object, oCur As Object, autoTextGroup$, autoText$) As String
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	&apos; Create service
+	Dim oAutoTextContainer : oAutoTextContainer = getProcessServiceManager().createInstance(&quot;com.sun.star.text.AutoTextContainer&quot;)
+	&apos; Get autotext group: com.sun.star.text.XAutoTextGroup
+	Dim oAutoTextGroup As Object : oAutoTextGroup = oAutoTextContainer.getByName(autoTextGroup) &apos; NoSuchElementException
+	&apos; Get autotext entry: com.sun.star.text.XAutoTextEntry
+	Dim oAutoText As Object : oAutoText = oAutoTextGroup.getByName(autoText)
+	&apos; Apply autotext at cursor position
+	oAutoText.applyTo(oCur)
+	&apos; Error handler
+	Exit Function
+	ErrorHandler:
+		insertAutoText() = &quot;Error!&quot;
+End Function
+
+&apos;
+&apos;
+&apos;
+Sub __testInsertAutoText
+	Dim oDoc As Object
+	oDoc = ThisComponent
+	Dim oCur As Object
+	oCur = oDoc.Text.createTextCursor()
+	insertAutoText(ThisComponent, oCur, &quot;Standard&quot;, &quot;AG&quot;)
+End Sub
+
+</script:module>

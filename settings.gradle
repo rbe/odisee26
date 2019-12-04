@@ -1,4 +1,10 @@
 rootProject.name = 'Odisee'
+
 include 'documentation'
 include 'docker'
 include 'webservice'
+include 'oxt'
+include ':clients:client-java'
+include ':clients:client-oracle'
+include ':clients:client-php'
+include ':clients:client-vbnet'

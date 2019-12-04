@@ -11,13 +11,15 @@
  */
 package org.odisee.debug
 
+import groovy.util.logging.Log
 import org.odisee.io.OdiseePath
 
 import java.lang.management.ManagementFactory
 import java.lang.management.ThreadMXBean
 import java.text.DecimalFormat
 
-final class Profile {
+@Log
+class Profile {
 
     private static final DecimalFormat DECIMAL_FORMAT = (DecimalFormat) DecimalFormat.instance
     private static final int FRACTION_DIGITS = 2
@@ -34,7 +36,7 @@ final class Profile {
         DECIMAL_FORMAT.maximumFractionDigits = FRACTION_DIGITS
         // Profiling enabled?
         if (OdiseePath.ODISEE_DEBUG || OdiseePath.ODISEE_PROFILE) {
-            println "Profile.<init>: Profiling is ${OdiseePath.ODISEE_PROFILE ? 'enabled' : 'disabled'}"
+            log.debug "Profile.<init>: Profiling is ${OdiseePath.ODISEE_PROFILE ? 'enabled' : 'disabled'}"
         }
     }
 
@@ -43,10 +45,10 @@ final class Profile {
      */
     static time = { String text, Closure closure ->
         if (OdiseePath.ODISEE_PROFILE) {
-            synchronized(Profile) {
+            synchronized (Profile) {
                 counter++
             }
-            println "${new java.util.Date().format(DATE_FORMAT)} Odisee: ${Thread.currentThread().name}: BEGIN-${counter} ${text}"
+            log.debug "${new java.util.Date().format(DATE_FORMAT)} ${Thread.currentThread().name}: BEGIN-${counter} ${text}"
             // Remember start time
             long startWall = System.currentTimeMillis()
             long startCpuTime = Profile.cpuTime
@@ -84,11 +86,11 @@ final class Profile {
             double wallCpuGap = Math.round(deltaWall - deltaCpuTimeInMs)
             // Log
             String total = String.format("total(%.0${FRACTION_DIGITS}f%%)=%.0${FRACTION_DIGITS}f ms", deltaCpuTimePct, deltaCpuTimeInMs)
-            String user =  String.format("user (%s%%)=%.0${FRACTION_DIGITS}f ms", deltaUserTimePct, deltaUserTimeInMs)
-            String sys =   String.format("sys  (%s%%)=%.0${FRACTION_DIGITS}f ms", deltaSystemTimePct, deltaSystemTimeInMs)
+            String user = String.format("user (%s%%)=%.0${FRACTION_DIGITS}f ms", deltaUserTimePct, deltaUserTimeInMs)
+            String sys = String.format("sys  (%s%%)=%.0${FRACTION_DIGITS}f ms", deltaSystemTimePct, deltaSystemTimeInMs)
             String wall = String.format('wall=%d ms', deltaWall)
             String wallGap = String.format("wallCpuGap=%.0${FRACTION_DIGITS}f ms", wallCpuGap)
-            println "${new java.util.Date().format(DATE_FORMAT)} Odisee: ${Thread.currentThread().name}: END-${counter} ${text}, ${total}, ${user}, ${sys}, ${wall}, ${wallGap}"
+            log.debug "${new java.util.Date().format(DATE_FORMAT)} ${Thread.currentThread().name}: END-${counter} ${text}, ${total}, ${user}, ${sys}, ${wall}, ${wallGap}"
             // Return result
             result
         } else {

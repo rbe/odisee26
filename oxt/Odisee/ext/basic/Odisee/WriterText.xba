@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterText" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterText
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Get complete text
+&apos;
+Function getCompleteText(oDoc As Object) As String
+	Dim oTextCur As Object
+	oTextCur = oDoc.Text.createTextCursor()
+	oTextCur.gotoEnd(True)
+	getCompleteText() = oTextCur.String
+End Function
+
+&apos;
+&apos; Insert a text (at end)
+&apos;
+Function insertText(oDoc As Object, s$, Optional oTextRange As com.sun.star.text.XTextRange) As com.sun.star.text.XTextRange
+	If IsMissing(oTextRange) Then
+		oTextRange = oDoc.Text.getEnd()
+	End If
+	oDoc.Text.insertString(oTextRange, s, False)
+	insertText() = oTextRange
+End Function
+
+&apos;
+&apos; Insert a new paragraph (at end)
+&apos;
+Function insertParagraphBreak(oDoc As Object, Optional oTextRange As Object) As Boolean
+	If IsMissing(oTextRange) Then
+		oTextRange = oDoc.Text.getEnd()
+	End If
+	oDoc.Text.insertControlCharacter(oTextRange, com.sun.star.text.ControlCharacter.PARAGRAPH_BREAK, False)
+	insertParagraphBreak() = True
+End Function
+
+&apos;
+&apos; Insert a new paragraph (at end)
+&apos;
+Function insertParagraph(oDoc As Object, Optional oTextRange As Object) As Boolean
+	If IsMissing(oTextRange) Then
+		oTextRange = oDoc.Text.getEnd()
+	End If
+	oDoc.Text.insertControlCharacter(oTextRange, com.sun.star.text.ControlCharacter.APPEND_PARAGRAPH, False)
+	insertParagraph() = True
+End Function
+
+&apos;
+&apos; Iterate through every paragraph
+&apos;
+Sub enumParagraphs
+	Dim tp As Object
+	tp = ThisComponent.Text.createEnumeration()
+	While tp.hasMoreElements()
+		x = tp.nextElement()
+		msgbox x.getString()
+	Wend
+End Sub
+
+&apos;
+&apos; Convert newline characters in a userfield into real newlines.
+&apos;
+Function ensureNewline(oDoc As Object, var$) As Boolean
+	Dim oFieldMaster As Object : oFieldMaster = oDoc.TextFieldMasters.getByName(&quot;com.sun.star.text.fieldmaster.User.&quot; + var)
+	If IsNull(oFieldMaster) Then
+		oFieldMaster = oDoc.TextFieldMasters.getByName(&quot;com.sun.star.text.fieldmaster.SetExpression.&quot; + var)
+	End If
+	Dim oField As Object : oField = oFieldMaster.DependentTextFields(0)
+	Dim content$ : content = oField.Content
+	oField.Anchor.setString(changeChar(oField.Anchor.String, Chr(10), Chr(13))
+	ensureNewline() = True
+End Function
+
+&apos;
+&apos; Set page style
+&apos;
+Function setPageDesc(n$) As Boolean
+	Dim tc As Object
+	tc = ThisComponent.Text.createTextCursor()
+	tc.gotoStart(false)
+	tc.PageDescName = n
+	setPageDesc() = True
+End Function
+
+</script:module>

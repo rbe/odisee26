@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# 
+# Odisee(R)
+#
+# Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt).
+# Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
+#
+# Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
+#
+
+host="127.0.0.1"
+
+set -o nounset
+set -o errexit
+
+if [[ $# != 1 ]]
+then
+    echo "usage: $0 { start }"
+    exit 1
+fi
+
+osname=$(uname -s)
+case "${osname}" in
+    "Darwin")
+        LO_HOME=/Applications/LibreOffice.app/Contents/MacOS
+    ;;
+    "GNU/Linux")
+        soffice="$(readlink $(which soffice))"
+        LO_HOME="$(dirname ${soffice})"
+    ;;
+    *)
+        echo "$0: unsupported operating system ${osname}"
+    ;;
+esac
+
+mode=${1:-}
+case "${mode}" in
+    start)
+        pushd ${LO_HOME} >/dev/null
+        for port in 2001 2002
+        do
+            userinst="${HOME}/odisee${port}"
+            mkdir -p ${userinst}
+            abstmpdir="$(pushd ${userinst} >/dev/null ; pwd ; popd >/dev/null)"
+            echo "Starting soffice at ${host}:${port}, UserInstallation=${userinst}, soffice=${LO_HOME}"
+            nohup ./soffice \
+                --accept="socket,host=${host},port=${port};urp;StarOffice.ServiceManager" \
+                -env:UserInstallation="file:///${userinst}" \
+                >${userinst}/soffice.log 2>&1 &
+        done
+        popd >/dev/null
+    ;;
+    *)
+        echo "Unknown mode ${mode}"
+    ;;
+esac
+
+exit 0

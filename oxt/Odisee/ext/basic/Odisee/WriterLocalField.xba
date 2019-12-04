@@ -1,0 +1,458 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterLocalField" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterLocalField
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Ensure that prefix for variable is correct
+&apos;
+Function checkLocalVarName(ByVal var$) As String
+	Dim s$ : s = SETEXPRMASTER &amp; &quot;.&quot;
+	&apos; Check given variable name for prefix: if present, strip it
+	Dim v$
+	If Left(var, Len(s)) = s Then
+		&apos;v = p + var
+		v = Replace(var, s, &quot;&quot;)
+	Else
+		v = var
+	End If
+	checkLocalVarName() = v
+End Function
+
+&apos;
+&apos; Create a variable (SetExpression)
+&apos; Type of variables: http://api.openoffice.org/docs/common/ref/com/sun/star/text/SetVariableType.html
+&apos;
+Function createLocalVar(oDoc As Object, ByVal var$, varType%, Optional numberingType%) As Variant
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	&apos;
+	var = checkLocalVarName(var)
+	&apos; Fully-qualified FieldMaster/variable name
+	Dim fqvn$
+	fqvn = SETEXPRMASTER &amp; &quot;.&quot; &amp; var
+	&apos; Create FieldMaster if it does not exist
+	Dim oMasterField As Object
+	If Not oDoc.TextfieldMasters.hasByName(fqvn) Then
+		oMasterField = oDoc.createInstance(SETEXPRMASTER)
+		oMasterField.Name = var
+		oMasterField.SubType = varType
+	Else
+		oMasterField = oDoc.TextFieldMasters.getByName(fqvn)
+	End If
+	&apos; Create variable
+	Dim oField As Object
+	oField = oDoc.createInstance(SETEXPR)
+	&apos; Set type
+	oField.SubType = varType
+	&apos; Set number format
+&apos;	If Not IsMissing(numberingType) Then
+&apos;		oField.NumberFormat = numberingType
+&apos;		oField.NumberingType = numberingType
+&apos;	End If
+	&apos; Attach to fieldmaster
+	oField.attachTextFieldMaster(oMasterField)
+	&apos; oField is returned
+	createLocalVar() = oField
+	Exit Function
+	&apos; Error handler
+	ErrorHandler:
+		createLocalVar() = Null
+End Function
+
+&apos;
+&apos; Create text/string variable (SetExpression)
+&apos;
+Function createLocalTextVar(oDoc As Object, ByVal var$) As Variant
+	createLocalTextVar() = createLocalVar(oDoc, var, com.sun.star.text.SetVariableType.STRING)
+End Function
+
+&apos;
+&apos; Create double variable (SetExpression)
+&apos;
+Function createLocalDoubleVar(oDoc As Object, ByVal var$) As Variant
+	createLocalDoubleVar() = createLocalVar(oDoc, var, com.sun.star.text.SetVariableType.VAR, 5002)
+End Function
+
+&apos;
+&apos; Create currency/EUR variable (SetExpression)
+&apos;
+Function createLocalCurrencyEurVar(oDoc As Object, ByVal var$) As Variant
+	createLocalCurrencyEurVar() = createLocalVar(oDoc, var, com.sun.star.text.SetVariableType.VAR, 15106)
+End Function
+
+&apos;
+&apos; Create simple variable (SetExpression)
+&apos;
+Function createLocalSimpleVar(oDoc As Object, ByVal var$) As Variant
+	createLocalSimpleVar() = createLocalVar(oDoc, var, com.sun.star.text.SetVariableType.VAR)
+End Function
+
+&apos;
+&apos; Is a variable of type text?
+&apos;
+Function isLocalTextVar(oDoc As Object, ByVal var$) As Boolean
+	isLocalTextVar() = False
+	&apos;
+	Dim oFieldMaster As Object
+	oFieldMaster = getLocalVarMaster(oDoc, var)
+	If Not IsNull(oFieldMaster) Then
+		If oFieldMaster.SubType = com.sun.star.text.SetVariableType.STRING Then
+			isLocalTextVar() = True
+		End If
+	End If
+End Function
+
+&apos;
+&apos; Is a variable of type simple?
+&apos;
+Function isLocalSimpleVar(oDoc As Object, ByVal var$) As Boolean
+	isLocalSimpleVar() = False
+	&apos;
+	Dim oFieldMaster As Object
+	oFieldMaster = getLocalVarMaster(oDoc, var)
+	If Not IsNull(oFieldMaster) Then
+		If oFieldMaster.SubType = com.sun.star.text.SetVariableType.VAR Then
+			isLocalSimpleVar() = True
+		End If
+	End If
+End Function
+
+&apos;
+&apos; Get fieldmaster of variable
+&apos;
+Function getLocalVarMaster(oDoc As Object, ByVal var$) As com.sun.star.beans.XPropertySet
+	&apos; Check variable name
+	var = checkLocalVarName(var)
+	&apos; Fully-qualified FieldMaster/variable name
+	Dim fqvn$
+	fqvn = SETEXPRMASTER &amp; &quot;.&quot; &amp; var
+	&apos; Get text field master
+	Dim oTextFieldMaster As Object
+	oTextFieldMaster = oDoc.getTextFieldMasters()
+	&apos; Get variable master
+	If oTextFieldMaster.hasByName(fqvn) Then
+		getLocalVarMaster() = oTextFieldMaster.getByName(fqvn)
+	End If
+End Function
+
+&apos;
+&apos; Get variable (SetExpression)
+&apos;
+Function getLocalVar(oDoc As Object, ByVal var$, Optional index As Long) As Variant &apos;com.sun.star.text.XDependentTextField
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	Dim oFieldMaster As Object
+	oFieldMaster = getLocalVarMaster(oDoc, var)
+	If Not IsNull(oFieldMaster) Then
+		getLocalVar() = oFieldMaster
+		&apos; Get and return dependent textfield by index?
+		If Not IsMissing(index) And UBound(oFieldMaster.DependentTextFields) &gt;= index Then
+			getLocalVar() = oFieldMaster.DependentTextFields(index)
+		End If
+	End If
+	Exit Function
+	&apos; ErrorHandler
+	ErrorHandler:
+		getLocalVar() = Null
+End Function
+
+&apos;
+&apos; Return Content or Value from textfield
+&apos;
+Function getLocalVarValue(oDoc As Object, ByVal var$, index As Long) As Variant
+	&apos; Get variable
+	Dim oField As Object
+	oField = getLocalVar(oDoc, var, index)
+	&apos; We got a a dependent textfield
+	If Not IsNull(oField) And oField.supportsService(SETEXPR) Then
+		&apos; Get Content or Value property depending on type
+		If isTextVariable(oDoc, oField) Then
+			getLocalVarValue() = oField.Content
+		ElseIf isSimpleVariable(oDoc, var) Then
+			getLocalVarValue() = oField.Value
+		End If
+	Else
+		&apos; Variable does not exist (at index)
+		getLocalVarValue() = Null
+	End If
+End Function
+
+&apos;
+&apos; Does a variable just have a FieldMaster or instances?
+&apos;
+Function localVarHasInstances(oDoc As Object, ByVal var$, Optional index As Long) As Boolean
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	Dim i%
+	i = localVarInstanceCount(oDoc, var)
+	If Not IsMissing(index) And i &gt;= index Then
+		localVarHasInstances() = True
+	ElseIf IsMissing(index) And i &gt; -1 Then
+		localVarHasInstances() = True
+	End If
+	&apos;
+	Exit Function
+	&apos; ErrorHandler
+	ErrorHandler:
+		localVarHasInstances() = False
+End Function
+
+&apos;
+&apos; How many instances a variable has got?
+&apos;
+Function localVarInstanceCount(oDoc As Object, ByVal var$) As Long
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	&apos; Check variable name
+	var = checkLocalVarName(var)
+	&apos; Fully-qualified FieldMaster/variable name
+	Dim fqvn$
+	fqvn = SETEXPRMASTER &amp; &quot;.&quot; &amp; var
+	&apos; Get text field master
+	Dim oTextFieldMaster As Object
+	oTextFieldMaster = oDoc.getTextFieldMasters()
+	If oTextFieldMaster.hasByName(fqvn) Then
+		&apos; Get FieldMaster
+		Dim oFieldMaster As Object
+		oFieldMaster = oTextFieldMaster.getByName(fqvn)
+		&apos; Return count of DependentTextFields
+		localVarInstanceCount() = aLen(oFieldMaster.DependentTextFields)
+		&apos;
+		Exit Function
+	End If
+	&apos; ErrorHandler
+	ErrorHandler:
+		localVarInstanceCount() = -1
+End Function
+
+&apos;
+&apos; If there are no instances or no index was given or index is higher than existing indexes
+&apos; or getLocalVar() returned a field master (e.g. when index does not exist)
+&apos;
+Function isNewLocalVar(oDoc As Object, ByVal var$, Optional index As Long) As Boolean
+	If Not localVarHasInstances(oDoc, var) Or getLocalVar(oDoc, var, index).supportsService(SETEXPRMASTER) Then
+		isNewLocalVar() = True
+	Else
+		isNewLocalVar() = False
+	End If
+End Function
+
+&apos;
+&apos; Set value of variable (SetExpression)
+&apos;
+Function setLocalVar(oDoc As Object, ByVal var$, Optional ByVal value As Variant, Optional index As Long) As Variant
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	&apos; Check variable name
+	var = checkLocalVarName(var)
+	&apos;
+	Dim v As Variant
+	v = getLocalVar(oDoc, var, index)
+	&apos; We got a variable or at least a fieldmaster
+	If Not IsNull(v) Then
+		&apos; Do we need create a new variable instance?
+		Dim newVar As Boolean
+		newVar = isNewLocalVar(oDoc, var, index)
+		If newVar Or IsMissing(index) Or index &gt; localVarInstanceCount(oDoc, var) Then
+			v = createLocalVar(oDoc, var, v.SubType)
+			index = 0
+		End If
+		&apos; Insert variable at end of text
+		If newVar Or IsMissing(index) Then
+			Dim oCur As Object : oCur = getTextCursorAtEndOfDocument(oDoc)
+			&apos; Hide text
+			oCur.CharHidden = True
+			&apos; Insert variable/SetExpression
+			oDoc.Text.insertTextContent(oCur, v, False)
+			&apos; Unhide text
+			oCur.CharHidden = False
+		End If
+		&apos; Set value
+		justSetLocalVar(oDoc, v, value)
+	End If
+	&apos; Refresh fields
+	oDoc.getTextFields().refresh()
+	Exit Function
+	&apos; ErrorHandler
+	ErrorHandler:
+End Function
+
+&apos;
+&apos; Just set value of local variable
+&apos;
+Function justSetLocalVar(oDoc As Object, oVar As Object, Optional ByVal value As Variant) As Variant
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	&apos;
+	If oVar.supportsService(SETEXPR) Then
+		If isLocalTextVar(oDoc, oVar.VariableName) Then
+			&apos; Save old value
+			justSetLocalVar() = oVar.Content
+			&apos; Set new value
+			&apos; If no value was given set value to its name
+			If IsMissing(value) Or IsNull(value) Then
+				oVar.Content = oVar.TextFieldMaster.Name
+			Else
+				oVar.Content = value
+			End If
+		ElseIf isLocalSimpleVar(oDoc, oVar.VariableName) Then
+			&apos; Save old value
+			justSetLocalVar() = oVar.Value
+			&apos; Set new value
+			&apos; If no value was given set value to zero
+			If IsMissing(value) Or IsNull(value) Then
+				oVar.Content = 0
+			Else
+				&apos; Determine NumberFormat
+				Dim nf%
+				If TypeName(value) = &quot;Long&quot; Or TypeName(value) = &quot;Double&quot; Then
+					oVar.Content = Replace(oVar.Content, &quot;,&quot;, oVar.TextFieldMaster.NumberingSeparator)
+					nf = 5002
+					nf = 5002
+				ElseIf TypeName(value) = &quot;String&quot; And Right(value, 2) = &quot; €&quot; Then
+					nf = 15106
+					nf = 15106
+					value = Left(value, InStr(value, &quot; &quot;))
+					value = RTrim(value)
+				End If
+				&apos; Set number format
+				oVar.NumberFormat = nf
+				oVar.NumberingType = nf
+				oVar.Content = value
+				oVar.Value = value
+			End If
+		End If
+	End If
+	Exit Function
+	&apos;
+	ErrorHandler:
+		justSetLocalVar() = Null
+End Function
+
+&apos;
+&apos;
+&apos;
+Function resetAllLocalVars(oDoc As Object) As Boolean
+	&apos;
+	&apos;On Error Goto ErrorHandler
+	&apos; Get text field master
+	Dim oTextFieldMaster As Object
+	oTextFieldMaster = oDoc.TextFieldMasters
+	Dim skipName(3)
+	skipName(0) = &quot;Illustration&quot;
+	skipName(1) = &quot;Table&quot;
+	skipName(2) = &quot;Text&quot;
+	skipName(3) = &quot;Drawing&quot;
+	&apos; Iterate through all fields
+	Dim oTextFieldMasters(), i%, z%
+	Dim oTFM As Object, dependentTextField(), j%
+	oTextFieldMasters() = oTextFieldMaster.getElementNames()
+	For i = 0 To UBound(oTextFieldMasters())
+		&apos; Skip?
+		For z = 0 To UBound(skipName())
+			If Right(oTextFieldMasters(i), Len(skipName(z))) = skipName(z) Then
+				Goto n
+			End If
+		Next
+		&apos;
+		If Left(oTextFieldMasters(i), Len(SETEXPRMASTER)) = SETEXPRMASTER Then
+			oTFM = oTextFieldMaster.getByName(oTextFieldMasters(i))
+			dependentTextField() = oTFM.DependentTextFields
+			If aLen(dependentTextField) &gt; 0 Then
+				For j = 0 To UBound(dependentTextField)
+					setLocalVar(oDoc, dependentTextField(j).VariableName, Null, j)
+				Next
+			Else
+				setLocalVar(oDoc, oTFM.Name)
+			End If
+		End If
+	n: Next
+	&apos; Refresh fields
+	oDoc.getTextFields().refresh()
+	Exit Function
+	&apos;
+	ErrorHandler:
+		resetAllLocalVars() = False
+End Function
+
+&apos;
+&apos;
+&apos;
+Function resetAllTextFieldTypes(oDoc As Object)
+	&apos; Document text
+	Dim oText As Object
+	oText = oDoc.Text
+	&apos; Enumeration
+	Dim oEnum(), oPara As Object, oParaEnum(), oT As Object, oTextField As Object
+	oEnum = oText.createEnumeration()
+   	While oEnum.hasMoreElements()
+		oPara = oEnum.nextElement()
+		oParaEnum = oPara.createEnumeration()
+		While oParaEnum.hasMoreElements()
+			oT = oParaEnum.nextElement()
+			If Not IsNull(oT.TextField) And Not IsEmpty(oT.TextField) Then
+				oTextField = oT.TextField
+				If Not IsNull(oTextField) And Not IsEmpty(oTextField) Then
+					oTextField.SubType = com.sun.star.text.SetVariableType.STRING
+				End If
+			End If
+		Wend
+	Wend
+	&apos; Refresh fields
+	oDoc.getTextFields().refresh()
+End Function
+
+&apos;
+&apos;
+&apos;
+Sub __testSetExpressions
+	Dim oDoc As Object
+	oDoc = ThisComponent
+	&apos;
+	MsgBox &quot;checkVariableName: var_a=&quot; &amp; checkLocalVarName(&quot;var_a&quot;)
+	MsgBox &quot;checkVariableName: &quot; &amp; SETEXPRMASTER &amp; &quot;.var_a=&quot; &amp; checkLocalVarName(SETEXPRMASTER &amp; &quot;.var_a&quot;)
+	Dim n$
+	&apos; Text variable
+	n = &quot;var_text&quot;
+	MsgBox &quot;createTextVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; IsNull(createLocalTextVar(oDoc, n)) &amp; &quot;=False?&quot;
+	MsgBox &quot;variableHasInstances: &quot; &amp; n &amp; &quot;=&quot; &amp; localVarHasInstances(oDoc, n) &amp; &quot;=False?&quot;
+	MsgBox &quot;setVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; setLocalVar(oDoc, n, &quot;value_a1&quot;) &amp; &quot;=?&quot;
+	MsgBox &quot;variableHasInstances: &quot; &amp; n &amp; &quot;=&quot; &amp; localVarHasInstances(oDoc, n) &amp; &quot;=True?&quot;
+	Dim varText As Variant
+	varText = getLocalVar(oDoc, n, 0)
+	If Not IsNull(varText) Then
+		MsgBox &quot;getVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; varText.Content &amp; &quot;=value_a1?&quot;
+	End If
+	&apos; Simple/double variable
+	n = &quot;var_double&quot;
+	MsgBox &quot;createSimpleVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; IsNull(createLocalDoubleVar(oDoc, n)) &amp; &quot;=False?&quot;
+	MsgBox &quot;variableHasInstances: &quot; &amp; n &amp; &quot;=&quot; &amp; localVarHasInstances(oDoc, n) &amp; &quot;=False?&quot;
+	MsgBox &quot;setVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; setLocalVar(oDoc, n, &quot;1234.5&quot;) &amp; &quot;=0?&quot;
+	MsgBox &quot;variableHasInstances: &quot; &amp; n &amp; &quot;=&quot; &amp; localVarHasInstances(oDoc, n) &amp; &quot;=True?&quot;
+	Dim varDouble As Variant
+	varDouble = getLocalVar(oDoc, n, 0)
+	If Not IsNull(varDouble) Then
+		MsgBox &quot;getVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; varDouble.Value &amp; &quot;=1234.5?&quot;
+	End If
+	&apos; Simple/EUR variable
+	n = &quot;var_eur&quot;
+	MsgBox &quot;createSimpleVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; IsNull(createLocalDoubleVar(oDoc, n)) &amp; &quot;=False?&quot;
+	MsgBox &quot;variableHasInstances: &quot; &amp; n &amp; &quot;=&quot; &amp; localVarHasInstances(oDoc, n) &amp; &quot;=False?&quot;
+	MsgBox &quot;setVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; setLocalVar(oDoc, n, &quot;3456.7 €&quot;) &amp; &quot;=0?&quot;
+	MsgBox &quot;variableHasInstances: &quot; &amp; n &amp; &quot;=&quot; &amp; localVarHasInstances(oDoc, n) &amp; &quot;=True?&quot;
+	Dim varEur As Variant
+	varEur = getLocalVar(oDoc, n, 0)
+	If Not IsNull(varEur) Then
+		MsgBox &quot;getVariable: &quot; &amp; n &amp; &quot;=&quot; &amp; varEur.Value &amp; &quot;=3456.7?&quot;
+	End If
+End Sub
+
+</script:module>

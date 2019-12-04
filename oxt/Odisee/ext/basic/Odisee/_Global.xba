@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="_Global" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee._Global
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos; Version
+Public Const VERSION = &quot;3.0&quot;
+Public Const VERSIONSTRING = &quot;Odisee 3.0&quot;
+
+&apos; Platform information
+Public PLATFORM()
+
+&apos; Actual user&apos;s data
+Public USER()
+
+&apos; Prefix für Benutzerfelder
+Public Const USERFIELDMASTER = &quot;com.sun.star.text.fieldmaster.User&quot;
+Public Const USERFIELD = &quot;com.sun.star.text.textfield.User&quot;
+Public Const SETEXPRMASTER = &quot;com.sun.star.text.fieldmaster.SetExpression&quot;
+Public Const SETEXPR = &quot;com.sun.star.text.textfield.SetExpression&quot;
+
+&apos; Constants for message boxes
+Public Const MSGBOX_OK_BUTTON = 0 &apos; Display OK button only.
+Public Const MSGBOX_OKCANCEL_BUTTON = 1 &apos; Display OK and Cancel buttons.
+Public Const MSGBOX_ABORTRETRYIGNORE_BUTTON = 2 &apos; Display Abort, Retry, and Ignore buttons.
+Public Const MSGBOX_YESNOCANCEL_BUTTON = 3 &apos; Display Yes, No, and Cancel buttons.
+Public Const MSGBOX_YESNO_BUTTON = 4 &apos; Display Yes and No buttons.
+Public Const MSGBOX_RETRYCANCEL_BUTTON = 5 &apos; Display Retry and Cancel buttons.
+Public Const MSGBOX_ERROR = 16 &apos; Add the Stop icon to the dialog.
+Public Const MSGBOX_QUESTION = 32 &apos; Add the Question icon to the dialog.
+Public Const MSGBOX_QUESTION_YESNO_BUTTON = MSGBOX_YESNO_BUTTON + MSGBOX_QUESTION &apos; Question with Yes/No buttons
+Public Const MSGBOX_WARNING = 48 &apos; Add the Exclamation Point icon to the dialog.
+Public Const MSGBOX_INFO = 64 &apos; Add the Information icon to the dialog.
+Public Const MSGBOX_FIRSTDEFAULT_BUTTON = 128 &apos; First button in the dialog as default button.
+Public Const MSGBOX_SECONDDEFAULT_BUTTON = 256 &apos; Second button in the dialog as default button.
+Public Const MSGBOX_THIRDDEFAULT_BUTTON = 512 &apos; Third button in the dialog as default button.
+Public Const MSGBOX_RET_OK = 1 &apos; OK
+Public Const MSGBOX_RET_CANCEL = 2 &apos; Cancel
+Public Const MSGBOX_RET_ABORT = 3 &apos; Abort
+Public Const MSGBOX_RET_RETRY = 4 &apos; Retry
+Public Const MSGBOX_RET_IGNORE = 5 &apos; Ignore
+Public Const MSGBOX_RET_YES = 6 &apos; Yes
+Public Const MSGBOX_RET_NO = 7 &apos; No
+
+&apos;
+&apos; Initialize Odisee.
+&apos;
+Sub init()
+	GlobalScope.BasicLibraries.loadLibrary(&quot;Tools&quot;)
+	&apos; Error handler
+	On Error Goto err
+	PLATFORM() = Odisee.UNO.getPlatform(&quot;Odisee&quot;)
+	USER() = Odisee.UNO.getUserData()
+	&apos; Error handler
+	Exit Sub
+	err:
+		MsgBox(&quot;Odisee:&quot; &amp; Chr(13) &amp; &quot;Konnte keine Informationen über die Platform bekommen!&quot;, MSGBOX_ERROR, VERSIONSTRING)
+End Sub
+
+</script:module>

@@ -1,0 +1,671 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Odisee-ext-build-base" default="help">
+    <!--
+
+        Global project settings.
+
+    -->
+    <!-- Include Odisee in extension? -->
+    <property name="include.odisee.ext" value="false"/>
+    <!-- Project base directory -->
+    <property name="base.dir" location="${basedir}"/>
+    <!-- Additional Ant libraries -->
+    <property name="antlib.dir" location="${basedir}/../antlib"/>
+    <!-- Project etc directory -->
+    <property name="etc.dir" value="${basedir}/etc"/>
+    <!--
+
+        Ant libraries.
+
+    -->
+    <!-- Ant contrib -->
+    <taskdef resource="net/sf/antcontrib/antlib.xml">
+        <classpath>
+            <pathelement location="${antlib.dir}/ant-contrib-1.0b3.jar"/>
+        </classpath>
+    </taskdef>
+    <!-- XMLTask -->
+    <taskdef name="xmltask" classname="com.oopsconsultancy.xmltask.ant.XmlTask">
+        <classpath>
+            <pathelement location="${antlib.dir}/xmltask.jar"/>
+        </classpath>
+    </taskdef>
+    <!--
+
+        Directories.
+
+    -->
+    <!-- etc -->
+    <property name="etc.dir" value="${basedir}/etc"/>
+    <!-- Binaries -->
+    <property name="bin.dir" value="${basedir}/bin"/>
+    <!-- Build -->
+    <property name="build.dir" value="${basedir}/build"/>
+    <!-- Distribution -->
+    <property name="dist.dir" value="${basedir}/dist"/>
+    <!--
+
+        Build settings.
+
+    -->
+    <!-- Name of extension: default is name of directory, can be overridden in build.properties -->
+    <basename property="ext.name" file="${basedir}"/>
+    <loadproperties srcFile="${basedir}/build.properties" prefix="prop"/>
+    <!--
+
+        Odisee OpenOffice Extension
+
+    -->
+    <!-- ext.name: Remove spaces and dashes -->
+    <propertyregex property="ext.name" input="${prop.ext.name}" override="true" regexp="[ -]" replace="" global="true"/>
+    <!-- Vendor prefix -->
+    <property name="ext.vendor.prefix" value="vnd.artofcoding.odisee"/>
+    <!-- Name of server-update.xml -->
+    <property name="server.update.xml" value="${prop.ext.name}-update.xml"/>
+    <!-- Version number -->
+    <property name="ext.version.number" value="${prop.ext.release.major}.${prop.ext.release.minor}.${prop.ext.release.build}"/>
+    <!--
+
+        Extension sources
+
+    -->
+    <!-- Extension source base directory -->
+    <property name="ext.dir" value="${basedir}/ext"/>
+    <!-- Autocorrection -->
+    <property name="ext.autocorr.dir" value="${ext.dir}/autocorr"/>
+    <!-- Autotexts -->
+    <property name="ext.autotexts.dir" value="${ext.dir}/autotexts"/>
+    <!-- Databases -->
+    <property name="ext.databases.dir" value="${ext.dir}/databases"/>
+    <!-- Basic module(s), each in its own subdirectory -->
+    <property name="ext.basic.dir" value="${ext.dir}/basic"/>
+    <!-- User configuration -->
+    <property name="ext.conf.dir" value="${ext.dir}/conf"/>
+    <!-- Extension configuration -->
+    <property name="ext.etc.dir" value="${ext.dir}/etc"/>
+    <!-- Galleries -->
+    <property name="ext.gallery.dir" value="${ext.dir}/gallery"/>
+    <!-- Fonts -->
+    <property name="ext.fonts.dir" value="${ext.dir}/fonts"/>
+    <!-- Images -->
+    <property name="ext.images.dir" value="${ext.dir}/images"/>
+    <!-- Extension metadata -->
+    <property name="ext.metainf.dir" value="${ext.dir}/META-INF"/>
+    <!-- -->
+    <property name="ext.packages.dir" value="${ext.dir}/packages"/>
+    <!-- Templates -->
+    <property name="ext.templates.dir" value="${ext.dir}/templates"/>
+    <!-- Wordbooks -->
+    <property name="ext.wordbooks.dir" value="${ext.dir}/wordbooks"/>
+    <!--
+
+        Extension build directories
+
+    -->
+    <property name="build.ext.dir" value="${basedir}/build/ext"/>
+    <property name="build.ext.autocorr.dir" value="${build.ext.dir}/autocorr"/>
+    <property name="build.ext.autotexts.dir" value="${build.ext.dir}/autotexts"/>
+    <property name="build.ext.databases.dir" value="${build.ext.dir}/databases"/>
+    <property name="build.ext.basic.dir" value="${build.ext.dir}/basic"/>
+    <property name="build.ext.conf.dir" value="${build.ext.dir}/conf"/>
+    <property name="build.ext.etc.dir" value="${build.ext.dir}/etc"/>
+    <property name="build.ext.gallery.dir" value="${build.ext.dir}/gallery"/>
+    <property name="build.ext.fonts.dir" value="${build.ext.dir}/fonts"/>
+    <property name="build.ext.images.dir" value="${build.ext.dir}/images"/>
+    <property name="build.ext.metainf.dir" value="${build.ext.dir}/META-INF"/>
+    <property name="build.ext.packages.dir" value="${build.ext.dir}/packages"/>
+    <property name="build.ext.registration.dir" value="${build.ext.dir}/registration"/>
+    <property name="build.ext.templates.dir" value="${build.ext.dir}/templates"/>
+    <property name="build.ext.wordbooks.dir" value="${build.ext.dir}/wordbooks"/>
+    <!--
+
+        Import other build.xmls.
+
+    -->
+    <!--
+
+        Generate META-INF/manifest.xml.
+
+    -->
+    <property name="manifestxmlbuf" value="file://${build.dir}/manifestxml.buffer"/>
+    <!-- -->
+    <target name="make-manifestxml">
+        <!-- Does the Odisee Basic library exist in the ext/basic directory? -->
+        <!--
+        <available file="${ext.basic.dir}/Odisee" property="available.basic.odisee"/>
+        <equals arg1="${include.odisee.ext}" arg2="true"/>
+        -->
+        <!-- Build empty manifest.xml -->
+        <antcall target="-create-empty-manifest"/>
+        <!-- Add basic libraries to manifest.xml -->
+        <if>
+            <available file="${ext.basic.dir}" type="dir"/>
+            <then>
+                <foreach maxThreads="1" target="-add-basiclibrary-to-manifest" param="f">
+                    <path>
+                        <dirset dir="${ext.basic.dir}" casesensitive="yes">
+                            <include name="*"/>
+                        </dirset>
+                    </path>
+                </foreach>
+            </then>
+        </if>
+        <!-- Addons.xcu -->
+        <if>
+            <available file="${ext.etc.dir}/Addons.xcu"/>
+            <then>
+                <antcall target="-add-addonsxcu-to-manifest" inheritRefs="true"/>
+            </then>
+        </if>
+        <!-- Paths.xcu -->
+        <if>
+            <available file="${ext.dir}/Paths.xcu"/>
+            <then>
+                <antcall target="-add-pathsxcu-to-manifest"/>
+            </then>
+        </if>
+        <!-- registrymodifications.xcu -->
+        <if>
+            <available file="${ext.etc.dir}/registrymodifications.xcu"/>
+            <then>
+                <antcall target="-add-registrymodificationsxcu-to-manifest"/>
+            </then>
+        </if>
+        <!-- pkg-description.txt -->
+        <if>
+            <available file="${ext.etc.dir}/pkg-description.txt"/>
+            <then>
+                <antcall target="-add-pkgdescription-to-manifest"/>
+            </then>
+        </if>
+        <!-- Write META-INF/manifest.xml -->
+        <xmltask dest="${build.ext.metainf.dir}/manifest.xml">
+            <paste path="/" buffer="${manifestxmlbuf}"/>
+            <print path="/"/>
+        </xmltask>
+    </target>
+    <!-- manifest.xml helper tasks -->
+    <target name="-create-empty-manifest">
+        <xmltask destbuffer="${manifestxmlbuf}">
+            <insert path="/"><![CDATA[
+                <manifest:manifest xmlns:manifest="http://openoffice.org/2001/manifest"></manifest:manifest>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-addonsxcu-to-manifest">
+        <xmltask sourcebuffer="${manifestxmlbuf}" destbuffer="${manifestxmlbuf}">
+            <insert path="/*[local-name()='manifest']"><![CDATA[
+                <manifest:file-entry manifest:full-path="etc/Addons.xcu" manifest:media-type="application/vnd.sun.star.configuration-data" xmlns:manifest="http://openoffice.org/2001/manifest"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-pathsxcu-to-manifest">
+        <xmltask sourcebuffer="${manifestxmlbuf}" destbuffer="${manifestxmlbuf}">
+            <insert path="/*[local-name()='manifest']"><![CDATA[
+                <manifest:file-entry manifest:full-path="Paths.xcu" manifest:media-type="application/vnd.sun.star.configuration-data" xmlns:manifest="http://openoffice.org/2001/manifest"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-registrymodifications-to-manifest">
+        <xmltask sourcebuffer="${manifestxmlbuf}" destbuffer="${manifestxmlbuf}">
+            <insert path="/*[local-name()='manifest']"><![CDATA[
+                <manifest:file-entry manifest:full-path="etc/registrymodifications.xcu" manifest:media-type="application/vnd.sun.star.configuration-data" xmlns:manifest="http://openoffice.org/2001/manifest"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-pkgdescription-to-manifest">
+        <xmltask sourcebuffer="${manifestxmlbuf}" destbuffer="${manifestxmlbuf}">
+            <insert path="/*[local-name()='manifest']"><![CDATA[
+                <manifest:file-entry manifest:full-path="etc/pkg-description.txt" manifest:media-type="application/vnd.sun.star.package-bundle-description" xmlns:manifest="http://openoffice.org/2001/manifest"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-basiclibrary-to-manifest">
+        <!-- Basename -->
+        <basename file="${f}" property="dirname"/>
+        <echo message="${dirname}"/>
+        <xmltask sourcebuffer="${manifestxmlbuf}" destbuffer="${manifestxmlbuf}">
+            <insert path="/*[local-name()='manifest']"><![CDATA[
+                <manifest:file-entry manifest:full-path="basic/${dirname}/" manifest:media-type="application/vnd.sun.star.basic-library" xmlns:manifest="http://openoffice.org/2001/manifest"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <!--
+
+        Generate description.xml.
+
+    -->
+    <property name="descriptionxmlbuf" value="file://${build.dir}/description.buffer"/>
+    <!-- description.xml helper tasks -->
+    <target name="-create-empty-description">
+        <xmltask destbuffer="${descriptionxmlbuf}">
+            <insert path="/"><![CDATA[
+                <description xmlns="http://openoffice.org/extensions/description/2006" xmlns:dep="http://openoffice.org/extensions/description/2006" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-identifier-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <identifier value="${ext.vendor.prefix}.${ext.name}" xmlns="http://openoffice.org/extensions/description/2006"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-version-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <version value="${ext.version.number}" xmlns="http://openoffice.org/extensions/description/2006"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-dependencies-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <dependencies xmlns="http://openoffice.org/extensions/description/2006"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-ooominimalversion-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="//*[local-name()='dependencies']"><![CDATA[
+                <OpenOffice.org-minimal-version value="${prop.ext.ooo.minver}" dep:name="OpenOffice.org ${prop.ext.ooo.minver}"
+                    xmlns="http://openoffice.org/extensions/description/2006" xmlns:dep="http://openoffice.org/extensions/description/2006"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-displayname-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <display-name xmlns="http://openoffice.org/extensions/description/2006">
+                    <name lang="en">${prop.ext.name}</name>
+                    <name lang="de">${prop.ext.name}</name>
+                </display-name>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-publisher-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <publisher xmlns="http://openoffice.org/extensions/description/2006">
+                    <name xlink:href="${prop.ext.vendor.url}" lang="en" xmlns:xlink="http://www.w3.org/1999/xlink">${prop.ext.vendor.name}</name>
+                </publisher>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-icon-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <icon xmlns="http://openoffice.org/extensions/description/2006">
+                    <default xlink:href="${prop.ext.icon}" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+                </icon>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-updateinformation-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <update-information xmlns="http://openoffice.org/extensions/description/2006">
+                    <src xlink:href="${prop.ext.update.url.prefix}/${server.update.xml}" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+                </update-information>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-registration-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[
+                <registration xmlns="http://openoffice.org/extensions/description/2006"/>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-licensetxt-to-description">
+        <xmltask sourcebuffer="${descriptionxmlbuf}" destbuffer="${descriptionxmlbuf}">
+            <insert path="//*[local-name()='registration']"><![CDATA[
+                <simple-license accept-by="admin" default-license-id="ID0" suppress-on-update="true" xmlns="http://openoffice.org/extensions/description/2006">
+                    <license-text xlink:href="etc/LICENSE.txt" lang="en" license-id="ID0" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+                </simple-license>
+            ]]></insert>
+        </xmltask>
+    </target>
+    <!-- -->
+    <target name="make-descriptionxml">
+        <antcall target="-create-empty-description"/>
+        <antcall target="-add-identifier-to-description"/>
+        <antcall target="-add-version-to-description"/>
+        <antcall target="-add-dependencies-to-description"/>
+        <antcall target="-add-ooominimalversion-to-description"/>
+        <antcall target="-add-displayname-to-description"/>
+        <antcall target="-add-publisher-to-description"/>
+        <antcall target="-add-icon-to-description"/>
+        <antcall target="-add-updateinformation-to-description"/>
+        <if>
+            <available file="${ext.etc.dir}/LICENSE.txt"/>
+            <then>
+                <antcall target="-add-registration-to-description"/>
+                <antcall target="-add-licensetxt-to-description"/>
+            </then>
+        </if>
+        <!-- Write META-INF/manifest.xml -->
+        <xmltask dest="${build.ext.dir}/description.xml">
+            <paste path="/" buffer="${descriptionxmlbuf}"/>
+            <print path="/"/>
+        </xmltask>
+    </target>
+    <!--
+
+        Generate server-update.xml.
+
+    -->
+    <property name="serverupdatexmlbuf" value="file://${build.dir}/serverupdatexml.buffer"/>
+    <!-- server-update.xml helper tasks -->
+    <target name="-create-empty-serverxml">
+        <xmltask destbuffer="${serverupdatexmlbuf}">
+            <insert path="/"><![CDATA[<description xmlns="http://openoffice.org/extensions/update/2006" xmlns:xlink="http://www.w3.org/1999/xlink"></description>]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-identifier-to-serverxml">
+        <xmltask sourcebuffer="${serverupdatexmlbuf}" destbuffer="${serverupdatexmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[<identifier value="${ext.vendor.prefix}.${ext.name}" xmlns="http://openoffice.org/extensions/update/2006"/>]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-version-to-serverxml">
+        <xmltask sourcebuffer="${serverupdatexmlbuf}" destbuffer="${serverupdatexmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[<version value="${ext.version.number}" xmlns="http://openoffice.org/extensions/update/2006"/>]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-updatedownload-to-serverxml">
+        <xmltask sourcebuffer="${serverupdatexmlbuf}" destbuffer="${serverupdatexmlbuf}">
+            <insert path="/*[local-name()='description']"><![CDATA[<update-download xmlns="http://openoffice.org/extensions/update/2006"><src xlink:href="${prop.ext.update.url.prefix}/${ext.name}.oxt" xmlns:xlink="http://www.w3.org/1999/xlink"/></update-download>]]></insert>
+        </xmltask>
+    </target>
+    <!-- -->
+    <target name="make-serverupdatexml">
+        <antcall target="-create-empty-serverxml"/>
+        <antcall target="-add-identifier-to-serverxml"/>
+        <antcall target="-add-version-to-serverxml"/>
+        <antcall target="-add-updatedownload-to-serverxml"/>
+        <!-- Write META-INF/manifest.xml -->
+        <xmltask dest="${dist.dir}/${server.update.xml}">
+            <paste path="/" buffer="${serverupdatexmlbuf}"/>
+            <print path="/"/>
+        </xmltask>
+    </target>
+    <!--
+
+        Generate Addons.xcu.
+
+    -->
+    <property name="addonsxcubuf" value="file://${build.dir}/addonsxcu.buffer"/>
+    <property name="addonsxcu-menubar-id" value="${ext.name}.OfficeMenuBar"/>
+    <!-- Addons.xcu helper tasks -->
+    <target name="-create-empty-addonsxcu">
+        <xmltask destbuffer="${addonsxcubuf}">
+            <insert path="/"><![CDATA[<oor:component-data xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" oor:name="Addons" oor:package="org.openoffice.Office"></oor:component-data>]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-addonui-to-addonsxcu">
+        <xmltask sourcebuffer="${addonsxcubuf}" destbuffer="${addonsxcubuf}">
+            <insert path="/*[local-name()='component-data']"><![CDATA[
+        <node oor:name="AddonUI" xmlns:oor="http://openoffice.org/2001/registry">
+        </node> <!-- oor:name="AddonUI" -->
+        ]]></insert>
+        </xmltask>
+    </target>
+    <!--
+        Add OfficeMenuBar.
+        @param title
+    -->
+    <target name="-add-officemenubar-to-addonsxcu">
+        <xmltask sourcebuffer="${addonsxcubuf}" destbuffer="${addonsxcubuf}">
+            <insert path="//*[local-name()='node'][@oor:name='AddonUI']"><![CDATA[
+        <node oor:name="OfficeMenuBar" xmlns:oor="http://openoffice.org/2001/registry">
+            <node oor:name="${addonsxcu-menubar-id}" oor:op="replace">
+                <prop oor:name="Title" oor:type="xs:string">
+                    <value>${title}</value>
+                </prop>
+            </node>
+        </node> <!-- oor:name="OfficeMenuBar" -->
+        ]]></insert>
+        </xmltask>
+    </target>
+    <target name="-add-submenu-to-addonsxcu">
+        <xmltask sourcebuffer="${addonsxcubuf}" destbuffer="${addonsxcubuf}">
+            <insert path="//*[local-name()='node'][@oor:name='${addonsxcu-menubar-id}']"><![CDATA[
+        <node oor:name="Submenu" xmlns:oor="http://openoffice.org/2001/registry">
+        </node> <!-- oor:name="Submenu" -->
+        ]]></insert>
+        </xmltask>
+    </target>
+    <!--
+        Add menu separator.
+        @param id
+    -->
+    <target name="-add-submenuseparator-to-addonsxcu">
+        <xmltask sourcebuffer="${addonsxcubuf}" destbuffer="${addonsxcubuf}">
+            <insert path="//*[local-name()='node'][@oor:name='Submenu']"><![CDATA[
+        <node oor:name="${id}" oor:op="replace" xmlns:oor="http://openoffice.org/2001/registry">
+            <prop oor:name="URL" oor:type="xs:string" xmlns:oor="http://openoffice.org/2001/registry">
+                <value xmlns:oor="http://openoffice.org/2001/registry">private:separator</value>
+            </prop>
+        </node> <!-- oor:name="${id}" -->
+        ]]></insert>
+        </xmltask>
+    </target>
+    <!--
+        Add menu item.
+        @param id
+        @param url
+        @param title
+        @param target
+    -->
+    <target name="-add-menuitem-to-addonsxcu">
+        <!-- Basename -->
+        <basename file="${f}" property="filename"/>
+        <!-- functionName: Replace spaces and dashes with underscore -->
+        <propertyregex override="true" property="functionName" input="${filename}" regexp="[ -]" replace="_" global="true"/>
+        <!-- functionName: Remove extension -->
+        <propertyregex override="true" property="functionName" input="${functionName}" regexp=".o\wt$" replace="" global="true"/>
+        <!-- title: Remove extension -->
+        <propertyregex override="true" property="title" input="${filename}" regexp=".o\wt$" replace="" global="true"/>
+        <!-- id -->
+        <property name="id" value="m${functionName}"/>
+        <!-- url -->
+        <property name="url.type" value="vnd.sun.star.script"/>
+        <property name="url.function" value="${ext.name}._Menu.${functionName}"/>
+        <property name="url.language" value="Basic"/>
+        <property name="url.location" value="application"/>
+        <!-- target -->
+        <property name="target" value="_self"/>
+        <!-- -->
+        <xmltask sourcebuffer="${addonsxcubuf}" destbuffer="${addonsxcubuf}">
+            <insert path="//*[local-name()='node'][@oor:name='Submenu']"><![CDATA[
+        <node oor:name="${id}" oor:op="replace" xmlns:oor="http://openoffice.org/2001/registry">
+            <prop oor:name="URL" oor:type="xs:string" xmlns:oor="http://openoffice.org/2001/registry">
+                <value xmlns:oor="http://openoffice.org/2001/registry">${url.type}:${url.function}?language=${url.language}&amp;location=${url.location}</value>
+            </prop>
+            <prop oor:name="Title" oor:type="xs:string" xmlns:oor="http://openoffice.org/2001/registry">
+                <value xmlns:oor="http://openoffice.org/2001/registry">${title}</value>
+            </prop>
+            <prop oor:name="Target" oor:type="xs:string" xmlns:oor="http://openoffice.org/2001/registry">
+                <value xmlns:oor="http://openoffice.org/2001/registry">${target}</value>
+            </prop>
+        </node> <!-- oor:name="${id}" -->
+        ]]></insert>
+        </xmltask>
+    </target>
+    <!-- -->
+    <target name="make-addonsxcu">
+        <!-- When an Addons.xcu file was provided and property odisee.override.addonsxcu is not set, copy it, otherwise create a new one -->
+        <if>
+            <and>
+                <available file="${ext.etc.dir}/Addons.xcu"/>
+                <not>
+                    <!-- ant -Dodisee.override.addonsxcu=t -->
+                    <isset property="odisee.override.addonsxcu"/>
+                </not>
+            </and>
+            <then>
+                <echo message="Addons.xcu provided by user, won't create one."/>
+                <!--copy/-->
+            </then>
+            <else>
+                <!-- Create empty Addons.xcu -->
+                <antcall target="-create-empty-addonsxcu"/>
+                <!-- Add AddonUI -->
+                <antcall target="-add-addonui-to-addonsxcu"/>
+                <!-- Add OfficeMenuBar -->
+                <antcall target="-add-officemenubar-to-addonsxcu">
+                    <param name="title" value="${ext.name}"/>
+                </antcall>
+                <!-- Add Submenu -->
+                <antcall target="-add-submenu-to-addonsxcu"/>
+                <!-- Add menu items for templates included in extension -->
+                <if>
+                    <available file="${ext.templates.dir}" type="dir"/>
+                    <then>
+                        <foreach maxThreads="1" target="-add-menuitem-to-addonsxcu" param="f">
+                            <path>
+                                <fileset dir="${ext.templates.dir}" casesensitive="yes">
+                                    <include name="**/*.o**"/>
+                                </fileset>
+                            </path>
+                        </foreach>
+                    </then>
+                </if>
+                <!-- Add separator and about box -->
+                <antcall target="-add-submenuseparator-to-addonsxcu">
+                    <param name="id" value="sepAboutBox"/>
+                </antcall>
+                <!-- Write META-INF/manifest.xml -->
+                <xmltask dest="${build.ext.dir}/Addons.xcu">
+                    <paste path="/" buffer="${addonsxcubuf}"/>
+                    <print path="/"/>
+                </xmltask>
+            </else>
+        </if>
+    </target>
+    <!--
+
+        Help.
+
+    -->
+    <target name="help">
+        <echo message="Please choose a target manually"/>
+    </target>
+    <!--
+
+        Cleanup.
+
+    -->
+    <target name="clean">
+        <property environment="env"/>
+        <!-- Clean build.dir -->
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+    </target>
+    <!--
+
+        Create extension directory structure.
+
+    -->
+    <target name="make-ext-dirs">
+        <mkdir dir="${build.ext.dir}"/>
+        <mkdir dir="${build.ext.autocorr.dir}"/>
+        <mkdir dir="${build.ext.autotexts.dir}"/>
+        <mkdir dir="${build.ext.databases.dir}"/>
+        <mkdir dir="${build.ext.basic.dir}"/>
+        <mkdir dir="${build.ext.conf.dir}"/>
+        <mkdir dir="${build.ext.gallery.dir}"/>
+        <mkdir dir="${build.ext.fonts.dir}"/>
+        <mkdir dir="${build.ext.images.dir}"/>
+        <mkdir dir="${build.ext.metainf.dir}"/>
+        <mkdir dir="${build.ext.packages.dir}"/>
+        <mkdir dir="${build.ext.templates.dir}"/>
+        <mkdir dir="${build.ext.wordbooks.dir}"/>
+    </target>
+    <!--
+
+        Build extension.
+
+    -->
+    <target name="build" depends="make-ext-dirs,make-manifestxml,make-descriptionxml,make-serverupdatexml">
+        <!-- Create dist directory -->
+        <mkdir dir="${dist.dir}"/>
+        <!-- Copy content of extension folder -->
+        <copy todir="${build.ext.dir}">
+            <fileset dir="${ext.dir}">
+                <include name="**"/>
+            </fileset>
+        </copy>
+        <!-- Copy Basic module(s) -->
+        <if>
+            <available file="${ext.basic.dir}" type="dir"/>
+            <then>
+                <copy todir="${build.ext.basic.dir}">
+                    <fileset dir="${ext.basic.dir}">
+                        <include name="**"/>
+                        <exclude name="Odisee/**"/>
+                    </fileset>
+                </copy>
+            </then>
+        </if>
+        <!-- Set build date in build.properties -->
+        <propertyfile file="build.properties">
+            <entry key="ext.release.date" type="date" value="now" pattern="yyyyMMdd-HHmmss"/>
+        </propertyfile>
+    </target>
+    <!--
+
+        Increment version numbers.
+
+    -->
+    <target name="inc-major-version">
+        <propertyfile file="build.properties">
+            <entry key="ext.release.major" type="int" default="0" operation="+" pattern="0"/>
+        </propertyfile>
+    </target>
+    <target name="inc-minor-version">
+        <propertyfile file="build.properties">
+            <entry key="ext.release.minor" type="int" default="0" operation="+" pattern="0"/>
+        </propertyfile>
+    </target>
+    <!-- Increase build number -->
+    <target name="inc-build-number">
+        <propertyfile file="build.properties">
+            <entry key="ext.release.build" type="int" default="0" operation="+" pattern="0"/>
+        </propertyfile>
+        <echo message="Build number is ${prop.ext.release.build}"/>
+    </target>
+    <!--
+
+        Make a distribution for development.
+
+    -->
+    <target name="world-dev" depends="build">
+        <echo message="Building for development"/>
+        <zip destfile="${dist.dir}/${ext.name}_dev.oxt" whenempty="fail">
+            <zipfileset dir="${build.ext.dir}" includes="**" excludes="bin/**"/>
+            <zipfileset dir="${build.ext.dir}" includes="bin/**" filemode="555"/>
+        </zip>
+    </target>
+    <!--
+
+        Make distribution for production.
+
+    -->
+    <target name="world-production" depends="build">
+        <echo message="Building for production"/>
+        <zip destfile="${dist.dir}/${ext.name}.oxt" whenempty="fail">
+            <zipfileset dir="${build.ext.dir}" includes="**" excludes="bin/**"/>
+            <zipfileset dir="${build.ext.dir}" includes="bin/**" filemode="555"/>
+        </zip>
+    </target>
+    <!--
+
+        Make all distributions.
+
+    -->
+    <target name="world" depends="clean,inc-build-number,world-dev,world-production">
+        <echo message="Building for development and production"/>
+    </target>
+</project>

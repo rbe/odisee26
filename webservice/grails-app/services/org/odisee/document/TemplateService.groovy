@@ -21,6 +21,8 @@ import java.nio.file.Paths
 
 class TemplateService {
 
+    static scope = 'singleton'
+
     void extractTemplateFromRequest(final Map arg) {
         use(DOMCategory) {
             def request = arg.xml.request[arg.activeIndex]
@@ -55,7 +57,7 @@ class TemplateService {
         }
     }
 
-    void copyTemplateToRequest(Map arg) {
+    void copyTemplateToRequest(Map<String, Object> arg) {
         arg.documentDir = arg.requestDir
         arg.templateDir = Paths.get("${OdiseePath.ODISEE_VAR}", OdiseeConstant.S_TEMPLATE)
         arg.revision = 1
@@ -67,7 +69,7 @@ class TemplateService {
         if (templateExists) {
             arg.templateFile = localTemplate
         } else {
-            throw new OdiseeException("Odisee: Template '${arg.template}' does not exist for user '${arg.principal.name}'")
+            throw new OdiseeException("Template '${arg.template}' does not exist for user '${arg.principal.name}'")
         }
     }
 

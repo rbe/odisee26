@@ -7,9 +7,6 @@ buildscript {
     }
 }
 
-plugins {
-}
-
 apply plugin: 'base'
 apply plugin: 'com.bmuschko.docker-remote-api'
 

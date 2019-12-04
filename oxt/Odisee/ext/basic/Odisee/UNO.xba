@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="UNO" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.UNO
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Execute a macro from document
+&apos;
+Function execDocumentMacro(oDoc As Object, module$, n$) As Variant
+	Dim script As Object : script = oDoc.ScriptProvider.getScript(&quot;vnd.sun.star.script:Standard.&quot; &amp; module &amp; &quot;.&quot; &amp; n &amp; &quot;?language=Basic&amp;location=document&quot;)
+	execDocumentMacro() = script.invoke(Array(), Array(), Array())
+End Function
+
+&apos;
+&apos; Listener für den Empfang von Druckereignissen installieren.
+&apos;
+&apos; Sub funPrefix_printJobEvent(evt)
+&apos; End Sub
+&apos;
+&apos; Sub funPrefix_disposing(event)
+&apos; 	REM dummy - muss vorhanden sein!
+&apos; End Sub
+&apos;
+Sub installPrintJobListener(oDoc As Object, funPrefix$) As Object
+	Dim oPrintJobListener As Object : oPrintJobListener = createUnoListener(funPrefix, &quot;com.sun.star.view.XPrintJobListener&quot;)
+	If Not IsNull(oPrintJobListener) Then
+		If isOfficeDocument(oDoc) Then
+		    oDoc.addPrintJobListener(oPrintJobListener)
+			installPrintJobListener() = oPrintJobListener
+		End If
+	End If
+	installPrintJobListener() = Nothing
+End Sub
+
+&apos;
+&apos; Remove print job listener
+&apos;
+Function uninstallPrintJobListener(oDoc As Object, oPrintJobListener As Object)
+	If Not isNull(oPrintJobListener) then
+		oDoc.removePrintJobListener(oPrintJobListener)
+		uninstallPrintJobListener() = True
+	End If
+	uninstallPrintJobListener() = False
+End Function
+
+&apos;
+&apos; Install close listener
+&apos;
+&apos; Sub funPrefix_queryClosing(evt)
+&apos; End Sub
+&apos;
+&apos; Sub funPrefix_notifyClosing(event)
+&apos; 	uninstallArchivCloseListener()
+&apos; End Sub
+&apos;
+&apos; Sub funPrefix_disposing(event)
+&apos; 	REM dummy - muss vorhanden sein!
+&apos; End Sub
+&apos;
+Function installCloseListener(oDoc As Object, funPrefix$) As Object
+	Dim oCloseListener As Object : oCloseListener = createUnoListener(funPrefix, &quot;com.sun.star.util.XCloseListener&quot;)
+	If Not IsNull(oCloseListener) Then
+		If isOfficeDocument(oDoc) Then
+		    oDoc.addCloseListener(oCloseListener)
+			installCloseListener() = oCloseListener
+		End If
+	End If
+	installCloseListener() = Nothing
+End Function
+
+&apos;
+&apos; Remove close listener
+&apos;
+Function uninstallCloseListener(oDoc As Object, oCloseListener As Object)
+	If Not isNull(oCloseListener) then
+		oDoc.removeCloseListener(oCloseListener)
+		uninstallCloseListener() = True
+	End If
+	uninstallCloseListener() = False
+End Function
+
+&apos;
+&apos; Umwandlung Datenbank-Datum in lesbares Datum
+&apos;
+Function fillStringFromDate(d As com.sun.star.util.Date)
+	fillStringFromDate() = format(d.Day, &quot;00&quot;) &amp; &quot;.&quot; &amp; format(d.Month, &quot;00&quot;) &amp; &quot;.&quot; &amp; d.Year
+End Function
+
+&apos;
+&apos; Get username from enivornment
+&apos;
+Function getUsername() As String
+	getUsername() = Environ(&quot;USERNAME&quot;)
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getUserData() As Array
+	GlobalScope.BasicLibraries.loadLibrary(&quot;Tools&quot;)
+	Dim oRegUser As Object : oRegUser = Tools.Misc.getRegistryKeyContent(&quot;org.openoffice.UserProfile/Data&quot;)
+	Dim props(6) As String
+	props(0) = oRegUser.getByName(&quot;givenname&quot;)
+	props(1) = oRegUser.getByName(&quot;sn&quot;)
+	props(2) = oRegUser.getByName(&quot;initials&quot;)
+	props(3) = oRegUser.getByName(&quot;mail&quot;)
+	props(4) = oRegUser.getByName(&quot;telephonenumber&quot;)
+	props(5) = oRegUser.getByName(&quot;facsimiletelephonenumber&quot;)
+	props(6) = oRegUser.getByName(&quot;position&quot;)
+	getUserData() = props()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getImageFromURL(url$) As Variant
+	&apos; Create graphic provider instance to load images from files.
+	Dim oGraphicProvider As Object
+	Dim provider$ : provider = &quot;com.sun.star.graphic.GraphicProvider&quot;
+	oGraphicProvider = getProcessServiceManager().createInstance(provider)
+	&apos; Set URL property so graphic provider is able to load the image
+	Dim oMediaProperties(0) As New com.sun.star.beans.PropertyValue
+	oMediaProperties(0) = makePropertyValue(&quot;URL&quot;, url)
+	&apos; Retrieve the com.sun.star.graphic.XGraphic instance 
+	getImageFromURL() = oGraphicProvider.queryGraphic(oMediaProperties())
+End Function
+
+&apos;
+&apos; Detect active locale
+&apos;
+Function detectLocale() As String
+	&apos;
+	Dim aConfigProvider As Object
+	aConfigProvider = getProcessServiceManager().createInstance(&quot;com.sun.star.configuration.ConfigurationProvider&quot;)
+	&apos;
+	Dim aParams2(0) As New com.sun.star.beans.PropertyValue
+	aParams2(0).Name = &quot;nodepath&quot;
+	aParams2(0).Value = &quot;/org.openoffice.Setup/L10N&quot;
+	&apos;
+	Dim aSettings As Object
+	aSettings = aConfigProvider.createInstanceWithArguments(&quot;com.sun.star.configuration.ConfigurationAccess&quot;, aParams2())
+	&apos;
+	Dim oooLocale$
+	oooLocale = aSettings.getbyname(&quot;ooLocale&quot;)
+	If Len(oooLocale) = 2 Then
+		oooLocale = oooLocale + &quot;-&quot; + Ucase(oooLocale)
+	End If
+	detectLocale() = oooLocale
+End Function 
+
+&apos;
+&apos;
+&apos;
+Function makePropertyValue(Optional sName$, Optional value) As com.sun.star.beans.PropertyValue
+	Dim oPropertyValue As New com.sun.star.beans.PropertyValue
+	If Not IsMissing(sName) Then
+		oPropertyValue.Name = sName
+	End If
+	If Not IsMissing(value) Then
+		oPropertyValue.Value = value
+	End If
+	makePropertyValue() = oPropertyValue
+End Function
+
+&apos;
+&apos;
+&apos;
+Function execDisp(oFrame As com.sun.star.frame.Frame, d$, arg As Array) As Boolean
+	Dim oDispatcher As Object : oDispatcher = getProcessServiceManager().createInstance(&quot;com.sun.star.frame.DispatchHelper&quot;)
+	oDispatcher.executeDispatch(oFrame, &quot;.uno:&quot; + d, &quot;&quot;, 0, arg)
+	execDisp() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Function executeDispatch(oDoc As Object, d$, arg As Array) As Boolean
+	Dim oDispatcher As Object : oDispatcher = getProcessServiceManager().createInstance(&quot;com.sun.star.frame.DispatchHelper&quot;)
+	oDispatcher.executeDispatch(oDoc.CurrentController.Frame, &quot;.uno:&quot; + d, &quot;&quot;, 0, arg)
+	executeDispatch() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Function execDispThis(d$, arg As Array) As Boolean
+	execDisp(ThisComponent.CurrenController.Frame, d, arg())
+	execDispThis() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Private Sub __testDispatcher
+	Dim arg(0) As New com.sun.star.beans.PropertyValue
+	arg(0).Name = &quot;Text&quot;
+	arg(0).Value = &quot;Hallo&quot;
+	execDispThis(&quot;InsertText&quot;, &quot;_self&quot;, 0, arg)
+End Sub
+
+&apos;
+&apos; Main services: start screen, Writer, Calc, Draw, Impress and Basic IDE
+&apos;
+Function getMainServices() As Array
+	getMainServices() = Array( _
+		&quot;com.sun.star.frame.StartModule&quot;, _
+		&quot;com.sun.star.text.TextDocument&quot;, _
+		&quot;com.sun.star.sheet.SpreadsheetDocument&quot;, _
+		&quot;com.sun.star.drawing.DrawingDocument&quot;, _
+		&quot;com.sun.star.presentation.PresentationDocument&quot;, _
+		&quot;com.sun.star.script.BasicIDE&quot; _
+	)
+	&apos;	&quot;com.sun.star.formula.FormulaProperties&quot;, _
+End Function
+
+&apos;
+&apos; Retrieves the running OOO version
+&apos;
+Function oooVersion() As String
+	&apos;
+	Dim sProvider$ : sProvider = &quot;com.sun.star.configuration.ConfigurationProvider&quot;
+	Dim configProvider As Object : configProvider = getProcessServiceManager().createInstance(sProvider)
+	&apos;
+	Dim props(0) As New com.sun.star.beans.PropertyValue
+	props(0) = makePropertyValue(&quot;nodepath&quot;, &quot;/org.openoffice.Setup/Product&quot;)
+	&apos;
+	Dim configAccess$ : configAccess = &quot;com.sun.star.configuration.ConfigurationAccess&quot;
+	Dim settings As Object : settings = configProvider.createInstanceWithArguments(configAccess, props())
+	&apos;
+	OOoVersion = settings.getByName(&quot;ooSetupVersion&quot;)
+End Function
+
+&apos;
+&apos; Check for Linux OS
+&apos;
+Function isLinux() As Boolean
+	If GetGUIType() = 4 Then
+		isLinux() = True
+	Else
+		isLinux() = False
+	End If
+End Function
+
+&apos;
+&apos; Check for Mac OS
+&apos;
+Function isMacOS() As Boolean
+	Dim t% : t = GetGUIType()
+	If t = 3 Or t = 4 Then
+		isMacOS() = True
+	Else
+		isMacOS() = False
+	End If
+End Function
+
+&apos;
+&apos; Check for Windows
+&apos;
+Function isWindows() As Boolean
+	If GetGUIType() = 1 Then
+		isWindows() = True
+	Else
+		isWindows() = False
+	End If
+End Function
+
+&apos;
+&apos; Get OS name
+&apos;
+Function osName() As String
+	If isWindows() Then
+		osName = &quot;Windows&quot;
+	ElseIf isLinux() Then
+		osName = &quot;Linux&quot;
+	ElseIf isMacOS() Then
+		osName = &quot;MacOS&quot;
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Public Function isWriter(oDoc As Object)
+	If oDoc.supportsService(&quot;com.sun.star.text.TextDocument&quot;) Then
+		isWriter() = True
+	Else
+		isWriter() = False
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Public Function isCalc(oDoc As Object)
+	If oDoc.supportsService(&quot;com.sun.star.sheet.SpreadsheetDocument&quot;) Then
+		isCalc() = True
+	Else
+		isCalc() = False
+	End If
+End Function
+
+&apos;
+&apos; Show supported services of an object
+&apos;
+Sub showServiceNames(o As Object)
+	Dim svcs(), i%, s$
+	svcs = o.getSupportedServiceNames()
+	For i = 0 To UBound(svcs)
+		s = s &amp; CStr(i) &amp; &quot;: &quot; &amp; svcs(i) &amp; Chr(13)
+	Next
+	MsgBox s
+End Sub
+
+&apos;
+&apos; Show or hide hidden objects
+&apos;
+Function showHiddenObjects(oDoc As Object, b As Boolean) As Boolean
+	Dim cc As Object
+	cc = oDoc.CurrentController
+	cc.ViewSettings.ShowHiddenText = b
+	cc.ViewSettings.ShowHiddenParagraphs = b
+	cc.ViewSettings.ShowHiddenCharacters = b
+	showHiddenObjects() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getFrameByTitle(title$) As com.sun.star.frame.Frame
+	Dim c As Object
+	c = StarDesktop.getComponents().createEnumeration()
+	Dim o As Object
+	While c.hasMoreElements()
+		o = c.nextElement()
+		&apos;o1 = c.nextElement().CurrentController.Frame
+		&apos;o2 = c.nextElement().getDocumentProperties()
+		If o.Title = title Then
+			getDocumentByTitle() = o
+			Break
+		End If
+	Wend
+End Function
+
+&apos;
+&apos;
+&apos;
+Function findDocument() As com.sun.star.lang.XComponent
+	Dim oDesktop As Object, oDocs As Object
+	Dim oDoc As Object, oComponents As Object
+	Dim instanceCount% : instanceCount = 0
+	oComponents = StarDesktop.getComponents()
+	oDocs = oComponents.createEnumeration()
+	Do While oDocs.hasMoreElements()
+		oDoc = oDocs.nextElement()
+		If oDoc.supportsService(&quot;com.sun.star.text.TextDocument&quot;) Then
+			findDocument() = oDoc
+			Exit Do
+		End If
+		instanceCount = instanceCount + 1
+	Loop
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getStatistic(oDoc As Object, n$) As String
+	getStatistic() = oDoc.DocumentStatistics(com.sun.star.text.DocumentStatistic.PAGES).Value
+End Function
+
+</script:module>

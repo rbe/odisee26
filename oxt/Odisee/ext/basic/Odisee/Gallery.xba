@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Gallery" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Gallery
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos; Name of gallery service
+Private Const themeProvider = &quot;com.sun.star.gallery.GalleryThemeProvider&quot;
+
+&apos;
+&apos; Get all theme names.
+&apos;
+Function getThemeNames() As Array
+	Dim oProvider As Object : oProvider = getProcessServiceManager().createInstance(themeProvider)
+	getThemeNames() = oProvider.getElementNames()
+End Function
+
+&apos;
+&apos; Remove an existing gallery.
+&apos;
+Function removeTheme(n$) As Boolean
+	Dim oProvider As Object : oProvider = getProcessServiceManager().createInstance(themeProvider)
+	If oProvider.hasByName(n) Then
+		oProvider.removeByName(n)
+		removeTheme() = True
+	Else
+		removeTheme() = False
+	End If
+End Function
+
+&apos;
+&apos; Create a new gallery.
+&apos;
+Function createTheme(n$, Optional clearIfExists As Boolean) As Object
+	Dim oProvider As Object : oProvider = getProcessServiceManager().createInstance(themeProvider)
+	Dim oTheme As Object
+	If oProvider.hasByName(n) Then
+		oTheme = oProvider.getByName(n)
+		If clearIfExists Then
+			&apos; I considered just removing the gallery, but changed my mine!
+			&apos; Removing the gallery might be faster.
+			Do While oTheme.getCount() &gt; 0
+				oTheme.removeByIndex(0)
+			Loop
+		End If
+	Else
+		oTheme = oProvider.insertNewByName(n)
+	End If
+	createTheme() = oTheme
+End Function
+
+&apos;
+&apos; Insert a graphic file into a gallery.
+&apos;
+Sub insertGraphic(oTheme As Object, url$, Optional insertAsLink As Boolean)
+	&apos; Default to false
+	If isMissing(insertAsLink) Then
+		insertAsLink = False
+	End If
+	&apos; SVG?
+	If LCase(Right(url, 4)) = &quot;.svg&quot; Then
+		Dim props(0) As New com.sun.star.beans.PropertyValue
+		props(0).Name  = &quot;FilterName&quot;
+		props(0).Value = &quot;draw_svg_import&quot;
+		Dim oDoc As Object : oDoc = StarDesktop.loadComponentFromURL(url, &quot;_blank&quot;, 0, props())
+		If Not isNull(oDoc) And Not isEmpty(oDoc) Then
+			print oTheme.insertDrawingByIndex(oDoc, 0)
+			oDoc.close(True)
+		End If
+	ElseIf insertAsLink Then
+		&apos; Insert the URL as a link
+		oTheme.insertURLByIndex(url, 0)
+	Else
+		&apos; Use the new GraphicProvider service, which allows direct access to a graphic object!
+		Dim oProvider : oProvider = getProcessServiceManager().createInstance(&quot;com.sun.star.graphic.GraphicProvider&quot;)
+		Dim gProps(1) as new com.sun.star.beans.PropertyValue
+		gProps(0).Name  = &quot;URL&quot;
+		gProps(0).Value = url
+		gProps(1).Name = &quot;AsLink&quot;
+		gProps(1).Value = False
+		&apos; Returns a graphic object from the URL to the graphic.
+		oTheme.insertGraphicByIndex(oProvider.queryGraphic(gProps()), 0)
+	End If
+End Sub
+
+&apos;
+&apos; Upload a whole directory into a gallery.
+&apos;
+Function uploadDirectory(theme$, dir$, Optional extension(), Optional recursive As Boolean) As Array
+	Dim files() : files = Odisee.IO.listFiles(dir, extension(), recursive)
+	If UBound(files()) &gt; -1 Then
+		Dim oTheme As Object : oTheme = Odisee.Gallery.createTheme(theme)
+		If Not isNull(theme) Then
+			Dim i%
+			For i = LBound(files()) To UBound(files())
+				Odisee.Gallery.insertGraphic(oTheme, files(i), False)
+			Next
+			&apos; Return value is array of inserted graphics
+			uploadDirectory() = files()
+		End If
+	End If
+End Function
+
+</script:module>

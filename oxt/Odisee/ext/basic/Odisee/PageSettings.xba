@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="PageSettings" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterPage
+&apos;
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Check page margin for a minimum and set if required.
+&apos;
+Sub checkMinimumPageMargins()
+	&apos;
+	Dim oDoc As Object : oDoc = ThisComponent
+	&apos; Error handler
+	On Error Goto Err
+	If Odisee.UNO.isWriter(oDoc) Or Odisee.UNO.isCalc(oDoc) Then
+		&apos; Page style settings
+		Dim minPageMargins(3) As New com.sun.star.beans.PropertyValue
+		minPageMargins(0).Name = &quot;TopMargin&quot;
+		minPageMargins(0).Value = 250
+		minPageMargins(1).Name = &quot;BottomMargin&quot;
+		minPageMargins(1).Value = 250
+		minPageMargins(2).Name = &quot;LeftMargin&quot;
+		minPageMargins(2).Value = 250
+		minPageMargins(3).Name = &quot;RightMargin&quot;
+		minPageMargins(3).Value = 250
+		&apos; Is document modified?
+		Dim modified As Boolean : modified = oDoc.isModified()
+		&apos;
+		Dim styleFamilySupplier As Object : styleFamilySupplier = oDoc.StyleFamilies
+		Dim pageStyles As Object : pageStyles = styleFamilySupplier.getByName(&quot;PageStyles&quot;)
+		&apos; Iterate through all page styles
+		Dim i%, j%, pageStyle As Object, margin As Long, oElts() : oElts() = pageStyles.ElementNames
+		For i = LBound(oElts()) To UBound(oElts())
+			pageStyle = pageStyles.getByName(oElts(i))
+			For j = LBound(minPageMargins()) To UBound(minPageMargins())
+				margin = pageStyle.getPropertyValue(minPageMargins(j).Name)
+				If margin &lt; minPageMargins(j).Value Then
+					pageStyle.setPropertyValue(minPageMargins(j).Name, minPageMargins(j).Value)
+				End If
+			Next
+		Next
+		&apos; Set original modified status
+		If Not modified Then
+			oDoc.modified = False
+		End If
+	End If
+	&apos; Error handler
+	Exit Sub
+	Err:
+		MsgBox(&quot;Error while settings page margins&quot;, MSGBOX_ERROR)
+End Sub
+
+</script:module>

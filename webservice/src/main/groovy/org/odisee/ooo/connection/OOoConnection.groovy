@@ -26,15 +26,17 @@ import com.sun.star.lang.XComponent
 import com.sun.star.lang.XEventListener
 import com.sun.star.lang.XMultiComponentFactory
 import com.sun.star.uno.XComponentContext
+import groovy.util.logging.Log
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import org.odisee.ooo.process.OOoProcess
-import org.odisee.uno.UnoCategory
 import org.odisee.shared.OdiseeConstant
+import org.odisee.uno.UnoCategory
 
 /**
  * Connect to an OpenOffice.org instance.
  */
+@Log
 class OOoConnection implements XEventListener {
 
     /**
@@ -90,7 +92,7 @@ class OOoConnection implements XEventListener {
                 'xComponentLoader'
         ].each {
             if (OdiseePath.ODISEE_DEBUG) {
-                println "${this}.clearReferences Clearing reference to ${it}"
+                log.debug "Clearing reference to ${it}"
             }
             this[it] = null
         }
@@ -116,14 +118,14 @@ class OOoConnection implements XEventListener {
             String bridgeName = "bridge${bridgeCnt++}" as String
             xBridge = xBridgeFactory.createBridge(bridgeName, 'urp', connection, null)
             if (OdiseePath.ODISEE_DEBUG) {
-                println "${this}.xConnect: Created XBridge ${bridgeName}, xBridge=${xBridge?.dump()}"
+                log.debug "Created XBridge ${bridgeName}, xBridge=${xBridge?.dump()}"
             }
             // Add this as event listener
             XComponent xComponent = (XComponent) xBridge.uno(XComponent)
             xComponent.addEventListener(this)
             // Get the remote instance
             xServiceManager = xBridge.getInstance('StarOffice.ServiceManager')
-            ////println "${this}.xConnect: xServiceManager=${xServiceManager?.dump()}"
+            //log.debug "xServiceManager=${xServiceManager?.dump()}"
             // Query the initial object for its main factory interface
             xMultiComponentFactory = (XMultiComponentFactory) xServiceManager.uno(XMultiComponentFactory)
             // retrieve the component context (it"s not yet exported from the office)
@@ -151,7 +153,7 @@ class OOoConnection implements XEventListener {
             // This would be reset though XEventListener#dispoing(Event)
             if (xOfficeComponentContext) {
                 if (OdiseePath.ODISEE_DEBUG) {
-                    println "${this}.connect: ${oooProcess.unoURL} still alive"
+                    log.debug "${oooProcess.unoURL} still alive"
                 }
                 return
             } else {
@@ -160,31 +162,31 @@ class OOoConnection implements XEventListener {
                     try {
                         xConnect()
                         if (OdiseePath.ODISEE_DEBUG) {
-                            println "${this}.connect: Checking connection to OOo instance at ${oooProcess.unoURL}"
+                            log.debug "Checking connection to OOo instance at ${oooProcess.unoURL}"
                         }
                         if (null == xBridge) {
-                            throw new OdiseeException('Odisee: No connection (XBridge)')
+                            throw new OdiseeException('No connection (XBridge)')
                         }
                         if (null == xComponentLoader) {
-                            throw new OdiseeException('Odisee: No connection (XComponentLoader)')
+                            throw new OdiseeException('No connection (XComponentLoader)')
                         }
                         if (OdiseePath.ODISEE_DEBUG) {
-                            println "${this}.connect: Successfully connected to OOo instance at ${oooProcess.unoURL}"
+                            log.debug "Successfully connected to OOo instance at ${oooProcess.unoURL}"
                         }
                         markConnectionAsUsable()
                     } catch (BridgeExistsException e) {
                         // Connection is reused; the bridge may exist already, assume it's ok
                         if (OdiseePath.ODISEE_DEBUG) {
-                            println "${this}.connect/catch: XBridge exists: ${e.message}"
+                            log.debug "XBridge exists: ${e.message}"
                         }
                     } finally {
                         if (OdiseePath.ODISEE_DEBUG) {
-                            println "${this}.connect/finally: XBridge=${xBridge} xOfficeComponentContext=${xOfficeComponentContext} xComponentLoader=${xComponentLoader}"
+                            log.debug "XBridge=${xBridge} xOfficeComponentContext=${xOfficeComponentContext} xComponentLoader=${xComponentLoader}"
                         }
                     }
                 } catch (e) {
                     markConnectionAsUnusable()
-                    throw new OdiseeException("Odisee: Cannot connect to ${oooProcess.unoURL}, marked as unusable for ${timeout} seconds", e)
+                    throw new OdiseeException("Cannot connect to ${oooProcess.unoURL}, marked as unusable for ${timeout} seconds", e)
                 }
             }
         } else {
@@ -228,12 +230,12 @@ class OOoConnection implements XEventListener {
             long diff = reactivateAt - curr
             if (curr < reactivateAt) {
                 if (OdiseePath.ODISEE_DEBUG) {
-                    println "${this}.connect: ${oooProcess.unoURL}: connection sleeping for ${diff} ms"
+                    log.debug "${oooProcess.unoURL}: connection sleeping for ${diff} ms"
                 }
                 throw new OdiseeException("Connection to ${oooProcess.unoURL} sleeping for additional ${diff}")
             } else {
                 if (OdiseePath.ODISEE_DEBUG) {
-                    println "${this}.connect: ${oooProcess.unoURL} curr=${curr} unusableSince=${unusableSince} reactivateAt=${reactivateAt} => ${curr < reactivateAt}"
+                    log.debug "${oooProcess.unoURL} curr=${curr} unusableSince=${unusableSince} reactivateAt=${reactivateAt} => ${curr < reactivateAt}"
                 }
                 usable = true
             }
@@ -260,7 +262,7 @@ class OOoConnection implements XEventListener {
      */
     @Override
     void disposing(EventObject event) {
-        println "${this}.disposing: ${event}"
+        log.debug "${event}"
         // Clear references to OOo objects
         clearReferences()
         // Execute closure on dispose
@@ -276,14 +278,14 @@ class OOoConnection implements XEventListener {
     boolean close() {
         if (xBridge) {
             if (OdiseePath.ODISEE_DEBUG) {
-                println "${this}.close: via XBridge/com.sun.star.lang.XComponent#dispose"
+                log.debug "via XBridge/com.sun.star.lang.XComponent#dispose"
             }
             use(UnoCategory) {
                 XComponent xComponent = (XComponent) xBridge.uno(XComponent)
                 xComponent.dispose()
             }
             if (OdiseePath.ODISEE_DEBUG) {
-                println "${this}.close: via XBridge/com.sun.star.lang.XComponent#dispose... done"
+                log.debug "via XBridge/com.sun.star.lang.XComponent#dispose... done"
             }
             return true
         } else {
@@ -297,12 +299,12 @@ class OOoConnection implements XEventListener {
      */
     void terminate() {
         if (OdiseePath.ODISEE_DEBUG) {
-            println "${this}.termiante(): Trying to terminate"
+            log.debug "Trying to terminate"
         }
         try {
             xDesktop.terminate()
         } catch (e) {
-            println "${this}.terminate: Terminating connection was unsucessfull: ${e}"
+            log.debug "Terminating connection was unsucessfull: ${e}"
         }
         // Stop process
         oooProcess?.stop()

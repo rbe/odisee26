@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Basic" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Basic
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Datumsumwandlung
+&apos;
+Function makeDateFromDateTimeString(sDateTimeString$) As String
+	&apos;2002-01-28 00:00:00.0
+	Const pt = &quot;.&quot;
+	makeDateFromDateTimeString() = Mid(sDateTimeString, 9, 2) &amp; pt &amp; Mid(sDateTimeString, 6, 2) &amp; pt &amp; Mid(sDateTimeString, 1, 4)
+End Function
+
+&apos;
+&apos; Convert date into string: YYYY-MM-DD.
+&apos;
+Function dateToIsoString(datum)
+	Const sep = &quot;-&quot;
+	Dim y$ : y = CStr(Year(datum))
+	Dim m$ : m = CStr(Month(datum))
+	If Len(m) = 1 Then
+		m = &quot;0&quot; &amp; m
+	End If
+	Dim d$ : d = CStr(Day(datum))
+	If Len(d) = 1 Then
+		d = &quot;0&quot; &amp; d
+	End If
+	dateToIsoString() = y &amp; sep &amp; m &amp; sep &amp; d
+End Function
+
+&apos;
+&apos; Get length of array
+&apos;
+Function aLen(arr As Array) As Integer
+	If Not IsNull(arr) Then
+		aLen() = UBound(arr) - LBound(arr) + 1
+	Else
+		aLen() = -1
+	End If
+End Function
+
+&apos;
+&apos; String replace...
+&apos;
+Function replace(source$, search$, newPart$)
+	Dim result$ : result = &quot;&quot;
+	Dim startPos As Long : startPos = 1
+	Dim currentPos As Long : currentPos = 1
+	If search = &quot;&quot; Then
+		result = source
+	Else 
+		Do While currentPos &lt;&gt; 0
+			currentPos = InStr(startPos, source, search)
+			If currentPos &lt;&gt; 0 Then
+				result = result + Mid(source, startPos, currentPos - startPos)
+				result = result + newPart
+				startPos = currentPos + Len(search)
+			Else
+				result = result + Mid(source, startPos, Len(source))
+			End If                &apos; Position &lt;&gt; 0
+		Loop 
+	End If 
+	replace() = result
+End Function
+
+&apos;
+&apos;
+&apos;
+Function changeChar(sText$, sSearch$, sNewPart$) As String
+	Do While InStr(sText, sSearch) &gt; 0
+		Mid(sText, InStr(sText, sSearch), 1, sNewPart)
+	Loop
+	changeChar() = sText
+End Function
+
+&apos;
+&apos;
+&apos;
+Function elimChar(ByVal bigString$, elimArray() As String)
+	Dim i%, n%
+	GlobalScope.BasicLibraries.LoadLibrary(&quot;Tools&quot;)
+	For i = 0 To Ubound(elimArray()) - 1
+		bigString = Tools.Strings.DeleteStr(bigString, elimArray(i))
+	Next
+	elimChar() = bigString
+End Function
+
+&apos;
+&apos; Split a string by a separator.
+&apos;
+Function splitString(str$, sep$) As Array
+	Dim count% : count = 0
+	Dim pos% : pos = 1
+	Dim posSep% : posSep = 0
+	Dim elt()
+	Do
+		posSep = InStr(pos + 1, str, sep)
+		ReDim Preserve elt(count)
+		elt(count) = Mid(str, pos, posSep - pos)
+		pos = posSep + 1
+		count = count + 1
+	Loop Until posSep = 0
+	splitString() = elt()
+End Function
+
+&apos;
+&apos; Convert a byte value from the range -128 to +127 into
+&apos;  an integer in the range 0 to 255.
+&apos; This function is the opposite of IntegerToByte().
+&apos;
+Function byteToInteger(ByVal nByte%) As Integer
+    If nByte &lt; 0 Then
+       nByte = nByte + 256
+    EndIf
+    byteToInteger() = nByte
+End Function
+
+&apos;
+&apos; This function is the opposite of ByteToInteger().
+&apos;
+Function integerToByte(ByVal nByte%) As Integer
+    If nByte &gt; 127 Then
+       nByte = nByte - 256
+    EndIf
+    integerToByte() = nByte
+End Function
+
+&apos; Convert an array of bytes to a string.
+&apos; Pass in an array of bytes.
+&apos; Each &quot;byte&quot; in the array is an integer value from -128 to +127.
+&apos; The array of bytes could have come from reading
+&apos;  from a com.sun.star.io.XInputStream.
+&apos; This function returns a string.
+&apos; This function is the opposite of StringToByteArray().
+Function byteArrayToString(aByteArray As Array)
+    Dim cBytes$ : cBytes = &quot;&quot;
+    Dim nByte$, i%
+    For i = LBound(aByteArray()) To UBound(aByteArray())
+       nByte = aByteArray(i)
+       nByte = ByteToInteger(nByte)
+       cBytes = cBytes + Chr(nByte)
+    Next i
+    byteArrayToString() = cBytes
+End Function
+
+&apos; Convert a string into an array of bytes.
+&apos; Pass a string value to the cString parameter.
+&apos; The function returns an array of bytes, suitable
+&apos;  for writing to a com.sun.star.io.XOutputStream.
+&apos; Each &quot;byte&quot; in the array is an integer value from -128 to +127.
+&apos; This function is the opposite of ByteArrayToString().
+Function stringToByteArray(ByVal cString$)
+    Dim nNumBytes% : nNumBytes = Len(cString)
+    Dim aBytes(nNumBytes - 1) As Integer
+    Dim cChar$, nByte%, i%
+    For i = 1 To nNumBytes
+       cChar = Mid(cString, i, 1)
+       nByte = Asc(cChar)
+       nByte = IntegerToByte(nByte)
+       aBytes(i - 1) = nByte
+    Next
+    stringToByteArray() = aBytes()
+End Function
+
+</script:module>

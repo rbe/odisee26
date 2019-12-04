@@ -10,9 +10,10 @@
  */
 package org.odisee.document
 
+import groovy.util.logging.Log
+import groovy.xml.dom.DOMCategory
 import org.odisee.io.FileHelper
 import org.odisee.lang.NameHelper
-import groovy.xml.dom.DOMCategory
 import org.w3c.dom.Element
 
 import java.nio.file.Path
@@ -20,18 +21,15 @@ import java.nio.file.Paths
 
 import static org.odisee.io.OdiseePath.ODISEE_VAR
 
+@Log
 class PostProcessService {
+
+    static scope = 'singleton'
 
     static transactional = false
 
-    /**
-     * The storage service.
-     */
     StorageService storageService
 
-    /**
-     * The PDF service.
-     */
     PdfService pdfService
 
     /**
@@ -56,14 +54,17 @@ class PostProcessService {
                     if (it.name() == 'result-placeholder') {
                         pdfFiles << Paths.get(generatedFile)
                     } else {
-                        String filename = it.'@file'.toString()
-                        pdfFiles << Paths.get("${ODISEE_VAR}/merge", filename)
+                        String filename = it.'@filename'.toString()
+                        pdfFiles << Path.of("${ODISEE_VAR}", filename)
                     }
                 }
             }
             // Merge PDFs and generate a new one
             Path mergedPdf = pdfService.mergeDocuments(destPdfFile, pdfFiles)
+            if (!arg.document) arg.document = []
             arg.document << storageService.createDocument(data: mergedPdf)
+        } else {
+            log.error "${generatedFile} not found"
         }
     }
 

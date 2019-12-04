@@ -17,7 +17,6 @@ final class DocumentStreamer {
 
     /**
      * Stream a Document or just bytes to client.
-     * @param arg
      */
     static void stream(final HttpServletResponse response, final Document document) {
         String contentFilename = document.filename

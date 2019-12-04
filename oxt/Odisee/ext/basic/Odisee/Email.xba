@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Email" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Email
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Send an email
+&apos;
+Function _sendMail(fromAddress$, recipientAddress$, ccAddress(), subject$, body$, att As Array, mode%) As Boolean
+	Dim oMailSystem As Object
+	If isWindows() Then
+		oMailSystem = getProcessServiceManager().createInstance(&quot;com.sun.star.system.SimpleSystemMail&quot;)
+	Else
+		oMailSystem = getProcessServiceManager().createInstance(&quot;com.sun.star.system.SimpleCommandMail&quot;)
+	End If
+	&apos;
+	Dim oMailClient As Object
+	oMailClient = oMailSystem.querySimpleMailClient()
+	&apos;
+	Dim oMessage As Object
+	oMessage = oMailClient.createSimpleMailMessage()
+	&apos; Subject
+	If Not IsNull(subject) And subject &lt;&gt; &quot;&quot; Then
+		oMessage.setSubject(subject)
+	End If
+	&apos; Recipient
+	If Not IsNull(recipientAddress) And recipientAddress &lt;&gt; &quot;&quot; Then
+		oMessage.setRecipient(recipientAddress)
+	End If
+	&apos; Cc
+	If Not IsNull(ccAddress) Then
+		oMessage.setCcRecipient(ccAddress)
+	End If
+	&apos; Attachment
+	If Not IsNull(att()) Then
+		oMessage.setAttachement(att())
+	End If
+	&apos; Send mail
+	oMailClient.sendSimpleMailMessage(oMessage, mode)
+	&apos;
+	_sendMail = True()
+End Function
+
+&apos;
+&apos; Send an email displaying the mail client&apos;s user interface
+&apos;
+Function sendMailWithUI(fromAddress$, recipientAddress$, ccAddress(), subject$, body$, att As Array) As Boolean
+	sendMailWithUI() = _sendMail(fromAddress, recipientAddress, ccAddress, subject, body, att, com.sun.star.system.SimpleMailClientFlags.DEFAULTS)
+End Function
+
+&apos;
+&apos; Send an email w/o displaying the mail client&apos;s user interface
+&apos;
+Function silentSendMail(fromAddress$, recipientAddress$, ccAddress(), subject$, body$, att As Array) As Boolean
+	silentSendMail() = _sendMail(fromAddress, recipientAddress, ccAddress, subject, body, att, com.sun.star.system.SimpleMailClientFlags.NO_USER_INTERFACE)
+End Function
+
+
+</script:module>

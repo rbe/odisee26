@@ -15,29 +15,11 @@ import com.sun.star.lib.uno.helper.UnoUrl
 import com.sun.star.lib.util.NativeLibraryLoader
 import org.odisee.api.OdiseeException
 
-/*
-// Try to find an OOo installation if oooProgram is not set
-// Maybe we don't need it as we use a TCP/IP connection to another server?
-try {
-    // Take first installation found
-    if (!oooProgram) {
-        oooProgram = findOOoInstallation()[0]
-    }
-} catch (e) {
-    // Ignore
-    println "Could not find local OpenOffice installation"
-}
-println "Found OOo installation at ${oooProgram}"
-*/
-
 /**
  *
  */
 class OOoProcess {
 
-    /**
-     *
-     */
     private static final String ONE_SPACE = ' '
     private static final String GREP = 'grep'
     private static final String SOFFICE = 'soffice'
@@ -54,19 +36,10 @@ class OOoProcess {
      */
     private String[] oooOptions
 
-    /**
-     *
-     */
     private String pipe
 
-    /**
-     *
-     */
     private String host
 
-    /**
-     *
-     */
     private Integer port
 
     /**
@@ -93,7 +66,6 @@ class OOoProcess {
         if (parsedUnoURL) {
             return
         }
-        //println "setUnoURL(${unoURL.dump()})"
         switch (unoURL) {
             case { it instanceof String }:
                 // Do nothing, assume complete UNO URL
@@ -109,18 +81,7 @@ class OOoProcess {
             default:
                 throw new OdiseeException("Don't know how to handle UNO URL: ${unoURL}")
         }
-        //println "setUnoURL: unoURL=${this.unoURL.dump()}"
-        // Helper function to parse an UNO URL
         parsedUnoURL = UnoUrl.parseUnoUrl(this.unoURL)
-        //println "setUnoURL: parsedUnoURL=${this.parsedUnoURL.dump()}"
-        /*
-          //println "unoURL.getConnection     =" + parsedUnoURL.getConnection()
-          //println "unoURL.getConnection..As =" + parsedUnoURL.getConnectionAndParametersAsString()
-          //println "unoURL.getConnectionPara =" + parsedUnoURL.getConnectionParameters().keySet()
-          //println "unoURL.getProtocol       =" + parsedUnoURL.getProtocol()
-          //println "unoURL.getProtocolPara   =" + parsedUnoURL.getProtocolParameters().keySet()
-          //println "unoURL.rootOid           =" + parsedUnoURL.getRootOid()
-          */
     }
 
     /**

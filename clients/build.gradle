@@ -1,0 +1,4 @@
+group rootProject.group
+version rootProject.version
+
+apply plugin: 'base'

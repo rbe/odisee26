@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterTemplate" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterTemplate
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos;
+&apos;
+Function initWriterTemplate() As Boolean
+	initWriterTemplate() = True
+End Function
+
+&apos;
+&apos;
+&apos; values = Array of com.sun.star.beans.XPropertySet
+&apos;
+Function addVarAutoText(oDoc As Object, oCur As com.sun.star.text.XTextCursor, values() As Array, autoTextGroup$, autoText$) As Boolean
+	&apos; Text cursor
+	Dim oCur As Object : oCur = getTextCursorAtEndOfDocument(oDoc)
+	&apos; Add variables as hidden text
+	If Not IsEmpty(values) Then
+		&apos;oCur = insertParagraphBreak(oDoc, oCur)
+		&apos; Hide text
+		oCur.CharHidden = True
+		&apos; Insert all supplied variables/values
+		Dim i%
+		For i = 0 To UBound(values())
+			If Not IsEmpty(values(i)) Then
+				setLocalVar(oDoc, values(i).Name, values(i).Value)
+			End If
+		Next
+		&apos; Unhide text
+		oCur.CharHidden = False
+	End If
+	&apos; Insert auto text
+	insertAutoText(oDoc, oCur, autoTextGroup, autoText)
+	&apos; Check autotext and variables (all variables are zero when using a autotext containing variables)
+	resetAllTextFieldTypes(oDoc)
+	addVarAutoText() = True
+End Function
+
+</script:module>

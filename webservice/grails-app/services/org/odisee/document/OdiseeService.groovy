@@ -10,8 +10,8 @@
  */
 package org.odisee.document
 
-import org.odisee.shared.OdiseeConstant
 import groovy.xml.dom.DOMCategory
+import org.odisee.shared.OdiseeConstant
 import org.w3c.dom.Element
 
 import java.nio.file.Files
@@ -22,11 +22,7 @@ import static org.odisee.io.OdiseePath.ODISEE_USER
 
 class OdiseeService {
 
-    /**
-     * The scope. See http://www.grails.org/Services.
-     * prototype request flash flow conversation session singleton
-     */
-    def scope = 'prototype'
+    static scope = 'singleton'
 
     TemplateService templateService
 
@@ -36,16 +32,45 @@ class OdiseeService {
 
     PostProcessService postProcessService
 
+    private final Map<String, Object> emptyArg = [
+            principal      : null,
+            xml            : null,
+            activeIndex    : -1,
+            uniqueRequestId: '',
+            requestDir     : null,
+            odiseeRequest  : null,
+            documentName   : null,
+            templateDir    : null,
+            documentDir    : null,
+            templateFile   : null,
+            id             : null,
+            template       : null,
+            revision       : 1,
+            document       : [],
+            data           : null,
+            bytes          : null,
+            filename       : null,
+            result         : []
+    ]
+
     private static void resetRequest(final Map arg) {
         [
                 OdiseeConstant.S_ID, OdiseeConstant.S_TEMPLATE, OdiseeConstant.S_REVISION,
                 'documentName',
                 'templateDir', 'templateFile',
-                'documentDir',
-                'document', 'data', 'bytes', 'filename'
+                'documentDir', 'document', 'data', 'bytes', 'filename'
         ].each {
             arg.remove(it)
         }
+    }
+
+    def deepcopy(orig) {
+        bos = new ByteArrayOutputStream()
+        oos = new ObjectOutputStream(bos)
+        oos.writeObject(orig); oos.flush()
+        bin = new ByteArrayInputStream(bos.toByteArray())
+        ois = new ObjectInputStream(bin)
+        return ois.readObject()
     }
 
     /**
@@ -54,50 +79,31 @@ class OdiseeService {
      * @return List with generated OooDocument instance(s).
      */
     List<Document> generateDocument(final Principal principal, final Element xml) {
-        final Map arg = [
-                principal      : principal,
-                xml            : xml,
-                activeIndex    : -1,
-                uniqueRequestId: UUID.randomUUID(),
-                requestDir     : null,
-                odiseeRequest  : null,
-                documentName   : null,
-                templateDir    : null,
-                documentDir    : null,
-                templateFile   : null,
-                id             : null,
-                template       : null,
-                revision       : 1,
-                document       : [],
-                data           : null,
-                bytes          : null,
-                filename       : null,
-                result         : []
-        ]
+        Map<String, Object> arg = (Map<String, Object>) emptyArg.clone()
         final GString userDocumentDir = "${ODISEE_USER}/${OdiseeConstant.S_DOCUMENT}"
+        arg.uniqueRequestId = UUID.randomUUID()
         arg.requestDir = Paths.get(userDocumentDir, arg.uniqueRequestId.toString())
         Files.createDirectories(arg.requestDir)
+        arg.principal = principal
+        arg.xml = xml
         requestService.extractRequestAndSaveToDisk(arg, OdiseeConstant.MINUS_ONE)
         use(DOMCategory) {
-            arg.xml.request.eachWithIndex { request, i ->
+            arg.xml.'request'.eachWithIndex { request, i ->
                 arg.activeIndex = i
-                if (i > 0) {
-                    resetRequest(arg)
-                }
+                if (i > 0) resetRequest(arg)
                 templateService.extractTemplateFromRequest(arg)
                 templateService.copyTemplateToRequest(arg)
                 templateService.checkPaths(arg)
                 requestService.processSingleRequest(arg)
                 postProcessService.postProcessRequest(arg)
                 arg.result.output.each { file ->
+                    if (!arg.document) arg.document = []
                     arg.document << storageService.createDocument(data: file)
                 }
             }
         }
         postProcessService.postProcessOdisee(arg)
-        if (log.debugEnabled) {
-            log.debug "Odisee: Generated ${arg.document?.size() ?: 0} document(s)"
-        }
+        log.info "Generated ${arg.document?.size() ?: 0} document(s)"
         arg.document
     }
 

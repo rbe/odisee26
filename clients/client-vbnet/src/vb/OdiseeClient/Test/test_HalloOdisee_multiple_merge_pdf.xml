@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odisee>
+    <!--
+        First request.
+    -->
+    <request name="HalloOdisee1">
+        <!-- Odisee server group, fixed value is group0 -->
+        <ooo group="group0"/>
+        <!-- Template: name and desired output format -->
+        <template name="HalloOdisee" outputFormat="pdf"/>
+        <!-- Archive generated files? Useful for debugging -->
+        <archive files="false"/>
+        <!-- Instructions executed against the template, order does matter! -->
+        <instructions>
+            <!-- Set userfield 'Hallo' -->
+            <userfield name="Hallo">Hallo Odisee 1</userfield>
+            <!-- Set table cell 'A4' in table 'Tabelle1' -->
+            <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+        </instructions>
+    </request>
+    <!--
+        Second request.
+    -->
+    <request name="HalloOdisee2">
+        <ooo group="group0"/>
+        <template name="HalloOdisee" outputFormat="pdf"/>
+        <archive files="false"/>
+        <instructions>
+            <userfield name="Hallo">Hallo Odisee 2</userfield>
+            <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+        </instructions>
+    </request>
+    <!--
+        Third request with merging a PDF.
+    -->
+    <request name="HalloOdisee3">
+        <ooo group="group0"/>
+        <template name="HalloOdisee" outputFormat="pdf"/>
+        <archive files="false"/>
+        <instructions>
+            <userfield name="Hallo">Hallo Odisee 3</userfield>
+            <userfield name="Tabelle1!A4">support@odisee.de</userfield>
+        </instructions>
+        <!-- The generated document is post-processed -->
+        <post-process>
+            <instructions>
+                <!-- The action is 'merge document with...' -->
+                <action type="merge-with">
+                    <!--
+                        When merging documents we need to know the order:
+                        'result-placeholder' refers to the previously generated document,
+                        'input file' refers to a document to include.
+                    -->
+                    <result-placeholder/>
+                    <!-- A relative path is interpreted as $ODISEE_HOME/var/deploy -->
+                    <input file="pdf/AGB.pdf"/>
+                </action>
+            </instructions>
+        </post-process>
+    </request>
+</odisee>

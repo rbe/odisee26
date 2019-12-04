@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE library:library PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "library.dtd">
+<library:library xmlns:library="http://openoffice.org/2000/library" library:name="Odisee" library:readonly="false" library:passwordprotected="false">
+ <library:element library:name="Basic"/>
+ <library:element library:name="WriterAutoText"/>
+ <library:element library:name="WriterAutoCorrect"/>
+ <library:element library:name="UNO"/>
+ <library:element library:name="Database"/>
+ <library:element library:name="IO"/>
+ <library:element library:name="Email"/>
+ <library:element library:name="HTTP"/>
+ <library:element library:name="Gallery"/>
+ <library:element library:name="WriterCursor"/>
+ <library:element library:name="WriterText"/>
+ <library:element library:name="WriterSearch"/>
+ <library:element library:name="WriterIndex"/>
+ <library:element library:name="WriterBookmark"/>
+ <library:element library:name="WriterTools"/>
+ <library:element library:name="Printing"/>
+ <library:element library:name="WriterLocalField"/>
+ <library:element library:name="WriterTemplate"/>
+ <library:element library:name="Toolbar"/>
+ <library:element library:name="WriterHTML"/>
+ <library:element library:name="Menu"/>
+ <library:element library:name="WriterTextFrame"/>
+ <library:element library:name="WriterGraphic"/>
+ <library:element library:name="WriterTextTable"/>
+ <library:element library:name="Dialog"/>
+ <library:element library:name="_Global"/>
+ <library:element library:name="Management"/>
+ <library:element library:name="Document"/>
+ <library:element library:name="WriterUserfield"/>
+ <library:element library:name="DynTmpl"/>
+ <library:element library:name="WriterForm"/>
+ <library:element library:name="WriterSettings"/>
+ <library:element library:name="PageSettings"/>
+ <library:element library:name="DateTime"/>
+</library:library>

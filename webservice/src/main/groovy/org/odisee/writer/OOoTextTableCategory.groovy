@@ -12,6 +12,7 @@
 package org.odisee.writer
 
 import com.sun.star.beans.XPropertySet
+import com.sun.star.container.NoSuchElementException
 import com.sun.star.container.XNamed
 import com.sun.star.lang.XComponent
 import com.sun.star.table.XCell
@@ -21,14 +22,16 @@ import com.sun.star.text.XText
 import com.sun.star.text.XTextTable
 import com.sun.star.text.XTextTablesSupplier
 import com.sun.star.uno.Any
+import groovy.util.logging.Log
 import org.odisee.api.OdiseeException
-import org.odisee.document.Coordinate
 import org.odisee.debug.Profile
+import org.odisee.document.Coordinate
 import org.odisee.uno.UnoCategory
 
 /**
  * Work with Writer's text tables.
  */
+@Log
 class OOoTextTableCategory {
 
     private static final String EXCLAMATION_MARK = '!'
@@ -39,11 +42,11 @@ class OOoTextTableCategory {
      * Get TextFieldSupplier from OpenOffice document.
      */
     static XTextTablesSupplier textTablesSupplier(XComponent component) {
-        Profile.time 'OOoTextTableCategory.textTablesSupplier', {
+        Profile.time('OOoTextTableCategory.textTablesSupplier', {
             use(UnoCategory) {
                 component.uno(XTextTablesSupplier)
             }
-        }
+        }) as XTextTablesSupplier
     }
 
     /**
@@ -60,36 +63,40 @@ class OOoTextTableCategory {
      * Get a reference to a TextTable.
      */
     static XTextTable getTextTable(XComponent component, String name) {
-        Profile.time "OOoTextTableCategory.getTextTable(name=$name)", {
+        Profile.time("OOoTextTableCategory.getTextTable(name=${name})", {
             use(UnoCategory) {
                 XTextTablesSupplier xTextTablesSupplier = (XTextTablesSupplier) component.uno(XTextTablesSupplier)
-                Any any = xTextTablesSupplier?.textTables?.getByName(name)
-                (XTextTable) any.object
+                try {
+                    Any any = (Any) xTextTablesSupplier?.textTables?.getByName(name)
+                    (XTextTable) any.object
+                } catch (NoSuchElementException e) {
+                    log.warning "Cannot find ${name}"
+                }
             }
-        }
+        }) as XTextTable
     }
 
     /**
      * Get cell of a TextTable.
      */
     static XCell getTextTableCell(XTextTable textTable, Integer row, Integer column) {
-        Profile.time "OOoTextTableCategory.getTextTableCell($row, $column)", {
+        Profile.time("OOoTextTableCategory.getTextTableCell($row, $column)", {
             use(UnoCategory) {
                 XCellRange xCellRange = (XCellRange) textTable.uno(XCellRange)
                 xCellRange.getCellByPosition(column, row)
             }
-        }
+        }) as XCell
     }
 
     /**
      * Get cell of a TextTable.
      */
     static XCell getTextTableCell(XTextTable textTable, String coord) {
-        Profile.time "OOoTextTableCategory.getTextTableCell(coord=$coord)", {
+        Profile.time("OOoTextTableCategory.getTextTableCell(coord=$coord)", {
             use(UnoCategory) {
                 textTable.getCellByName(coord)
             }
-        }
+        }) as XCell
     }
 
     /**
@@ -131,7 +138,6 @@ class OOoTextTableCategory {
             if (row > 0) {
                 int rowCount = textTable.rows.count - 1 // count is 1-indexed
                 if (row > rowCount) {
-                    //println "ensureTextTableCapacity: adding row ${row} at ${rowCount + 1} to ${textTable.getInfo().name}"
                     textTable.rows.insertByIndex(rowCount + 1, Math.max(row - rowCount, 1))
                 }
             }
@@ -145,7 +151,6 @@ class OOoTextTableCategory {
                     // com.sun.star.uno.Any
                     int columnCount = xPropertySet.getPropertyValue('TableColumnSeparators')?.length
                     if (column > columnCount) {
-                        //println "ensureTextTableCapacity: adding column ${column} at ${columnCount + 1} to ${textTable.getInfo().name}"
                         // Use column count when extending table as the table might not have same column count as a certain row (splitting)
                         columnCount = textTable.columns.count // count is 1-indexed
                         textTable.columns.insertByIndex(columnCount, Math.max(column - columnCount, 1))
@@ -251,8 +256,9 @@ class OOoTextTableCategory {
      */
     static Map getInfo(XTextTable textTable) {
         use(UnoCategory) {
+            XNamed xNamed = (XNamed) textTable.uno(XNamed)
             [
-                    name     : ((XNamed) textTable.uno(XNamed)).name,
+                    name     : xNamed.name,
                     cellNames: textTable.cellNames //getCellNames()
             ]
         }
@@ -329,7 +335,11 @@ class OOoTextTableCategory {
         Profile.time "OOoTextTableCategory.set(component=$component, name=$name, value=$value)", {
             Map m = Coordinate.parseCoordinate(name)
             XTextTable xTextTable = getTextTable(component, m.table)
-            set(xTextTable, name, value)
+            if (null != xTextTable) {
+                set(xTextTable, name, value)
+            } else {
+                log.warning "Coordinate ${name} did not resolve to a table"
+            }
         }
     }
 

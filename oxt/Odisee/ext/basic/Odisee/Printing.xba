@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Printing" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Printing
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Ask if component can print; implements XPrintable
+&apos;
+Function canPrint(oComponent As Object) As Boolean
+	If hasUnoInterfaces(oComponent, &quot;com.sun.star.view.XPrintable&quot;) Then
+		canPrint() = True
+	Else
+		canPrint() = False
+	End If
+End Function
+
+&apos;
+&apos; Print document
+&apos; Name clash: print is already defined in OOo
+&apos;
+Function _print(oDoc As Object, ByVal pages$, ByVal copyCount%, ByVal collate As Boolean) As Boolean
+	If canPrint(oDoc) Then
+		&apos; Create properties
+		Dim args(3) As New com.sun.star.beans.PropertyValue
+		&apos; Which pages to print
+		args(0).Name = &quot;Pages&quot;
+		If IsNull(pages) Or pages = &quot;&quot; Then
+			pages = &quot;1-&quot;
+		End If
+		args(0).Value = pages
+		&apos; Copy count
+		args(1).Name = &quot;CopyCount&quot;
+		If IsNull(copyCount) Then
+			copyCount = 1
+		End If
+		args(1).Value = copyCount
+		&apos; Collate copies
+		args(2).Name = &quot;Collate&quot;
+		args(2).Value = collate
+		&apos; Wait for print job to complete
+		args(3).Name = &quot;Wait&quot;
+		args(3).Value = true
+		oDoc.print(args())
+		_print() = True
+	Else
+		_print() = False
+	End If
+End Function
+
+&apos;
+&apos; Print whole document
+&apos;
+Function printAllPages(oDoc As Object) As Boolean
+	printAllPages() = _print(oDoc, &quot;1-&quot;, 1, true)
+End Function
+
+&apos;
+&apos; Test print function
+&apos;
+Sub __testPrint
+	MsgBox printAllPages(ThisComponent)
+End Sub
+
+&apos;
+&apos; Install listener for print jobs
+&apos;
+&apos; funPrefix_printJobEvent(event)
+&apos; funPrefix_disposing(event)
+&apos;
+&apos; Sub funPrefix_disposing(event)
+&apos; REM dummy - muss vorhanden sein!
+&apos; End Sub
+&apos;
+&apos; event.State = com.sun.star.view.PrintableState.JOB_STARTED
+&apos; event.State = com.sun.star.view.PrintableState.JOB_COMPLETED
+&apos;
+Function installPrintJobListener(oDoc As Object, funPrefix$) As Boolean
+	Dim oPrintJobListener As Object : oPrintJobListener = createUNOListener(funPrefix, &quot;com.sun.star.view.XPrintJobListener&quot;)
+    oDoc.addPrintJobListener(oPrintJobListener)
+    installPrintJobListener() = True
+End Function
+
+&apos;
+&apos; Remove a print job listener
+&apos;
+Function uninstallPrintJobListener(oDoc As Object, oPrintJobListener As Object) As Boolean
+	If Not IsNull(oPrintJobListener) Then
+		oDoc.removePrintJobListener(oPrintJobListener)
+	End If
+	uninstallPrintJobListener() = True
+End Function
+</script:module>

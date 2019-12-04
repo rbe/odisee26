@@ -11,28 +11,24 @@
 
 package org.odisee.document
 
-import org.odisee.io.Compression
-import org.odisee.debug.WallTime
-import org.odisee.xml.XmlHelper
 import org.odisee.api.OdiseeException
+import org.odisee.debug.WallTime
+import org.odisee.io.Compression
 import org.odisee.io.OdiseePath
+import org.odisee.xml.XmlHelper
 import org.w3c.dom.Element
 
 import java.security.Principal
 
 class DocumentController {
 
-    /**
-     * The Odisee service.
-     */
     OdiseeService odiseeService
 
-    /**
-     * The before-request-interceptor:
-     * Don't cache our response.
-     */
-    def beforeInterceptor = {
-        response.setHeader('Cache-Control', 'no-cache,no-store,must-revalidate,max-age=0')
+    public static final Principal principal = new Principal() {
+        @Override
+        String getName() {
+            return "odisee";
+        }
     }
 
     def generate() {
@@ -44,20 +40,14 @@ class DocumentController {
             final InputStream decompressedInputStream = Compression.decompress(request.inputStream)
             final Element xml = XmlHelper.convertToXmlElement(decompressedInputStream)
             if (null != xml) {
-                final Principal principal = new Principal() {
-                    @Override
-                    String getName() {
-                        return "odisee";
-                    }
-                }
-                final Document document = processXmlRequest(/*request.userPrincipal*/principal, xml)
+                final Document document = processXmlRequest(/*request.userPrincipal*/ principal, xml)
                 if (null == document) {
-                    throw new OdiseeException('Odisee: Cannot send stream, no document')
+                    throw new OdiseeException('Cannot send stream, no document')
                 } else {
                     DocumentStreamer.stream(response, document)
                 }
             } else {
-                throw new OdiseeException('Odisee: Invalid or missing XML request')
+                throw new OdiseeException('Invalid or missing XML request')
             }
         } catch (e) {
             processThrowable(e)
@@ -66,22 +56,18 @@ class DocumentController {
             response.outputStream.close()
             if (OdiseePath.ODISEE_PROFILE) {
                 wallTime.stop()
-                log.info "Odisee: Document processing took ${wallTime.diff()} ms (wall clock)"
+                log.info "Document generation took ${wallTime.diff()} ms (wall clock)"
             }
         }
     }
 
-    private Document processXmlRequest(final Principal principal, final Element xml) {
-        try {
-            final List<Document> documents = odiseeService.generateDocument(principal, xml)
-            if (null != documents && documents.size() > 0) {
-                final Document document = documents.last()
-                return document
-            } else {
-                throw new OdiseeException('Odisee: Document generation failed')
-            }
-        } catch (e) {
-            throw new OdiseeException("Odisee: Document generation failed", e)
+    private Document processXmlRequest(final Principal principal, final Element xml) throws OdiseeException {
+        final List<Document> documents = odiseeService.generateDocument(principal, xml)
+        if (null != documents && documents.size() > 0) {
+            return documents.last()
+        } else {
+            // TODO Return empty document
+            throw new OdiseeException('Document generation failed')
         }
     }
 
@@ -103,7 +89,7 @@ class DocumentController {
             }
             response.outputStream.flush()
         } catch (e) {
-            log.error 'Odisee: Could not send error message to client', e
+            log.error 'Could not send error message to client', e
         }
     }
 

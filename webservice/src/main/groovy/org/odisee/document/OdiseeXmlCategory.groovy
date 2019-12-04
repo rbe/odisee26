@@ -12,20 +12,14 @@
 package org.odisee.document
 
 import com.sun.star.lang.XComponent
+import groovy.util.logging.Log
 import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
-import org.odisee.shared.OdiseeConstant
 import org.odisee.ooo.connection.OdiseeServerRuntimeException
 import org.odisee.ooo.connection.OfficeConnection
 import org.odisee.ooo.connection.OfficeConnectionFactory
-import org.odisee.writer.OOoAutotextCategory
-import org.odisee.writer.OOoBookmarkCategory
-import org.odisee.writer.OOoDocumentCategory
-import org.odisee.writer.OOoFieldCategory
-import org.odisee.writer.OOoImageCategory
-import org.odisee.writer.OOoTextTableCategory
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import org.odisee.shared.OdiseeConstant
+import org.odisee.writer.*
 
 import javax.xml.bind.DatatypeConverter
 import java.nio.charset.Charset
@@ -44,9 +38,8 @@ import java.util.concurrent.TimeUnit
  * $ODISEE_VAR/template/name without extension/revision/name_revision.ott
  * $ODISEE_VAR/document/name without extension/name_revision.odt, .pdf
  */
+@Log
 class OdiseeXmlCategory {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(OdiseeXmlCategory.class)
 
     /**
      * Find latest revision of a file with name following this convention:
@@ -254,7 +247,6 @@ class OdiseeXmlCategory {
         String location = macro.'@location'.toString() ?: 'document'
         String language = macro.'@language'.toString() ?: 'Basic'
         String macroUrl = "${macroName}?language=${language}&location=${location}"
-        //
         OdiseeXmlCategory.processInstruction template, { t ->
             int paramCount = macro.parameter.size()
             Object[] params = null
@@ -347,7 +339,7 @@ class OdiseeXmlCategory {
                         methodName = tagName[0].toUpperCase() + tagName[1..-1]
                         OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
                     } catch (e) {
-                        LOGGER.error "Odisee: Could not execute instruction '${tagName} ${instruction}'", e
+                        log.error "Odisee: Could not execute instruction '${tagName} ${instruction}'", e
                     }
                 }
             }

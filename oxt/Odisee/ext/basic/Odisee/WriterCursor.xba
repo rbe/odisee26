@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterCursor" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterCursor
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos;
+&apos;
+Function getTextCursorAtStartOfDocument(oDoc As Object) As com.sun.star.text.XTextCursor
+	Dim oTextCur As Object
+	oTextCur = oDoc.Text.createTextCursor()
+	oTextCur.gotoStart(false)
+	getTextCursorAtStartOfDocument() = oTextCur
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getTextCursorAtEndOfDocument(oDoc As Object) As com.sun.star.text.XTextCursor
+	Dim oTextCur As Object
+	oTextCur = oDoc.Text.createTextCursor()
+	oTextCur.gotoEnd(false)
+	getTextCursorAtEndOfDocument() = oTextCur
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getTextCursorAtBookmark(bm$) As com.sun.star.text.XTextCursor
+	Dim oAnchor As Object : oAnchor = oDoc.getBookmarks().getByName(bm).getAnchor()
+	Dim oTextCur As Object : oTextCur = oDoc.Text.createTextCursor()
+	oTextCur.gotoRange(oAnchor, False)
+	getTextCursorAtBookmark() = oTextCur
+End Function
+
+&apos;
+&apos;
+&apos;
+Function moveViewCursorToStartOfDocument(oDoc As Object) As com.sun.star.text.XTextViewCursor
+	Dim oViewCur As Object
+	oViewCur = oDoc.CurrentController.ViewCursor
+	oViewCur.jumpToFirstPage(False)
+	moveViewCursorToStartOfDocument() = oViewCur
+End Function
+
+&apos;
+&apos;
+&apos;
+Function moveViewCursorToEndOfDocument(oDoc As Object) As com.sun.star.text.XTextViewCursor
+	Dim oViewCur As Object : oViewCur = oDoc.CurrentController.ViewCursor
+	oViewCur.jumpToLastPage(False)
+	moveViewCursorToEndOfDocument() = oViewCur
+End Function
+
+&apos;
+&apos; Set view cursor to position of bookmark
+&apos;
+Function setViewCursorToBookmark(oDoc as Object, bm$) As com.sun.star.text.XTextViewCursor
+	If oDoc.Bookmarks.hasByName(bm) Then
+		Dim oAnchor As Object : oAnchor = oDoc.Bookmarks.getByName(bm).Anchor
+		Dim oViewCur As Object : oViewCur = moveViewCursorToStartOfDocument(oDoc) &apos;oDoc.CurrentController.ViewCursor
+		oViewCur.gotoRange(oAnchor, False)
+		setViewCursorToBookmark() = oViewCur
+	Else
+		setViewCursorToBookmark() = Nothing
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getViewCursorAtTextCursor(oDoc As Object, oTextCur As Object) As com.sun.star.text.XTextViewCursor
+	Dim oViewCur As Object : oViewCur = oDoc.CurrentController.ViewCursor
+	oViewCur.gotoRange(oTextCur, False)
+	getViewCursorAtTextCursor() = oViewCur
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getTextCursorAtViewCursor(oDoc As Object, Optional oViewCur As Object) As com.sun.star.text.XTextCursor
+	&apos;
+	If IsMissing(oViewCur) Then
+		oViewCur = oDoc.CurrentController.ViewCursor
+	End If
+	&apos;
+	Dim oTextCur As Object
+	oTextCur = oDoc.Text.createTextCursor()
+	oTextCur.gotoRange(oViewCur)
+	getTextCursorAtViewCursor() = oTextCur
+End Function
+
+&apos;
+&apos; Get text cursor before a table.
+&apos;
+Function getTextCursorBeforeTable(oDoc As Object, n$) As com.sun.star.text.XTextCursor
+	Dim oAnchor : oAnchor = oDoc.TextTables.getByName(n).Anchor
+	If Not IsNull(oAnchor) Then
+		Dim oTextCur : oTextCur = oDoc.Text.createTextCursorByRange(oAnchor)
+		oTextCur.gotoPreviousParagraph(False)
+		getTextCursorBeforeTable() = oTextCur
+	End If
+End Function
+
+&apos;
+&apos; Get text cursor after a table.
+&apos;
+Function getTextCursorAfterTable(oDoc As Object, n$) As com.sun.star.text.XTextCursor
+	Dim oAnchor : oAnchor = oDoc.TextTables.getByName(n).Anchor
+	If Not IsNull(oAnchor) Then
+		Dim oTextCur : oTextCur = oDoc.Text.createTextCursorByRange(oAnchor)
+		oTextCur.gotoNextParagraph(False)
+		getTextCursorAfterTable() = oTextCur
+	End If
+End Function
+
+&apos;
+&apos; Get text cursor after last inserted table (table with highest index).
+&apos;
+Function getTextCursorAfterLastInsertedTable(oDoc As Object, n$) As com.sun.star.text.XTextCursor
+	Dim oAnchor : oAnchor = oDoc.TextTables.getByIndex(oDoc.TextTables.Count - 1).Anchor
+	If Not IsNull(oAnchor) Then
+		Dim oTextCur : oTextCur = oDoc.Text.createTextCursorByRange(oAnchor)
+		oTextCur.gotoNextParagraph(False)
+		getTextCursorAfterLastInsertedTable() = oTextCur
+	End If
+End Function
+
+</script:module>

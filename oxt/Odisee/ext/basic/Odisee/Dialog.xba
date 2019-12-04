@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Dialog" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Dialog
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Synchronize content from bag (SQL result) with dialog controls.
+&apos;
+Sub syncBagWithDialog(oDoc As Object, oDlg As Object, oBag As Object, bagPrefix$)
+	Dim aControls() : aControls = oDlg.getControls()
+	Dim i%, j%, s$, oControl As Object, controlName$, v As Variant
+	Dim bagPrefixLen% : bagPrefixLen = Len(bagPrefix)
+	For i = 1 To UBound(aControls)
+		oControl = aControls(i).Model
+		controlName = Mid(oControl.Name, 3) &apos; Prefixed with two chars
+		If Left(controlName, bagPrefixLen) = bagPrefix Then
+			controlName = Odisee.Basic.replace(controlName, bagPrefix, &quot;&quot;)
+			If Odisee.Database.bagHasColumn(oBag, controlName) Then
+				v = Odisee.Database.getValueFromBag(oBag, 0, controlName)
+				Select Case Left(oControl.Name, 2)
+					Case &quot;et&quot;: oControl.Text = v
+					Case &quot;dt&quot;: oControl.Date = v
+				End Select
+			End If
+		End If
+	Next
+	oDoc.Textfields.refresh()
+End Sub
+
+&apos;
+&apos; Synchronize dialog controls with content from bag (SQL result).
+&apos;
+Sub syncDialogWithBag(oDoc As Object, oDlg As Object, oBag As Object, bagPrefix$)
+	Dim aControls() : aControls = oDlg.getControls()
+	Dim i%, j%, s$, oControl As Object, controlName$, v As Variant
+	For i = 1 To UBound(aControls)
+		oControl = aControls(i).Model
+		If Left(oControl.Name, 2) = &quot;et&quot; Then
+			controlName = Mid(oControl.Name, 3)
+			If Left(controlName, 6) = bagPrefix Then
+				controlName = Odisee.Basic.replace(controlName, bagPrefix, &quot;&quot;)
+				v = Odisee.Database.getValueFromBag(oBag, 0, controlName)
+				oControl.Text = v
+			End If
+		End If
+	Next
+	oDoc.Textfields.refresh()
+End Sub
+
+&apos;
+&apos; Alle Controls anhand ihres Namens mit Benutzerfeldern abgleichen oder umgekehrt
+&apos; bWrite: Userfield beschreiben?
+&apos;
+&apos; Labels: la
+&apos; Textfields: et
+&apos; Checkboxes: cb
+&apos; Listboxes: lb
+&apos; Comboboxes: cm
+&apos; TODO Radiobuttons: rb
+&apos;
+Function provideUserfields(oDoc As Object, oDlg As Object, Optional bWrite As Boolean) As Boolean
+	&apos; Textfields
+	Dim oTextFieldMaster As Object : oTextFieldMaster = oDoc.TextFieldMasters
+	&apos;
+	If IsMissing(bWrite) Then
+		bWrite = False
+	End If
+	&apos; Controls
+	Dim aControls() : aControls = oDlg.getControls()
+	Dim oControl As Object, oUserfield As Object, controlName$
+	&apos;
+	Dim i%, userfieldName$
+	For i = 0 To UBound(aControls())
+		oControl = aControls(i).Model
+		controlName = oControl.Name
+		userfieldName = USERFIELDMASTER &amp; &quot;.&quot; &amp; Mid(oControl.Name, 3)
+		&apos; Checkboxes
+		If Left(oControl.Name, 2) = &quot;cb&quot; Then
+			If oTextFieldMaster.hasByName(userfieldName) Then
+				oUserfield = oTextFieldMaster.getByName(userfieldName)
+				If bWrite Then
+					Select Case CBool(oControl.State)
+						Case False: oUserfield.Value = 0
+						Case True: oUserfield.Value = 1
+					End Select
+				Else
+					Select Case CBool(oUserfield.Content)
+						Case False: oControl.State = 0
+						Case True: oControl.State = 1
+					End Select
+				End If
+			Else
+				MsgBox(&quot;Benutzerfeld nicht gefunden: &quot; &amp; Mid(oControl.Name, 3), Odisee._Global.MSGBOX_OK_BUTTON, &quot;Odisee.Dialog.provideUserfields&quot;)
+			End If
+		&apos; Comboboxes
+		ElseIf Left(oControl.Name, 2) = &quot;cm&quot; Then
+			If oTextFieldMaster.hasByName(userfieldName) Then
+				oUserfield = oTextFieldMaster.getByName(userfieldName)
+				If bWrite Then
+					oUserfield.Content = oControl.Text
+				Else
+					oControl.Text = oUserfield.Content
+				End If
+			Else
+				MsgBox(&quot;Benutzerfeld nicht gefunden: &quot; &amp; Mid(oControl.Name, 3), Odisee._Global.MSGBOX_OK_BUTTON, &quot;Odisee.Dialog.provideUserfields&quot;)
+			End If
+		&apos; Listboxes
+		ElseIf Left(oControl.Name, 2) = &quot;lb&quot; Then
+			If oTextFieldMaster.hasByName(userfieldName) Then
+				oUserfield = oTextFieldMaster.getByName(userfieldName)
+				If bWrite Then
+					Dim idxToName : idxToName = resolveIndexToName(oControl)
+					If Not IsNull(idxToName) Then
+						oUserfield.Content = Join(idxToName, &quot;;&quot;)
+					End If
+				Else
+					oControl.SelectedItems = resolveNameToIndex(oUserfield, oControl)
+				End If
+			Else
+				MsgBox(&quot;Benutzerfeld nicht gefunden: &quot; &amp; Mid(oControl.Name, 3), Odisee._Global.MSGBOX_OK_BUTTON, &quot;Odisee.Dialog.provideUserfields&quot;)
+			End If
+		&apos; Textfields
+		ElseIf Left(oControl.Name, 2) = &quot;et&quot; Then
+			If oTextFieldMaster.hasByName(userfieldName) Then
+				oUserfield = oTextFieldMaster.getByName(userfieldName)
+				If bWrite Then
+					oUserfield.Content = oControl.Text
+				Else
+					oControl.Text = oUserfield.Content
+				End If
+			Else
+				MsgBox(&quot;Benutzerfeld nicht gefunden: &quot; &amp; Mid(oControl.Name, 3), Odisee._Global.MSGBOX_OK_BUTTON, &quot;Odisee.Dialog.provideUserfields&quot;)
+			End If
+		&apos; Datefields
+		ElseIf Left(oControl.Name, 2) = &quot;dt&quot; Then
+			If oTextFieldMaster.hasByName(userfieldName) Then
+				oUserfield = oTextFieldMaster.getByName(userfieldName)
+				If bWrite Then
+					If Not IsEmpty(oControl.Date) Then
+						oUserfield.Value = CDateFromUnoDate(oControl.Date)
+					Else
+						oUserfield.Value = 0
+					End If
+				Else
+					oControl.Date = CDateToUnoDate(oUserfield.Value)
+				End If
+			Else
+				MsgBox(&quot;Benutzerfeld nicht gefunden: &quot; &amp; Mid(oControl.Name, 3), Odisee._Global.MSGBOX_OK_BUTTON, &quot;Odisee.Dialog.provideUserfields&quot;)
+			End If
+		End If
+	Next
+	&apos; Refresh textfields
+	oDoc.TextFields.refresh()
+	provideUserfields() = True
+End Function
+
+&apos;
+&apos; Translate an array of selected indexes of a listbox into their
+&apos; corresponding names 
+&apos;
+Function resolveIndexToName(oListBox As Object) As Array
+	&apos; Selected items
+	Dim items() : items = oListBox.SelectedItems
+	&apos; Length of array of selected items
+	Dim nItems% : nItems = aLen(items())
+	If nItems &gt; 0 Then
+		&apos; Array with translated names
+		Dim names(nItems - 1) As String
+		&apos; Walk through all indexes and get their name
+		Dim i%
+		For i = LBound(items()) To UBound(items())
+			names(i) = oListBox.AllItems(items(i)).First
+		Next
+		&apos; Return value
+		resolveIndexToName() = names()
+	End If
+End Function
+
+&apos;
+&apos; Read a list of semicolon seperated names of items of a listbox
+&apos; from a userfield and calculate the indexes.
+&apos;
+Function resolveNameToIndex(oUserfield As Object, oListBox As Object) As Array
+	&apos; Array with names from userfield
+	Dim items() : items = Split(oUserfield.Content, &quot;;&quot;)
+	Dim nItems() : nItems = aLen(items())
+	Dim indexes(nItems - 1) As Integer
+	&apos; Walk through all names and find their index in the listbox
+	Dim i%, j%
+	For i = LBound(items()) To UBound(items())
+		For j = 0 To oListBox.ItemCount
+			If items(i) = oListBox.AllItems(j).First Then
+				indexes(i) = j
+				Exit For
+			End If
+		Next
+	Next
+	resolveNameToIndex() = indexes()
+End Function
+
+&apos;
+&apos; Is a checkbox control active?
+&apos;
+Function isCheckboxActive(oDlg As Object, checkboxName$) As Boolean
+	Dim oControl : oControl = oDlg.getControl(checkboxName)
+	If Not IsNull(oControl) Then
+		isCheckboxActive() = CBool(oControl.State)
+	End If
+End Function
+
+&apos;
+&apos; Move into &quot;WriterControls&quot; module?
+&apos;
+Function getControlShapeByName(n$) As com.sun.star.drawing.ControlShape
+	Dim oDoc As Object : oDoc = ThisComponent
+	Dim i%, oShape As Object, bHide As Boolean
+	For i = 0 To oDoc.DrawPage.Count - 1
+		 oShape = oDoc.DrawPage.getByIndex(i)
+		 If oShape.ShapeType = &quot;com.sun.star.drawing.ControlShape&quot; And oShape.Name = n Then
+		 	getControlShapeByName() = oShape
+		 	Exit Function
+		 End If
+	Next
+End Function
+
+</script:module>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterSettings" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterSettings
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+&apos;
+&apos; Show and print hidden paragraphs?
+&apos;
+&apos; http://wiki.services.openoffice.org/wiki/Documentation/DevGuide/Text/TextView
+&apos; http://api.openoffice.org/docs/common/ref/com/sun/star/text/ViewSettings.html
+&apos; http://api.openoffice.org/docs/common/ref/com/sun/star/text/DocumentSettings.html
+&apos;
+&apos; TODO: Dispatcher nutzen, da bei AZUL über Seitenansicht der Haken wieder gesetzt wird
+&apos;
+Sub showHiddenParagraphs(oDoc As Object, b As Boolean)
+	&apos; DocumentSettings
+	Dim oDocSettings : oDocSettings = oDoc.createInstance(&quot;com.sun.star.text.DocumentSettings&quot;)
+	oDocSettings.PrintHiddenText = b
+	&apos; Controller
+	Dim oCtrl As Object : oCtrl = oDoc.CurrentController
+	oCtrl.ViewSettings.ShowHiddenParagraphs = b
+End Sub
+
+</script:module>

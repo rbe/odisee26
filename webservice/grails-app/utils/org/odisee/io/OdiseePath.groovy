@@ -11,6 +11,8 @@
  */
 package org.odisee.io
 
+import groovy.util.logging.Log
+import org.odisee.api.OdiseeException
 import org.odisee.shared.OdiseeConstant
 
 import java.nio.file.Files
@@ -21,7 +23,8 @@ import java.nio.file.Paths
  * Odisee's paths, built from environment variables.
  */
 @Singleton
-public class OdiseePath {
+@Log
+class OdiseePath {
 
     /**
      * Profile?
@@ -46,19 +49,19 @@ public class OdiseePath {
     /**
      * Base directory for Odisee.
      */
-    public static final Path ODISEE_HOME
+    public static Path ODISEE_HOME
 
     /**
      * Variable data directory for Odisee.
      */
-    public static final Path ODISEE_VAR
-    public static final Path ODISEE_USER
-    public static final Path ODISEE_TMP
+    public static Path ODISEE_VAR
+    public static Path ODISEE_USER
+    public static Path ODISEE_TMP
 
     /**
      * Deployment directory for Odisee, contains additional files.
      */
-    public static final Path ODISEE_DEPLOY
+    public static Path ODISEE_DEPLOY
 
     public static final String S_ETC_ODIINST = "etc/odiinst";
 
@@ -67,9 +70,12 @@ public class OdiseePath {
         // Is Odisee home set?
         String envOdiseeHome = System.getenv(OdiseeConstant.S_ODISEE_HOME)
         if (!envOdiseeHome) {
-            ODISEE_HOME = Path.of(System.getProperty(OdiseeConstant.S_ODISEE_HOME))
-            if (!ODISEE_HOME) ODISEE_HOME = Paths.get(OdiseeConstant.S_DOT).toAbsolutePath()
-            println "Consider setting ODISEE_HOME, using directory ${ODISEE_HOME}"
+            String systemPropOdiseeHome = Path.of(System.getProperty(OdiseeConstant.S_ODISEE_HOME))
+            if (systemPropOdiseeHome) {
+                ODISEE_HOME = Path.of(systemPropOdiseeHome)
+            } else {
+                throw new OdiseeException("ODISEE_HOME not set")
+            }
         } else {
             ODISEE_HOME = Paths.get(envOdiseeHome).toAbsolutePath()
         }
@@ -107,16 +113,16 @@ public class OdiseePath {
     }
 
     static void dumpEnv() {
-        println 'Odisee environment variables:'
-        println "  JAVA_HOME:     ${JAVA_HOME}"
-        println "  Java Version:  ${System.getProperty('java.version')}"
-        println "  ODISEE_HOME:   ${ODISEE_HOME}"
-        println "  ODISEE_VAR:    ${ODISEE_VAR}"
+        log.info 'Odisee environment variables:'
+        log.info "  JAVA_HOME:     ${JAVA_HOME}"
+        log.info "  Java Version:  ${System.getProperty('java.version')}"
+        log.info "  ODISEE_HOME:   ${ODISEE_HOME}"
+        log.info "  ODISEE_VAR:    ${ODISEE_VAR}"
         if (ODISEE_DEBUG) {
-            println "  ODISEE_DEBUG  =${ODISEE_DEBUG}"
+            log.info "  ODISEE_DEBUG  =${ODISEE_DEBUG}"
         }
         if (ODISEE_PROFILE) {
-            println "  ODISEE_PROFILE=${ODISEE_PROFILE}"
+            log.info "  ODISEE_PROFILE=${ODISEE_PROFILE}"
         }
     }
 

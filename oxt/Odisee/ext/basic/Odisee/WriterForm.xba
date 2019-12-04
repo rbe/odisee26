@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterForm" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterForm
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Check a radio button by its label
+&apos;
+Sub checkRadioButtonByLabel(oDoc As Object, n$)
+	Dim forms : forms = oDoc.DrawPage.getForms.getByIndex(0)
+	Dim i%, control As Object
+	For i = 0 To forms.Count - 1
+		control = forms.getByIndex(i)
+		If control.supportsService(&quot;com.sun.star.form.component.RadioButton&quot;) Then
+			If control.Label = n Then
+				control.State = 1
+			End If
+		End If
+	Next
+End Sub
+
+&apos;
+&apos; Set &apos;visible&apos; and &apos;printable&apos; flag of combobox.
+&apos;
+Sub setComboboxVisible(oDoc As Object, n$, b As Boolean)
+	&apos; Get form
+	Dim oForm As Object : oForm = oDoc.DrawPage.Forms.getByIndex(0)
+	&apos; Find combobox by name
+	Dim oCombobox As Object : oCombobox = oForm.getByName(n)
+	&apos; Set combobox invisible
+	oCombobox.EnableVisible = b
+	&apos; Don&apos;t print combobox
+	oCombobox.Printable = b
+End Sub
+</script:module>

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+  targetNamespace="http://xml.odisee.de/server/request" xmlns="http://xml.odisee.de/server/request">
+  <xs:element name="odisee">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="post-process" minOccurs="0"/>
+        <xs:element ref="request" maxOccurs="unbounded"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="request">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" ref="group"/>
+        <xs:element ref="template"/>
+        <xs:element ref="archive" minOccurs="0"/>
+        <xs:element ref="instructions" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="name" use="required" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="template">
+    <xs:complexType>
+      <xs:attribute name="name" use="required" type="xs:string"/>
+      <xs:attribute name="outputFormat" use="optional" type="xs:string"/>
+      <xs:attribute name="pre-save-macro" use="optional" type="xs:string"/>
+      <xs:attribute name="revision" use="optional" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="instructions">
+    <xs:complexType>
+      <xs:sequence maxOccurs="unbounded" minOccurs="1">
+        <xs:element ref="autotext" maxOccurs="unbounded" minOccurs="0"/>
+        <xs:element ref="bookmark" maxOccurs="unbounded" minOccurs="0"/>
+        <xs:element ref="macro" maxOccurs="unbounded" minOccurs="0"/>
+        <xs:element ref="userfield" maxOccurs="unbounded" minOccurs="0"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0" ref="table"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="userfield">
+    <xs:complexType mixed="true">
+      <xs:attribute name="name" use="required" type="xs:string"/>
+      <xs:attribute name="post-macro" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="table">
+    <xs:complexType mixed="true">
+      <xs:attribute name="name" use="required" type="xs:string"/>
+      <xs:attribute name="post-macro" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="autotext">
+    <xs:complexType>
+      <xs:attribute name="group" type="xs:string" use="required"/>
+      <xs:attribute name="name" use="required" type="xs:string"/>
+      <xs:attribute name="bookmark" use="optional" type="xs:string"/>
+      <xs:attribute name="atend" type="xs:boolean" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="bookmark">
+    <xs:complexType mixed="true">
+      <xs:attribute name="name" use="required" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="macro">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="parameter" minOccurs="0"/>
+      </xs:sequence>
+      <xs:attribute name="language" use="optional" type="xs:string" default="Basic"/>
+      <xs:attribute name="location" use="optional" type="xs:string" default="document"/>
+      <xs:attribute name="name" use="required" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="parameter">
+    <xs:complexType>
+      <xs:attribute name="value" use="required" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="group">
+    <xs:complexType>
+      <xs:attribute name="name" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="archive">
+    <xs:complexType>
+      <xs:attribute name="database" use="required" type="xs:boolean"/>
+      <xs:attribute name="files" use="required" type="xs:boolean"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="post-process">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="1" maxOccurs="unbounded" ref="action"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="action">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" ref="result-placeholder"/>
+        <xs:element minOccurs="0" ref="input"/>
+      </xs:sequence>
+      <xs:attribute name="type" use="required" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="result-placeholder"/>
+  <xs:element name="input">
+    <xs:complexType>
+      <xs:attribute name="filename" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

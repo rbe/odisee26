@@ -28,8 +28,6 @@ RUN mkdir var \
 COPY LICENSE.txt .
 COPY bin/* bin/
 COPY etc/* etc/
-COPY xml/* etc/xml/
-COPY image/* var/image/
 COPY shell_profile .bash_profile
 COPY entrypoint.sh .
 

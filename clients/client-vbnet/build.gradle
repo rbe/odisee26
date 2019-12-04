@@ -1,0 +1,21 @@
+plugins {
+    id 'com.ullink.msbuild' version '3.6'
+}
+
+import static org.apache.tools.ant.taskdefs.condition.Os.*
+
+task buildSolution {
+    group 'Odisee'
+    onlyIf { isFamily(FAMILY_WINDOWS) }
+    msbuild {
+        solutionFile = 'src/vb/OdiseeClient.sln'
+        //projectFile = file('src/vb/OdiseeClient/OdiseeClient.vbproj')
+        verbosity = 'detailed'
+        projectName = project.name
+        targets = ['Clean', 'Rebuild']
+        version = '14.0'
+        msbuildDir = '/Library/Frameworks/Mono.framework/Versions/6.0.0/lib/mono/xbuild/14.0/bin'
+        destinationDir = 'build/msbuild/bin'
+    }
+}
+assemble.dependsOn 'buildSolution'

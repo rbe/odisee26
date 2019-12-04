@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterBookmark" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterBookmark
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Get bookmark by name
+&apos;
+Function getBookmark(oDoc As Object, bookmark$) As Object
+	getBookmark() = oDoc.getBookmarks().getByName(bookmark)
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getBookmarkThis(n$) As Object
+	getBookmarkThis() = getBookmark(ThisComponent, n)
+End Function
+
+&apos;
+&apos; Set text at bookmark
+&apos;
+Function setTextAtBookmark(Optional oDoc As Object, bm$, s$) As Boolean
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	If IsMissing(oDoc) Or IsNull(oDoc) Then
+		oDoc = ThisComponent
+	End If
+	&apos;
+	Dim anchor As Object : anchor = getBookmark(oDoc, bm).getAnchor()
+	anchor.setString(s)
+	&apos;
+	setTextAtBookmark() = True
+	Exit Function
+	&apos; Error handler
+	ErrorHandler:
+		setTextAtBookmark() = False
+End Function
+
+&apos;
+&apos; Insert content of userfield at bookmark
+&apos;
+Function setUserFieldContentAtBookmark(oDoc As Object, bm$, userField$) As Boolean
+	setUserFieldContentAtBookmark() = False
+End Function
+
+&apos;
+&apos;
+&apos;
+Function setTextAtBookmarkThis(bm$, s$) As Boolean
+	setTextAtBookmarkThis() = setTextAtBookmark(ThisComponent, bm, s)
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getParagraphAtBookmark(oDoc As Object, bm$) As String
+	&apos; Error handler
+	On Error Goto ErrorHandler
+	&apos; Create view cursor
+	Dim viewCursor As Object :viewCursor = oDoc.CurrentController.getViewCursor()
+	&apos; Get anchor at bookmark
+	Dim anchor As Object : anchor = getBookmark(oDoc, bm).getAnchor()
+	If Not IsNull(anchor) Then
+		viewCursor.gotoRange(anchor, false)
+		&apos; Create textcursor
+		Dim tc As Object : tc = viewCursor.Text.createTextCursor()
+		tc.gotoEndOfParagraph(True)
+		getParagraphAtBookmark() = tc.getString()
+	End If
+	Exit Function
+	&apos; Error handler
+	ErrorHandler:
+		getParagraphAtBookmark() = &quot;&quot;
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getParagraphAtBookmarkThis(bm$) As String
+	getParagraphAtBookmarkThis() = getParagraphAtBookmark(ThisComponent, bm)
+End Function
+
+</script:module>

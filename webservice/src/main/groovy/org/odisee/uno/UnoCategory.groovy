@@ -21,44 +21,20 @@ import com.sun.star.uno.UnoRuntime
  */
 class UnoCategory {
 
-    /**
-     *
-     * @param unoObj
-     * @param clazz
-     * @return
-     */
     static Object uno(Object unoObj, Class clazz) {
         UnoRuntime.queryInterface(clazz, unoObj)
     }
 
-    /**
-     *
-     * @param propertySet
-     * @param pname
-     * @return
-     */
     static Object getAt(XPropertySet propertySet, String pname) {
         propertySet.getPropertyValue(pname)
     }
 
-    /**
-     *
-     * @param propertySet
-     * @param pname
-     * @param newValue
-     */
-    static void putAt(XPropertySet propertySet, String pname, Object newValue) {
-        propertySet.setPropertyValue(pname, newValue)
-    }
-
-    /**
-     *
-     * @param ndx
-     * @param x
-     * @return
-     */
     static Object getAt(XIndexAccess ndx, Integer x) {
         ndx.getByIndex(x)
+    }
+
+    static void putAt(XPropertySet propertySet, String pname, Object newValue) {
+        propertySet.setPropertyValue(pname, newValue)
     }
 
 }

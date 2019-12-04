@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterSearch" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterSearch
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos;
+&apos;
+Function search(oDoc As Object, sText$) As com.sun.star.text.XTextRange
+	Dim sdesc As Object : sdesc = oDoc.createSearchDescriptor()
+	sdesc.SearchString = sText
+	Dim ff As Object
+	ff = oDoc.FindFirst(sdesc)
+	If Not IsNull(ff) Then
+		search() = ff
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Function searchAndReplace(oDoc As Object, search$, replace$) As Boolean
+	Dim rdesc As Object : rdesc = oDoc.createReplaceDescriptor()
+	rdesc.SearchRegularExpression = False
+	rdesc.SearchString = search
+	rdesc.ReplaceString = replace
+	oDoc.replaceAll(rdesc)
+	searchAndReplace() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Function searchAndReplaceArray(oDoc As Object, search As Array, replace As Array) As Boolean
+	If aLen(search) &lt;&gt; aLen(replace) Then
+		searchAndReplaceArrayThis = False
+		Exit Function
+	End If
+	For i = 0 To UBound(search)
+		searchAndReplaceArray() = searchAndReplace(oDoc, search(i), replace(i))
+	Next
+End Function
+
+&apos;
+&apos;
+&apos;
+Function searchRegexp(oDoc As Object, sText$) As com.sun.star.text.XTextRange
+	Dim sdesc As Object : sdesc = oDoc.createSearchDescriptor()
+	sdesc.SearchRegularExpression = True
+	sdesc.SearchString = sText
+	Dim ff As Object
+	ff = oDoc.findFirst(sdesc)
+	If Not IsNull(ff) Then
+		searchRegexp() = ff
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Function searchAndReplaceRegexp(oDoc As Object, sText$, sReplace$) As com.sun.star.text.XTextRange
+	Dim sdesc As Object : sdesc = oDoc.createSearchDescriptor()
+	sdesc.SearchRegularExpression = True
+	sdesc.SearchString = sText
+	sdesc.ReplaceString = sReplace
+	Dim ff As Object
+	ff = oDoc.findFirst(sdesc)
+	If Not IsNull(ff) Then
+		oDoc.replaceAll(sdesc)
+		searchAndreplaceRegexp() = ff
+	End If
+End Function
+
+</script:module>

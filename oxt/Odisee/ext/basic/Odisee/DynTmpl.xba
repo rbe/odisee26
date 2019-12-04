@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="DynTmpl" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.DynTmpl
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+Function simpleRetrieveHttp()
+	&apos;Odisee.HTTP.doGET2(&quot;http://www.bensmann.com/&quot;)
+	&apos;Odisee.WriterGraphic.insertGraphicAtEnd(&quot;http://www.azul.de/mm_db/Internet-Bilder/.normal_AZUL_Logo_60er_Geb200.jpg&quot;)
+End Function
+
+&apos;
+&apos; Open a text template by using a local copy or by retrieving it from the web.
+&apos;
+Function openTextTemplate(profile(), n$) As com.sun.star.text.XTextDocument
+	updateTemplate(profile(), n)
+	openTextTemplate() = Odisee.Document.openWriter(profile(1) &amp; n)
+End Function
+
+&apos;
+&apos; Download a template and put it into our template folder.
+&apos;
+&apos; profile(0) = Template source, e.g. http://...
+&apos; profile(1) = Save template to folder
+&apos;
+Function updateTemplate(profile(), n$) As Boolean
+	&apos;On Error Goto ErrorHandler
+	Dim oSFA As Object : oSFA = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	&apos; Does local copy exist?
+	If oSFA.exists(profile(1) &amp; n) Then
+		&apos; Yes, check versions and update if necessary
+		If isDocumentUpdated(profile(), n) Then
+			&apos; Download
+			updateTemplate() = downloadTemplate(profile(), n)
+		End If
+	Else
+		&apos; No, download it
+		updateTemplate() = downloadTemplate(profile(), n)
+	End If
+	updateTemplate() = False
+	&apos; Error handler
+	Exit Function
+	ErrorHandler:
+		&apos; Do nothing
+		updateTemplate() = False
+End Function
+
+&apos;
+&apos; Compare versions of document:
+&apos;   remote version &gt; local version = true
+&apos;   else false.
+&apos;
+Function isDocumentUpdated(profile(), n$) As Boolean
+	&apos;On Error Goto ErrorHandler
+	Dim remoteVer% : remoteVer = 1
+	Dim localVer% : localVer = 0
+	&apos; TODO Read remote and local version from file
+	
+	&apos; Compare versions
+	If remoteVer &gt; localVer Then
+		isDocumentUpdated() = True
+	Else
+		isDocumentUpdated() = False
+	End If
+	&apos; Error handler
+	Exit Function
+	ErrorHandler:
+		&apos; Do nothing
+		isDocumentUpdated() = False
+End Function
+
+&apos;
+&apos; Just do a download.
+&apos;
+Function downloadTemplate(profile(), n$) As Boolean
+	&apos;On Error Goto ErrorHandler
+	Dim oSFA As Object : oSFA = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	Dim source$ : source = profile(0) &amp; n
+	Dim dest$ : dest = profile(1) &amp; n
+	&apos;oSFA.openFileRead(source)
+	&apos;oSFA.openFileWrite(dest)
+	oSFA.copy(source, dest)
+	downloadTemplate() = oSFA.exists(profile(1) &amp; n)
+	&apos; Error handler
+	Exit Function
+	ErrorHandler:
+		&apos; Do nothing
+		downloadTemplate() = False
+End Function
+
+&apos;
+&apos; horizontalPos: type, x, xRel, y, yRel
+&apos; verticalPos: type, x, xRel, y, yRel
+&apos;
+Function updateGraphic(oDoc As Object, n$, url$, anchorType, horizontalPos As Array, verticalPos As Array) As Boolean
+	&apos;On Error Goto ErrorHandler
+	Odisee.WriterGraphic.insertGraphicAtBookmark(oDoc, n$, url)
+	&apos; Error handler
+	updateGraphic() = True
+	Exit Function
+	ErrorHandler:
+		&apos; Do nothing
+		updateGraphic() = False
+End Function
+
+</script:module>

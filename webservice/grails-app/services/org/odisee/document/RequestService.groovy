@@ -23,6 +23,8 @@ import java.nio.file.Path
 
 class RequestService implements InitializingBean {
 
+    static scope = 'singleton'
+
     private OfficeConnectionFactory officeConnectionFactory
 
     @Override
@@ -73,8 +75,8 @@ class RequestService implements InitializingBean {
             arg.result = requestXMLFile.toDocument(officeConnectionFactory, 0)
             if (!arg.result) {
                 final String group = 'group0'
-                def filename = requestXMLFile.fileName.toString()
-                log.error "Odisee: ${ filename}/${arg.activeIndex}: Got no result, maybe all instances in group '${group}' are unwilling to perform?"
+                log.error "${requestXMLFile.fileName.toString()}/${arg.activeIndex}:" +
+                        " Got no result, maybe all instances in group '${group}' are unwilling to perform?"
             }
         }
     }

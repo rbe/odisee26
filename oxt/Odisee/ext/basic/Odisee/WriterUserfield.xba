@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterUserfield" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterUserfield
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Ensure that prefix for variable is correct.
+&apos;
+Function checkUserfieldName(ByVal var$) As String
+	Dim s$ : s = USERFIELDMASTER &amp; &quot;.&quot;
+	&apos; Check given variable name for prefix: if present, strip it
+	Dim v$
+	If Left(var, Len(s)) = s Then
+		&apos;v = p + var
+		v = Replace(var, s, &quot;&quot;)
+	Else
+		v = var
+	End If
+	checkUserfieldName() = v
+End Function
+
+&apos;
+&apos; Does an userfield exist?
+&apos;
+Function hasUserfield(oDoc As Object, var$) As Boolean
+	On Error Resume Next
+	&apos; Check variable name
+	var = checkUserfieldName(var)
+	&apos; Fully-qualified FieldMaster/variable name
+	Dim fqvn$ : fqvn = USERFIELDMASTER &amp; &quot;.&quot; &amp; var
+	&apos; Get text field master
+	Dim oTextFieldMaster As Object : oTextFieldMaster = oDoc.TextFieldMasters
+	&apos; Get variable master
+	If oTextFieldMaster.hasByName(fqvn) Then
+		hasUserField() = True
+	Else
+		hasUserField() = False
+	End If
+End Function
+
+&apos;
+&apos; Get fieldmaster of an userfield.
+&apos;
+Function getUserfieldMaster(oDoc As Object, ByVal var$) As com.sun.star.beans.XPropertySet
+	&apos; Check variable name
+	var = checkUserfieldName(var)
+	&apos; Fully-qualified FieldMaster/variable name
+	Dim fqvn$ : fqvn = USERFIELDMASTER &amp; &quot;.&quot; &amp; var
+	&apos; Get text field master
+	Dim oTextFieldMasters As Object : oTextFieldMasters = oDoc.TextFieldMasters
+	&apos; Get variable master
+	If oTextFieldMasters.hasByName(fqvn) Then
+		getUserfieldMaster() = oTextFieldMasters.getByName(fqvn)
+	End If
+End Function
+
+&apos;
+&apos; Get variable (User)
+&apos;
+Function getUserfield(oDoc As Object, ByVal var$, Optional index As Long) As com.sun.star.text.XDependentTextField &apos;Variant
+	&apos; Error handler
+	&apos;On Error Goto ErrorHandler
+	Dim oFieldMaster As Object : oFieldMaster = getUserfieldMaster(oDoc, var)
+	If Not IsNull(oFieldMaster) Then
+		getUserfield() = oFieldMaster
+		If Not IsNull(oFieldMaster) Then
+			If Not IsMissing(index) Then
+				getUserfield() = oTextFieldMaster.DependentTextFields(index)
+			End If
+		End If
+	End If
+	&apos; ErrorHandler
+	Exit Function
+	ErrorHandler:
+		&apos;getUserfield() = Null
+End Function
+
+&apos;
+&apos; Return .Value from userfield
+&apos;
+Function getUserfieldValue(oDoc As Object, ByVal var$, Optional index As Long) As Variant
+	&apos; Get variable
+	Dim oField As Object : oField = getUserfield(oDoc, var) &apos; , index is magically 448?
+	&apos; We got a a dependent textfield
+	If Not IsNull(oField) Then
+		If oField.supportsService(USERFIELDMASTER) Then
+			getUserfieldValue() = oField.Value
+		End If
+	Else
+		&apos; Variable does not exist (at index)
+		getUserfieldValue() = 0
+	End If
+End Function
+
+&apos;
+&apos; Return .Content from userfield
+&apos;
+Function getUserfieldContent(oDoc As Object, ByVal var$, Optional index As Long) As Variant
+	&apos; Get variable
+	Dim oField As Object : oField = getUserfield(oDoc, var) &apos; , index is magically 448?
+	&apos; We got a a dependent textfield
+	If Not IsNull(oField) Then
+		If oField.supportsService(USERFIELDMASTER) Then
+			getUserfieldContent() = oField.Content
+		End If
+	Else
+		&apos; Variable does not exist (at index)
+		getUserfieldContent() = &quot;&quot;
+	End If
+End Function
+
+&apos;
+&apos; Set .Content in userfield
+&apos; Returns old content
+&apos;
+Function setUserfieldContent(oDoc As Object, ByVal var$, ByVal content$, Optional index As Long) As String
+	&apos; Get variable
+	Dim oField As Object : oField = getUserfield(oDoc, var) &apos; , index is magically 448?
+	&apos; We got a a dependent textfield
+	If Not IsNull(oField) Then
+		If oField.supportsService(USERFIELDMASTER) Then
+			setUserfieldContent() = oField.Content
+			oField.Content = content
+		End If
+	Else
+		&apos; Variable does not exist (at index)
+		setUserfieldContent() = &quot;&quot;
+	End If
+End Function
+
+&apos;
+&apos; Set .Content in userfield
+&apos; Returns old content
+&apos;
+Function setUserfieldValue(oDoc As Object, ByVal var$, ByVal value, Optional index As Long) As Variant
+	&apos; Get variable
+	Dim oField As Object : oField = getUserfield(oDoc, var) &apos; , index is magically 448?
+	&apos; We got a a dependent textfield
+	If Not IsNull(oField) Then
+		If oField.supportsService(USERFIELDMASTER) Then
+			setUserfieldValue() = oField.Value
+			oField.Value = value
+		End If
+	Else
+		&apos; Variable does not exist (at index)
+		setUserfieldValue() = 0
+	End If
+End Function
+
+&apos;
+&apos; Replace occurrences of {UserfieldName} with actual content of userfield
+&apos; in a text table (and certain rows).
+&apos; @param oDoc
+&apos; @param tableName
+&apos; @param repl
+&apos; @param startRowIdx
+&apos; @param endRowIdx
+&apos;
+Sub replaceUserfieldInTable(oDoc As Object, tableName$, repl(), Optional startRowIdx%, Optional endRowIdx%)
+	&apos; Get table
+	Dim oTable As Object : oTable = Odisee.WriterTextTable.getTable(oDoc, tableName)
+	If Not IsNull(oTable) Then
+		&apos; Now starting row index given, get first row in table
+		If IsMissing(startRowIdx) Then
+			startRowIdx = 1
+		End If
+		&apos; Now end row index given, get last row in table
+		If IsMissing(endRowIdx) Then
+			endRowIdx = oTable.Rows.Count
+		End If
+		&apos;
+		Dim arrIdx%, rowIdx%, search$, content$
+		For rowIdx = startRowIdx To endRowIdx
+			For arrIdx = LBound(repl()) To UBound(repl())
+				search =  &quot;{&quot; &amp; repl(arrIdx) &amp; &quot;}&quot;
+				&apos; Get content of userfield
+				content = Odisee.WriterUserfield.getUserfieldContent(oDoc, repl(arrIdx))
+				&apos; Replace content if content of userfield is NOT its name
+				If content &lt;&gt; repl(arrIdx) Then
+					&apos; Search and replace placeholders for userfields in row
+					&apos;&apos;Odisee.WriterTextTable.rangeReplace(oDoc, search, content, tableName, rowIdx)
+					Odisee.WriterSearch.searchAndReplace(oDoc, search, content)
+				&apos;Else
+				&apos;	Odisee.WriterSearch.searchAndReplace(oDoc, search, &quot;&quot;)
+				End If
+			Next
+		Next
+	End If
+End Sub
+
+&apos;
+&apos; Replace occurrences of {UserfieldName} with actual content of userfield
+&apos; in all text tables (and certain rows).
+&apos; @param oDoc
+&apos; @param repl
+&apos; @param startRowIdx
+&apos; @param endRowIdx
+&apos;
+Sub replaceUserfieldInTables(oDoc As Object, repl(), Optional startRowIdx%, Optional endRowIdx%)
+	&apos; Table count
+	Dim ttCount% : ttCount = oDoc.TextTables.Count - 1
+	&apos; Process all tables
+	Dim i%, tableName$
+	For i = 0 To ttCount
+		tableName = oDoc.TextTables.getByIndex(i).Name
+		If IsMissing(startRowIdx) And IsMissing(endRowIdx) Then
+			replaceUserfieldInTable(oDoc, tableName$, repl())
+		End If
+		If Not IsMissing(startRowIdx) And IsMissing(endRowIdx) Then
+			replaceUserfieldInTable(oDoc, tableName$, repl(), startRowIdx)
+		End If
+		If Not IsMissing(startRowIdx) And Not IsMissing(endRowIdx) Then
+			replaceUserfieldInTable(oDoc, tableName$, repl(), startRowIdx, endRowIdx)
+		End If
+	Next
+End Sub
+
+&apos;
+&apos; Replace occurrences of {UserfieldName} with actual content of userfield
+&apos; in whole document.
+&apos;
+Sub replaceUserfield(oDoc As Object)
+End Sub
+
+&apos;
+&apos; Set userfields empty (content = &quot;&quot;) when their value is their name.
+&apos;
+Sub emptyUserfields(oDoc As Object)
+	Dim oTFM As Object : oTFM = oDoc.TextFields.createEnumeration()
+	Dim oField As Object, n$, content$
+	While oTFM.hasMoreElements()
+		oField = oTFM.nextElement()
+		n = oField.TextFieldMaster.Name
+		If oField.supportsService(USERFIELD) Then
+			content = oField.TextFieldMaster.Content
+			If content = n Then
+				oField.TextFieldMaster.Content = &quot;&quot;
+			End If
+		End If
+		&apos;If uf.supportsService() Then
+		&apos;End If
+	Wend
+	oDoc.TextFields.refresh()
+End Sub
+
+&apos;
+&apos; Copy all user fields: rename all user fields and copy their values to &lt;userfield&gt;_&lt;i&gt;
+&apos;
+Sub copyUserFields(oDoc As Object)
+	userfields = oDoc.getTextFields().createEnumeration()
+	Do While userfields.hasMoreElements()
+		uf = userfields.nextElement()
+		If uf.supportsService(gTextFieldMasterPrefix) Then
+			&apos; Do nothing
+		ElseIf uf.supportsService(gTextFieldMasterPrefix) Then
+			ufName = uf.getTextFieldMaster().Name
+			If Not InStr(ufName, &quot;__&quot;) Then
+				&apos; Create name for new user field
+				ufName2 = ufName &amp; &quot;__&quot; &amp; CStr(i)
+				&apos; Create user field if it does&apos;nt exist
+				If Not oDoc.getTextFieldMasters().hasByName(&quot;com.sun.star.text.FieldMaster.User.&quot; &amp; ufName2) Then
+					fieldMaster2 = ThisComponent.createInstance(&quot;com.sun.star.text.FieldMaster.User&quot;)
+					fieldMaster2.setPropertyValue(&quot;Name&quot;, ufName2)
+					fieldMaster2.setPropertyValue(&quot;Content&quot;, uf.getTextFieldMaster().Content)
+					copiedUserfield = oDoc.createInstance(&quot;com.sun.star.text.TextField.User&quot;)
+					copiedUserfield.attachTextFieldMaster(fieldMaster2)
+				Else
+					&apos; TODO Retrieve user field and set value
+				End If
+				&apos; Replace old field: TODO DELETE OLD FIELD
+				anchor = uf.getAnchor()
+				&apos; Insert copied user field
+				oDoc.Text.insertTextContent(anchor, copiedUserfield, false)
+			End If
+		End If
+	Loop
+End Sub
+
+</script:module>

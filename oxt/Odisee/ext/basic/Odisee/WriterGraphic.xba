@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterGraphic" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterGraphic
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Set graphic&apos;s print property
+&apos;
+Function printGraphic(oDoc As Object, graphicName$, bPrint As Boolean) As Boolean
+	Dim oGraphics As Object : oGraphics = oDoc.GraphicObjects
+	If oGraphics.hasByName(graphicName) Then
+		Dim oGraphic As Object : oGraphic = oGraphics.getByName(graphicName)
+		oGraphic.Print = bPrint
+		printGraphic() = bPrint
+	Else
+		printGraphic() = False
+	End If
+End Function
+
+&apos;
+&apos; Set all given graphic&apos;s print property
+&apos;
+Function printGraphics(oDoc As Object, graphicName As Array, bPrint As Boolean) As Boolean
+	Dim i%
+	For i = LBound(graphicName()) To UBound(graphicName())
+		printGraphic(oDoc, graphicName(i), bPrint)
+	Next
+	printGraphics() = bPrint
+End Function
+
+&apos;
+&apos; Given a URL to an external graphic resource, load that graphic permanently into this document, 
+&apos; and return a new URL to the internal resource. The new URL can be used in place of the old URL.
+&apos;
+Function loadGraphicIntoDocument(oDoc As Object, cUrl$, cInternalName$) As String
+	&apos; Get the BitmapTable from this drawing document. It is a service that maintains a list of bitmaps that are internal to the document.
+	Dim oBitmaps : oBitmaps = oDoc.createInstance(&quot;com.sun.star.drawing.BitmapTable&quot;)
+	&apos; Add an external graphic to the BitmapTable of this document.
+	oBitmaps.insertByName(cInternalName, cUrl)
+	&apos; Now ask for it back.
+	&apos; What we get back is an different Url that points to a graphic which is inside this document, and remains with the document.
+	Dim cNewUrl : cNewUrl = oBitmaps.getByName(cInternalName)
+	loadGraphicIntoDocument() = cNewUrl 
+End Function
+
+&apos;
+&apos;
+&apos;
+Function makePoint(ByVal x As Long, ByVal y As Long) As com.sun.star.awt.Point
+	Dim oPoint As Object : oPoint = createUnoStruct(&quot;com.sun.star.awt.Point&quot;)
+	oPoint.X = x
+	oPoint.Y = y
+	makePoint() = oPoint
+End Function
+
+&apos;
+&apos;
+&apos;
+Function makeSize(ByVal width As Long, ByVal height As Long) As com.sun.star.awt.Size
+	Dim oSize As Object : oSize = createUnoStruct(&quot;com.sun.star.awt.Size&quot;)
+	oSize.Width = width
+	oSize.Height = height
+	makeSize() = oSize
+End Function
+
+&apos;
+&apos;
+&apos;
+Function makeRectangleShape(oDoc As Object, Optional oPosition As com.sun.star.awt.Point, Optional oSize As com.sun.star.awt.Size) As com.sun.star.drawing.RectangleShape
+	Dim oShape As Object : oShape = oDoc.createInstance(&quot;com.sun.star.drawing.RectangleShape&quot;) 
+	If Not IsMissing(oPosition) Then
+		oShape.Position = oPosition
+	End If
+	If Not IsMissing(oSize) Then
+		oShape.Size = oSize
+	End If
+	makeRectangleShape() = oShape
+End Function
+
+&apos;
+&apos;
+&apos;
+Function makeGraphicObjectShape(oDoc As Object, Optional oPosition As com.sun.star.awt.Point, Optional oSize As com.sun.star.awt.Size) As com.sun.star.drawing.GraphicObjectShape
+   Dim oShape As Object : oShape = oDoc.createInstance(&quot;com.sun.star.drawing.GraphicObjectShape&quot;)
+   If Not IsMissing(oPosition) Then
+      oShape.Position = oPosition
+   End If
+   If Not IsMissing(oSize) Then
+      oShape.Size = oSize
+   End If
+   makeGraphicObjectShape() = oShape
+End Function
+
+&apos;
+&apos;
+&apos;
+Function insertGraphicAtBookmark(oDoc As Object, bookmark$, url$) As Boolean
+	Dim oAnchor : oAnchor = oDoc.Bookmarks.getByName(bookmark).getAnchor()
+	Dim oCursor : oCursor = oDoc.CurrentController.getViewCursor()
+	oCursor.gotoRange(oAnchor, False)
+	Dim oGraph : oGraph = oDoc.createInstance(&quot;com.sun.star.text.GraphicObject&quot;)
+	With oGraph
+		.GraphicURL = url
+		.AnchorType = com.sun.star.text.TextContentAnchorType.AS_CHARACTER
+	End With
+	oDoc.Text.insertTextContent(oCursor, oGraph, False)
+	insertGraphicAtBookmark() = True
+End Function
+
+&apos;
+&apos;
+&apos;
+Function insertGraphicAtEnd(oDoc As Object, url$) As Boolean
+	Dim oText : oText = oDoc.getText() 
+	Dim oCursor : oCursor = oText.createTextCursor() 
+	oCursor.gotoEnd(False) 
+	Dim oGraph : oGraph = oDoc.createInstance(&quot;com.sun.star.text.GraphicObject&quot;)
+	With oGraph
+		.GraphicURL = url
+		.AnchorType = com.sun.star.text.TextContentAnchorType.AS_CHARACTER
+	End With
+	oText.insertTextContent(oCursor, oGraph, False)
+	insertGraphicAtEnd() = True
+End Function
+
+&apos;
+&apos; Uses a view cursor and dispatcher to insert a graphic
+&apos;
+Function insertGraphicUsingDispatcher(oDoc As Object, url$, Optional gname$) As com.sun.star.drawing.GraphicObjectShape
+	&apos; Construct property values for dispatcher
+	Dim args(1) As New com.sun.star.beans.PropertyValue
+	args(0).Name = &quot;FileName&quot;
+	args(0).Value = convertToUrl(url)
+	args(1).Name = &quot;AsLink&quot;
+	args(1).Value = False
+	&apos; Get frame and dispatcher
+	Dim oFrame : oFrame = oDoc.CurrentController.Frame
+	Dim oDisp : oDisp = getProcessServiceManager().createInstance(&quot;com.sun.star.frame.DispatchHelper&quot;)
+	&apos; Execute dispatch
+	oDisp.executeDispatch(oFrame, &quot;.uno:InsertGraphic&quot;, &quot;&quot;, 0, args())
+	&apos; Get last inserted graphic
+	Dim oGraphicObjects : oGraphicObjects = oDoc.GraphicObjects
+	Dim oGraphic : oGraphic = oGraphicObjects.getByIndex(oGraphicObjects.Count - 1)
+	&apos; Set its name
+	If Not IsMissing(gname) Then
+		oGraphic.Name = gname
+	End If
+	&apos; Return value
+	insertGraphicUsingDispatcher() = oGraphic
+End Function
+
+&apos;
+&apos; Uses a view cursor and dispatcher to insert a graphic
+&apos;
+Function insertGraphicAtEndUsingDispatcher(oDoc As Object, url$, Optional gname$) As com.sun.star.drawing.GraphicObjectShape
+	Dim oViewCur : oViewCur = oDoc.CurrentController.ViewCursor
+	oViewCur.gotoEnd(False)
+	insertGraphicAtEndUsingDispatcher() = insertGraphicUsingDispatcher(oDoc, url, gname)
+	&apos; Workaround: position view cursor at start of page
+	oViewCur.jumpToStartOfPage()
+End Function
+
+&apos;
+&apos; Uses a bookmark, a view cursor and dispatcher to insert a graphic
+&apos;
+Function insertGraphicAtBookmarkUsingDispatcher(oDoc As Object, bookmark$, url$, Optional gname$) As com.sun.star.drawing.GraphicObjectShape
+	Dim oViewCur : oViewCur = WriterCursor.setViewCursorToBookmark(oDoc, bookmark)
+	&apos; When no name was given, set it to Graphic_&lt;name of bookmark&gt;
+	If IsMissing(gname) Then
+		gname = &quot;Graphic_&quot; &amp; bookmark
+	End If
+	insertGraphicAtBookmarkUsingDispatcher() = insertGraphicUsingDispatcher(oDoc, url, gname)
+	&apos; Workaround: position view cursor at start of page
+	oViewCur.jumpToStartOfPage()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function getLastInsertedGraphic(oDoc As Object) As com.sun.star.drawing.GraphicObjectShape
+	getLastInsertedGraphic() = oDoc.GraphicObjects.getByIndex(oGraphicObjects.Count - 1)
+End Function
+
+&apos;
+&apos; Adjust horizontal alignment of graphic.
+&apos; align = com.sun.star.text.HoriOrientation.LEFT
+&apos;
+Function ajustGraphicAlignment(oDoc As Object, graphic$, align%)
+	Dim oGraphicObjects As Object : oGraphicObjects = oDoc.GraphicObjects
+	If oGraphicObjects.hasByName(graphic) Then
+		Dim g1 : g1 = oGraphicObjects.getByName(graphic)
+		If Not IsNull(g1) Then
+			g1.HoriOrient = align
+		End If
+	End If
+End Function
+
+</script:module>

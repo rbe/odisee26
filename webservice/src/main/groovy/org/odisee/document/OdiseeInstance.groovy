@@ -12,6 +12,7 @@
 
 package org.odisee.document
 
+import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import groovy.util.logging.Log
 
@@ -49,9 +50,12 @@ final class OdiseeInstance {
                 }
             }
         } else {
+            /*
             log.warning('Odisee: No odiinst found, using default 127.0.0.1:2001')
             odiinst << ['odi1', '127.0.0.1', '2001', '', '', '', 'false']
             oooGroup[S_GROUP0] = ['127.0.0.1': 2001]
+            */
+            throw new OdiseeException('No odiinst found')
         }
         odiinst
     }

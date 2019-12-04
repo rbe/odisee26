@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="HTTP" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.HTTP
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Retrieve an object via HTTP
+&apos;
+Function retrieveHttp(aUrl$)
+	oUCB = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.UniversalContentBroker&quot;)
+	oUCB.Initialize(Array(&quot;Local&quot;, &quot;Office&quot;))
+	xId = oUCB.createContentIdentifier(aURL)
+	xContent = oUCB.queryContent(xId)
+	&apos; create some empty command environment
+	oCommandEnvironment = createUnoListener(&quot;XCE1_&quot;, &quot;com.sun.star.ucb.XCommandEnvironment&quot;)
+	&apos; find out, if it is really a document
+	Dim aProps(0) as new com.sun.star.beans.Property
+	aProps(0).Name = &quot;IsDocument&quot;
+	aProps(0).Handle = -1
+	&apos;
+	xValues = executeCommand(xContent, &quot;getPropertyValues&quot;, aProps, oCommandEnvironment)
+	iCol = xValues.findColumn(&quot;IsDocument&quot;)
+	bResult = xValues.getBoolean(iCol)
+	If bResult &lt;&gt; True Then
+		msgbox &quot;no document&quot;
+		Exit Function
+	End If
+	&apos; open an outputstream
+	sFileOut = &quot;C:\dummy.txt&quot;
+	oSFA = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	If oSFA.exists(sFileOut) Then
+		oSFA.kill(sFileOut)
+	End If
+	oFileOut = oSFA.openFileWrite(sFileOut) 
+	&apos; now try to open
+	Dim oOpenCommand as new com.sun.star.ucb.OpenCommandArgument2
+	oOpenCommand.Mode = com.sun.star.ucb.OpenMode.DOCUMENT
+	oOpenCommand.Sink = oFileOut
+	executeCommand(xContent, &quot;open&quot;, oOpenCommand, oCommandEnvironment)
+	oFileOut.flush()
+	oFileOut.closeOutput()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function executeCommand(xContent as com.sun.star.ucb.XContent, aCommandName$, aArgument as Any, oCommandEnvironment as Any) as Any 
+  Dim aCommand as new com.sun.star.ucb.Command 
+  aCommand.Name = aCommandName
+  aCommand.Handle = -1
+  aCommand.Argument = aArgument
+  executeCommand = xContent.execute(aCommand, 0, oCommandEnvironment) 
+End Function
+
+&apos;
+&apos;
+&apos;
+Function XCE1_getInteractionHandler() as com.sun.star.task.XInteractionHandler 
+  XCE1_getInteractionHandler = getProcessServiceManager().createInstance(&quot;com.sun.star.task.InteractionHandler&quot;) 
+End Function
+
+&apos;
+&apos;
+&apos;
+Function XCE1_getProgressHandler() as com.sun.star.ucb.XProgressHandler 
+End Function
+
+&apos;
+&apos;
+&apos;
+Function doGET(server$, port%, path$) As Array
+	Dim cCR$ : cCR = Chr(13)
+	Dim cLF$ : cLF = Chr(10)
+	&apos; Port
+	If IsMissing(port) Then
+		port = 80
+	End If
+	Dim oConnector : oConnector = getProcessServiceManager().createInstance(&quot;com.sun.star.connection.Connector&quot;)
+	Dim oConnection : oConnection = oConnector.Connect(&quot;socket,host=&quot; + server + &quot;,port=&quot; + port)
+	oConnection.write(_
+		StringToByteArray(_
+			&quot;GET &quot; + path + &quot; HTTP/1.1&quot; + cCR + cLF _
+			+ &quot;Host: &quot; + server + cCR + cLF + _
+			+ cCR + cLF))
+	oConnection.flush()
+	Dim aByteArray() : aByteArray = Array()
+	Dim nBytesRead% : nBytesRead = oConnection.read(aByteArray, 1 * 1024)
+	oConnection.close()
+	doGET() = aByteArray()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function doGET2(url$)
+	Dim oSimpleFileAccess : oSimpleFileAccess = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	Dim oInputStream : oInputStream = oSimpleFileAccess.openFileRead(url)
+	Dim aByteArray() : aByteArray = Array()
+	Dim bytesRead% : bytesRead = oInputStream.readSomeBytes(aByteArray, 1 * 1024)
+	msgbox &quot;read &quot; &amp; cstr(bytesRead) &amp; chr(10) &amp; chr(13) &amp; ByteArrayToString(aByteArray)
+	While bytesRead &gt; 0
+		bytesRead = oInputStream.readSomeBytes(aByteArray, 1 * 1024)
+		msgbox &quot;read &quot; &amp; cstr(bytesRead) &amp; chr(10) &amp; chr(13) &amp; ByteArrayToString(aByteArray)
+	Wend
+	oInputStream.closeInput()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function doPOST()
+End Function
+
+&apos;
+&apos;
+&apos;
+Function readOneLine(url$) As String
+	Dim oSFA As Object : oSFA = getProcessServiceManager().createInstance(&quot;com.sun.star.ucb.SimpleFileAccess&quot;)
+	&apos;On Error Goto ErrorResponse
+	Dim oInputStream : oInputStream = oSFA.openFileRead(url)
+	Dim oTextStream : oTextStream = getProcessServiceManager().createInstance(&quot;com.sun.star.io.TextInputStream&quot;)
+	oTextStream.InputStream = oInputStream
+	readOneLine() = oTextStream.readLine()
+End Function
+
+</script:module>

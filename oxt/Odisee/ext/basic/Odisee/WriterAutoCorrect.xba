@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterAutoCorrect" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterAutoCorrect
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos;
+&apos;
+Function syncAutoCorr(autoCorrDat$, locale$, calcUrl$, sheetName$, cellRange$, keyCell%, valueCell%)
+	On Error Goto ErrorHandler
+	&apos; Filename for auto correction .xml
+	Dim autoCorrXml$
+	autoCorrXml = &quot;DocumentList.xml&quot;
+	&apos; Get paths for auto correction
+	Dim oPaths As Object
+	oPaths = getProcessServiceManager().createInstance(&quot;com.sun.star.util.PathSettings&quot;)
+	Dim saAutoCorr()
+	saAutoCorr() = split(oPaths.AutoCorrect, &quot;;&quot;)
+	Dim sofficeShareURL$, sofficeUserURL$
+	sofficeShareURL = saAutoCorr(0)
+	sofficeUserURL = saAutoCorr(1)
+	&apos; Temporary file for DocumentList.xml extracted from acor_&lt;locale&gt;.dat
+	Dim tempXml$ : tempXml = sofficeUserURL + &quot;/DocumentList_&quot; + locale + &quot;.xml&quot;
+	&apos; Extract DocumentList.xml as DocumentList_&lt;locale&gt;.xml
+	unzip(autoCorrDat, autoCorrXml, tempXml)
+	&apos; Open DocumentList_&lt;locale&gt;.xml in Writer
+	Dim xml As Object
+	xml = openWriter_UTF8(tempXml)
+	&apos; Add entries from Calc sheet
+	Dim oCalc As Object
+	oCalc = openCalc(calcUrl)
+	Dim oSheet As Object
+	oSheet = oCalc.Sheets.getByName(sheetName)
+	If Not IsNull(oSheet) Then
+		&apos; Get cell cursor
+		Dim oCur As Object
+		oCur = oSheet.createCursorByRange(oSheet.getCellRangeByName(cellRange))
+		&apos; Determine end row
+		Dim startRow%, endRow%
+		oCur.gotoStart()
+		startRow = oCur.RangeAddress.startRow
+		oCur.gotoEnd()
+		endRow = oCur.RangeAddress.endRow
+		oCur.gotoStart()
+		&apos;
+		Dim i%, artbez$, wirkstoff$
+		For i = startRow + 1 To endRow
+			artbez = oHausliste.getCellByPosition(keyCell, i).String
+			wirkstoff = oHausliste.getCellByPosition(valueCell, i).String
+			addAutoCorrXmlEntry(xml, artbez, wirkstoff)
+		Next
+	End If
+	&apos; Save and close documents
+	xml.store()
+	xml.close(true)
+	oCalc.close(false)
+	&apos; Update acor_&lt;locale&gt;.dat with DocumentList_&lt;locale&gt;.xml as DocumentList.xml
+	If zip(tempXml, autoCorrXml, autoCorrDat) Then
+		&apos; Cleanup
+		kill(tempXml)
+		syncAutoCorr() = True
+	Else
+		syncAutoCorr() = False
+	End If
+	Exit Function
+	ErrorHandler:
+		syncAutoCorr() = False
+End Function
+
+&apos;
+&apos;
+&apos;
+Function addAutoCorrXmlEntry(doc As Object, e1$, e2$) As com.sun.star.text.XTextRange
+	&apos;
+	Dim s1$, s2$, s3$, s4$
+	s1 = &quot;&lt;block-list:block block-list:abbreviated-name=&quot;&quot;&quot;
+	s2 = &quot;&quot;&quot; block-list:name=&quot;&quot;&quot;
+	s3 = &quot;&quot;&quot;/&gt;&quot;
+	s4 = &quot;&lt;/block-list:block-list&gt;&quot;
+	&apos;
+	Dim x$, xr$
+	x = s1 + e1 + s2 + e2 + s3
+	xr = s1 + e1 + s2 + &quot;.*&quot; + s3
+	&apos; Does entry already exist?
+	Dim s As Object
+	s = searchRegexp(doc, xr)
+	If IsNull(s) Then
+		&apos; No, add it
+		searchAndReplace(doc, s4, x)
+		&apos; Add paragraph
+		doc.Text.insertControlCharacter(doc.Text.getEnd(), com.sun.star.text.ControlCharacter.APPEND_PARAGRAPH, False)
+		doc.Text.insertString(doc.Text.getEnd(), s4, False)
+	Else
+		&apos; Yes, update it
+		searchAndReplaceRegexp(doc, xr, x)
+		addAutoCorrXmlEntry() = s
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Function removeAutoCorrXmlEntry(doc As Object, e1$) As com.sun.star.text.XTextRange
+	&apos;
+	Dim s1$, s2$, s3$
+	s1 = &quot;&lt;block-list:block block-list:abbreviated-name=&quot;&quot;&quot;
+	s2 = &quot;&quot;&quot; block-list:name=&quot;&quot;&quot;
+	s3 = &quot;&quot;&quot;/&gt;&quot;
+	&apos;
+	Dim x$
+	x = s1 + e1 + s2 + &quot;.*&quot; + s3
+	&apos;
+	Dim oTextRange As Object
+	oTextRange = searchRegexp(doc, x, &quot;&quot;)
+	If Not IsNull(oTextRange) Then
+		&apos;oTextRange.goRight(1, True)
+		oTextRange.String = &quot;&quot;
+		removeAutoCorrXmlEntry() = oTextRange
+	End If
+End Function
+
+</script:module>

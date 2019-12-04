@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="WriterIndex" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.WriterIndex
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos;
+&apos;
+Sub showIndexNames()
+	Dim idx As Object : idx = ThisComponent.getDocumentIndexes()
+	Dim idxName() : idxName = idx.getElementNames
+	Dim s As String
+	s = &quot;&quot;
+	For i = 0 To uBound(idxName)
+		s = s &amp; idxName(i)
+	Next
+	MsgBox s
+End Sub
+
+&apos;
+&apos;
+&apos;
+Function updateAllIndexes() As Boolean
+	Dim idx As Object : idx = ThisComponent.getDocumentIndexes()
+	Dim idxName() : idxName = idx.getElementNames
+	For i = 0 To UBound(idxName)
+		idx.getByName(idxName(i)).update()
+	Next
+	updateAllIndexes() = True
+End Function
+
+</script:module>

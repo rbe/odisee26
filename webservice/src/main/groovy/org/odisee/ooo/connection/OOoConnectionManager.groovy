@@ -11,6 +11,7 @@
  */
 package org.odisee.ooo.connection
 
+import groovy.util.logging.Log
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import org.odisee.ooo.process.OOoProcess
@@ -32,6 +33,7 @@ Cache should store a use-count (0 or 1):
 /**
  * OpenOffice Connection Manager.
  */
+@Log
 class OOoConnectionManager {
 
     /**
@@ -87,7 +89,9 @@ class OOoConnectionManager {
      */
     void addOOoConnectionToGroup(group, unoURL) {
         OOoProcess oooProcess = new OOoProcess(oooProgram: oooProgram, oooOptions: oooOptions, unoURL: unoURL)
-        if (OdiseePath.ODISEE_DEBUG) println "${this}.addOOoConnectionToGroup(${group}): Adding connection to '${unoURL}'"
+        if (OdiseePath.ODISEE_DEBUG) {
+            log.debug "${group}: Adding connection to '${unoURL}'"
+        }
         // Put connection into connectionCache
         def conn = new OOoConnection(group: group, oooProcess: oooProcess)
         connectionCache[group] << conn
@@ -141,7 +145,7 @@ class OOoConnectionManager {
         int cacheSize = connectionCache[group].size()
         int inuseSize = connectionsInUse[group].size()
         int unusableCount = connectionCache[group].findAll { it.unusableSince > 0 }.size()
-        println "${this}.${prefix}: ${cacheSize} connections available, ${inuseSize} in use = ${cacheSize + inuseSize}, ${unusableCount} temporarily unusable"
+        log.debug "${prefix}: ${cacheSize} connections available, ${inuseSize} in use = ${cacheSize + inuseSize}, ${unusableCount} temporarily unusable"
     }
 
     /**
@@ -176,10 +180,14 @@ class OOoConnectionManager {
             // Connections are in connectionCache after alreadySetup()
             conn = connectionCache[group].poll(5, TimeUnit.SECONDS)
             if (conn) {
-                if (OdiseePath.ODISEE_DEBUG) println "${this}.acquire(${group}): got connection to ${conn.oooProcess}, it is ${conn.unusableSince > 0 ? 'unusable' : 'usable'} (unusableSince=${conn.unusableSince})"
+                if (OdiseePath.ODISEE_DEBUG) {
+                    log.debug "${this}.acquire(${group}): got connection to ${conn.oooProcess}, it is ${conn.unusableSince > 0 ? 'unusable' : 'usable'} (unusableSince=${conn.unusableSince})"
+                }
                 // Move connection into in-use pool
                 connectionsInUse[group] << conn
-                if (OdiseePath.ODISEE_DEBUG) dump group, "acquire(${group}): ${conn.oooProcess} <- ${conn.group}"
+                if (OdiseePath.ODISEE_DEBUG) {
+                    dump group, "acquire(${group}): ${conn.oooProcess} <- ${conn.group}"
+                }
                 try {
                     // Establish connection
                     conn.connect()
@@ -200,6 +208,7 @@ class OOoConnectionManager {
      */
     void release(conn) {
         if (!conn) {
+            log.warn "Cannot release, no connection object"
             return
         }
         // Perform connection-specific release operations
@@ -208,7 +217,9 @@ class OOoConnectionManager {
         connectionsInUse[conn.group].remove(conn)
         // Append connection at end of list
         connectionCache[conn.group] << conn
-        if (OdiseePath.ODISEE_DEBUG) dump conn.group, "release: ${conn.oooProcess} -> ${conn.group}"
+        if (OdiseePath.ODISEE_DEBUG) {
+            dump conn.group, "release: ${conn.oooProcess} -> ${conn.group}"
+        }
     }
 
     /**

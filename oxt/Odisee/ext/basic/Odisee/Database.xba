@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Database" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Database
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Connect to a database
+&apos;
+Function connect(odbUrl$, Optional user$, Optional pwd$) As com.sun.star.sdbc.XConnection
+	On Error Goto ErrorHandler
+	Dim databaseContext As Object : databaseContext = getProcessServiceManager().createInstance(&quot;com.sun.star.sdb.DatabaseContext&quot;)
+	Dim oDbSource As Object : oDbSource = databaseContext.getByName(odbUrl) &apos;com.sun.star.sdbc.XDataSource
+	If Not IsNull(oDbSource) Then
+		If IsMissing(user) Then
+			user = &quot;&quot;
+		End If
+		If IsMissing(pwd) Then
+			pwd = &quot;&quot;
+		End If
+		connect() = oDbSource.getConnection(user, pwd)
+	End If
+	&apos; Error handler
+	Exit Function
+	ErrorHandler:
+		connect() = Nothing
+		MsgBox(&quot;Kann nicht zur Datenbank &quot; &amp; Chr(13) &amp; odbUrl &amp; Chr(13) &amp; &quot; verbinden&quot;, 0, &quot;Odisee&quot;)
+End Function
+
+&apos;
+&apos; Prepare a statement
+&apos;
+Function prepare(oConnection As com.sun.star.sdbc.XConnection, sql$) As com.sun.star.sdbc.XPreparedStatement
+	On Error Goto ErrorHandler
+	If Not IsNull(oConnection) Then
+		prepare() = oConnection.prepareStatement(sql) &apos;com.sun.star.sdbc.XPreparedStatement
+	End If
+	Exit Function
+	&apos; Error handler
+	ErrorHandler:
+		prepare() = Nothing	
+End Function
+
+&apos;
+&apos; Create a bag (two-dimensional array) from a result set
+&apos;
+Function getBagFromResult(oResultSet As com.sun.star.sdbc.XResultSet) As Array
+	&apos; Get meta data
+	Dim oMetaData : oMetaData = oResultSet.getMetaData()
+	Dim colCount% : colCount = oMetaData.getColumnCount()
+	&apos;
+	Dim row% : row = 0
+	Dim col%
+	Dim cn$, ct%, val
+	Dim resultBags(0, colCount - 1) As New com.sun.star.beans.PropertyValue
+	While oResultSet.Next()
+		ReDim Preserve resultBags(row, colCount - 1)
+		For col = 1 To colCount
+			cn = oMetaData.getColumnName(col)
+			ct = oMetaData.getColumnType(col)
+			Select Case ct
+				Case com.sun.star.sdbc.DataType.NUMERIC
+					val = oResultSet.getInt(col)
+				Case com.sun.star.sdbc.DataType.INTEGER
+					val = oResultSet.getInt(col)
+				Case com.sun.star.sdbc.DataType.VARCHAR
+					val = oResultSet.getString(col)
+				Case com.sun.star.sdbc.DataType.DATE
+					val = oResultSet.getDate(col)
+				Case Else
+					val = oResultSet.getObject(col, Null)
+			End Select
+			resultBags(row, col - 1) = makePropertyValue(cn, val)
+		Next
+		row = row + 1
+	Wend
+	oResultSet.close()
+	getBagFromResult() = resultBags
+End Function
+
+&apos;
+&apos; Return a bag of a SQL statement
+&apos;
+Function getBagFromQuery(oConnection As com.sun.star.sdbc.XConnection, sql$) As Array
+	getBagFromQuery() = getBagFromResult(query(oConnection, sql))
+End Function
+
+&apos;
+&apos; Return a whole row as array from a bag
+&apos;
+Function getRowFromBag(oBag As Array, row%) As Array
+	getRowFromBag() = oBag(row)
+End Function
+
+&apos;
+&apos; Has a bag a certain column (referenced by name)?
+&apos;
+Function bagHasColumn(oBag As Array, col$) As Boolean
+	Dim i%, oPV
+	Dim u% : u = UBound(oBag(), 2)
+	For i = 0 To u
+		oPV = oBag(0, i)
+		If UCase(oPV.Name) = UCase(col) Then
+			bagHasColumn() = True
+			Exit Function
+		End If
+	Next
+End Function
+
+&apos;
+&apos; Return a column (referenced by name) value of a certain row from a bag
+&apos;
+Function getValueFromBag(oBag As Array, row%, col$) As Variant
+	Dim i%, oPV
+	Dim u% : u = UBound(oBag(), 2)
+	For i = 0 To u
+		oPV = oBag(row, i)
+		If UCase(oPV.Name) = UCase(col) Then
+			getValueFromBag() = oPV.Value
+			Exit Function
+		End If
+	Next
+End Function
+
+&apos;
+&apos; Return a column value of a certain row of a bag, previously got with getRowFromBag()
+&apos;
+Function getValueFromBagRow(oBagRow As Array, col$) As Variant
+	getValueFromBagRow() = Null
+	Dim i%, oPV
+	For i = 0 To UBound(oBagRow())
+		oPV = oBag(i)
+		If oPV.Name = col Then
+			getValueFromBagRow() = oPV.Value
+			Exit Function
+		End If
+	Next
+End Function
+
+&apos;
+&apos; Query database
+&apos;
+Function query(oConnection As com.sun.star.sdbc.XConnection, sql$) As com.sun.star.sdbc.XResultSet
+	If Not IsNull(oConnection) Then
+		If Not oConnection.isClosed() Then
+			Dim oStatement : oStatement = oConnection.createStatement()
+			Dim oResult : oResult = oStatement.executeQuery(sql) &apos;com.sun.star.sdbc.XResultSet
+			query() = oResult
+		Else
+			MsgBox &quot;No connection&quot;
+		End If
+	End If
+End Function
+
+&apos;
+&apos; Execute an update/insert/delete
+&apos;
+Function update(oConnection As com.sun.star.sdbc.XConnection, sql$) As Long
+	If Not IsNull(oConnection) Then
+		If Not oConnection.isClosed() Then
+			update() = oConnection.createStatement().executeUpdate(sql)
+		Else
+			MsgBox &quot;No connection&quot;
+		End If
+	End If
+End Function
+
+</script:module>

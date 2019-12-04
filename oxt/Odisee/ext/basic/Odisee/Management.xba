@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Management" script:language="StarBasic">&apos; ==========================================================
+&apos; Odisee.Management
+&apos;
+&apos; Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann
+&apos; Copyright (C) 2011-2014 art of coding UG
+&apos;
+&apos; ==========================================================
+
+Option Explicit
+
+&apos;
+&apos; Get informations about current platform.
+&apos;
+&apos;  oPathSettings = getProcessServiceManager().createInstance(&quot;com.sun.star.util.PathSettings&quot;)
+&apos;  GetWorkDir() = oPathSettings.Work
+Function getPlatform(libName$) As Array
+	&apos;
+	Dim oPV(8) As New com.sun.star.beans.PropertyValue
+	&apos; Get PathSubstitution service
+	Dim oPS As Object : oPS = getProcessServiceManager().createInstance(&quot;com.sun.star.util.PathSubstitution&quot;)
+	&apos; Base path to installed extension
+	oPV(0).Name = &quot;BasePath&quot;
+	oPV(0).Value = getLibraryDir(libName)
+	&apos; Path to templates
+	oPV(1).Name = &quot;TemplatePath&quot;
+	oPV(1).Value = oPV(0).Value &amp; &quot;template/&quot;
+	&apos; Path to OpenOffice.org user directory
+	oPV(2).Name = &quot;UserPath&quot;
+	oPV(2).Value = oPS.getSubstituteVariableValue(&quot;$(user)&quot;) &amp; &quot;/&quot;
+	&apos; Path for temporary files
+	oPV(3).Name = &quot;TempPath&quot;
+	oPV(3).Value = oPS.getSubstituteVariableValue(&quot;$(temp)&quot;) &amp; &quot;/&quot;
+	&apos; Path for configuration files
+	oPV(4).Name = &quot;ConfigPath&quot;
+	oPV(4).Value = oPV(0).Value &amp; &quot;conf/&quot;
+	&apos; Path for database files
+	oPV(5).Name = &quot;DatabasePath&quot;
+	oPV(5).Value = oPV(0).Value &amp; &quot;conf/&quot;
+	&apos; Home directory: Windows or UNIX?
+	If isWindows() Then
+		oPV(6).Name = &quot;UserHome&quot;
+		oPV(6).Value = Environ(&quot;USERPROFILE&quot;)
+		&apos; BasePath
+		oPV(0).Value = convertFromURL(oPV(0).Value) &apos;BASEPATH
+		&apos; UserPath
+		oPV(2).Value = convertFromURL(oPV(2).Value) &apos;USERPATH
+	ElseIf isLinux() Or isMacOS() Then
+		oPV(6).Name = &quot;UserHome&quot;
+		oPV(6).Value = Environ(&quot;HOME&quot;)
+	End If
+	&apos; Directory separator
+	oPV(7).Name = &quot;DirectorySeparator&quot;
+	oPV(7).Value = GetPathSeparator()
+	&apos; Path to gallery
+	oPV(8).Name = &quot;GalleryPath&quot;
+	oPV(8).Value = oPV(0).Value &amp; &quot;gallery/&quot;
+	&apos;
+	getPlatform() = oPV()
+End Function
+
+&apos;
+&apos; Get platform information by name
+&apos;
+Function getPlatformByName(n$, Optional libName$) As Variant
+	&apos; Initialize platform information
+	If IsNull(PLATFORM()) Then
+		getPlatform(libName)
+	End If
+	&apos;
+	Dim i%
+	For i = 0 To UBound(PLATFORM())
+		If PLATFORM(i).Name = n Then
+			getPlatformByName() = PLATFORM(i).Value
+			Exit For
+		End If
+	Next
+End Function
+
+&apos;
+&apos; Get directory for a library.
+&apos;
+Function getLibraryDir(sLibName$) As String
+	If BasicLibraries.isLibraryLink(sLibName) Then
+		Dim url$ : url = BasicLibraries.getLibraryLinkURL(sLibName)
+		Dim splitUrl() : splitUrl = splitString(url, &quot;/&quot;)
+		Dim s1() As String
+		&apos; WORKAROUND: redim preserve geht nicht unter Linux!
+		ReDim s1(UBound(splitUrl()) - 2)
+		Dim i%
+		For i = 0 To UBound(s1())
+			s1(i) = splitUrl(i)
+		Next
+		getLibraryDir() = Join(s1(), &quot;/&quot;) &amp; &quot;/&quot;
+	Else
+		getLibraryDir() = getProcessServiceManager().createInstance(&quot;com.sun.star.util.PathSubstitution&quot;).getSubstituteVariableValue(&quot;$(user)&quot;) &amp; &quot;/basic/&quot; &amp; sLibName &amp; &quot;/&quot;
+	End If
+End Function
+
+&apos;
+&apos;
+&apos;
+Sub addLibraries(srcLibName$, destLibName$)
+	Dim oLibrary As Object : oLibrary = BasicLibraries
+	&apos; Erst mal die Module
+	Dim oGlobalLibrary As Object : oGlobalLibrary = GlobalScope.BasicLibraries
+	addLib(oGlobalLibrary, oLibrary, srcLibName, destLibName)
+	&apos; Dann die Dialoge
+	oLibrary = DialogLibraries
+	oGlobalLibrary = GlobalScope.DialogLibraries
+	addLib(oGlobalLibrary, oLibrary, srcLibName, destLibName)
+End Sub
+
+&apos;
+&apos;
+&apos;
+Sub addLib(oGlobalLib As Object, oLib As Object, srcLibName$, destLibName$)
+	If Not oGlobalLib.hasByName(destLibName) Then
+		oGlobalLib.createLibrary(destLibName)
+	End If
+	If oLib.hasByName(srcLibName) Then
+		Dim oSrcLib : oSrcLib = oLib.getByName(srcLibName)
+		Dim srcModules() As String : srcModules = oSrcLib.getElementNames()
+		Dim oDestLib
+		Dim i%
+		For i = 0 To UBound(srcModules())
+			oDestLib = oGlobalLib.getByName(destLibName)
+			If Not oDestLib.hasByName(srcModules(i)) Then
+				oDestLib.insertByName(srcModules(i), oSrcLib.getByName(srcModules(i)))
+			End If
+		Next
+	End If      
+End Sub
+
+</script:module>
