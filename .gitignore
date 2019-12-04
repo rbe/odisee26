@@ -2,6 +2,9 @@
 webservice/src/main/docker/var/deploy/**
 webservice/src/main/docker/var/document/**
 webservice/src/main/docker/var/tmp/
+oxt/antlib/
+oxt/Odisee/build/
+oxt/Odisee/dist/
 clients/client-vbnet/src/.vs/
 clients/client-vbnet/src/vb/OdiseeClient/bin/
 clients/client-vbnet/src/vb/OdiseeClient/obj/
