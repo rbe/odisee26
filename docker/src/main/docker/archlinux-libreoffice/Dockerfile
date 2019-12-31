@@ -29,9 +29,3 @@ RUN ${pacman} -S libreoffice-${LO_VARIANT} libreoffice-${LO_VARIANT}-${LO_LANG} 
     && ${pacman} -S hunspell hunspell-${LO_LANG}
 
 RUN ${pacman} -S jre11-openjdk
-
-ARG ODISEE_HOME=/home/odisee
-RUN mkdir ${ODISEE_HOME} \
-    && mkdir ${ODISEE_HOME}/bin
-COPY bin/odistartdevinst ${ODISEE_HOME}/bin
-RUN chmod 555 ${ODISEE_HOME}/bin/odistartdevinst

@@ -27,8 +27,3 @@ RUN ${zypper_update} \
     && ${zypper_install} fontconfig
 
 RUN ${zypper_install} java-11-openjdk-headless
-
-RUN mkdir ${ODISEE_HOME} \
-    && mkdir ${ODISEE_HOME}/bin
-COPY bin/odistartdevinst ${ODISEE_HOME}/bin
-RUN chmod 555 ${ODISEE_HOME}/bin/odistartdevinst
