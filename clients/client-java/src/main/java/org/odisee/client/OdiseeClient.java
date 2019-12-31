@@ -27,6 +27,7 @@ import de.odisee.xml.server.request.Userfield;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.net.URL;
@@ -40,63 +41,40 @@ import static java.nio.file.StandardOpenOption.CREATE;
 
 public final class OdiseeClient {
 
+    public static final String LANGUAGE_BASIC = "Basic";
+
+    public static final String LOCATION_DOCUMENT = "document";
+
     private final ObjectFactory factory;
 
-    private final String serviceURL;
+    private final Request actualRequest;
 
-    private final OdiseeHttpHelper httpHelper;
+    private String serviceURL;
 
     private final Odisee odisee;
 
-    private Request actualRequest;
+    private OdiseeHttpHelper httpHelper;
+
+    private OdiseeClient() {
+        factory = new ObjectFactory();
+        odisee = factory.createOdisee();
+        actualRequest = factory.createRequest();
+    }
 
     public OdiseeClient(final String serviceURL) {
+        this();
         Objects.requireNonNull(serviceURL);
         this.serviceURL = serviceURL;
         httpHelper = new OdiseeHttpHelper();
-        factory = new ObjectFactory();
-        odisee = factory.createOdisee();
     }
 
     public OdiseeClient(final String serviceURL, final String username, final String password) {
-        Objects.requireNonNull(serviceURL);
+        this();
         this.serviceURL = serviceURL;
         Objects.requireNonNull(username);
         Objects.requireNonNull(password);
         httpHelper = new OdiseeHttpHelper(username, password);
-        factory = new ObjectFactory();
-        odisee = factory.createOdisee();
     }
-
-    //
-    // Odisee Client Factory
-    //
-
-    /**
-     * @deprecated Use constructor.
-     */
-    public static OdiseeClient createLocalClient() {
-        return createClient("localhost");
-    }
-
-    /**
-     * @deprecated Use constructor.
-     */
-    public static OdiseeClient createClient(final String serviceURL) {
-        return new OdiseeClient(serviceURL);
-    }
-
-    /**
-     * @deprecated Use constructor.
-     */
-    public static OdiseeClient createClient(final String serviceURL,
-                                            final String username, final String password) {
-        return new OdiseeClient(serviceURL, username, password);
-    }
-
-    //
-    // Odisee Client
-    //
 
     private Instructions getInstructions(final Request request) {
         final List<Instructions> allInstructions = request.getInstructions();
@@ -112,11 +90,7 @@ public final class OdiseeClient {
         return getInstructions(request).getAutotextAndBookmarkAndMacro();
     }
 
-    //
-    // Odisee Client API
-    //
-
-    public OdiseeClient mergeDocumentAtEnd(final Request request, final Path path) {
+    public OdiseeClient mergeDocumentAtEnd(final Path path) {
         final PostProcess postProcess = factory.createPostProcess();
         final Action action = factory.createAction();
         action.setType("merge-with");
@@ -129,12 +103,7 @@ public final class OdiseeClient {
         return this;
     }
 
-    public OdiseeClient mergeDocumentAtEnd(final Path path) {
-        return mergeDocumentAtEnd(actualRequest, path);
-    }
-
-    public OdiseeClient executeMacro(final Request request,
-                                     final String macroName, final String location, final String language,
+    public OdiseeClient executeMacro(final String macroName, final String location, final String language,
                                      final List<String> parameters) {
         final Macro macro = factory.createMacro();
         macro.setName(macroName);
@@ -149,26 +118,15 @@ public final class OdiseeClient {
         return this;
     }
 
-    public OdiseeClient executeMacro(final String macroName, final String location, final String language,
-                                     final List<String> parameters) {
-        return executeMacro(actualRequest, macroName, location, language, parameters);
-    }
-
-    public OdiseeClient executeBasicMacroInDocument(final Request request, final String macroName,
-                                                    final List<String> parameters) {
-        return executeMacro(request, macroName, "document", "Basic", parameters);
-    }
-
     public OdiseeClient executeBasicMacroInDocument(final String macroName, final List<String> parameters) {
-        return executeMacro(actualRequest, macroName, "document", "Basic", parameters);
+        return executeMacro(macroName, LOCATION_DOCUMENT, LANGUAGE_BASIC, parameters);
     }
 
     public OdiseeClient executeBasicMacroInDocument(final String macroName) {
-        return executeMacro(actualRequest, macroName, "document", "Basic", null);
+        return executeMacro(macroName, LOCATION_DOCUMENT, LANGUAGE_BASIC, null);
     }
 
-    public OdiseeClient setTableCellValue(final Request request,
-                                          final String tableName, final String coordinate, final String value) {
+    public OdiseeClient setTableCellValue(final String tableName, final String coordinate, final String value) {
         final Userfield userfieldTableCell = factory.createUserfield();
         userfieldTableCell.setName(String.format("%s!%s", tableName, coordinate));
         userfieldTableCell.setContent(value);
@@ -176,11 +134,7 @@ public final class OdiseeClient {
         return this;
     }
 
-    public OdiseeClient setTableCellValue(final String tableName, final String coordinate, final String value) {
-        return setTableCellValue(actualRequest, tableName, coordinate, value);
-    }
-
-    public OdiseeClient setUserfield(final Request request, final String userfieldName, final String value) {
+    public OdiseeClient setUserfield(final String userfieldName, final String value) {
         final Userfield userfield = factory.createUserfield();
         userfield.setName(userfieldName);
         userfield.setContent(value);
@@ -188,13 +142,10 @@ public final class OdiseeClient {
         return this;
     }
 
-    public OdiseeClient setUserfield(final String userfieldName, final String value) {
-        return setUserfield(actualRequest, userfieldName, value);
-    }
-
     /**
      * @deprecated Since 2.6 there's no archiving.
      */
+    @Deprecated(since = "2.6", forRemoval = true)
     public OdiseeClient setArchive(final Request request, boolean database, boolean files) {
         final Archive archive = request.getArchive();
         if (null == archive) {
@@ -208,62 +159,41 @@ public final class OdiseeClient {
     /**
      * @deprecated Since 2.6 there's no archiving.
      */
-    public OdiseeClient setArchive(boolean database, boolean filesystem) {
+    @Deprecated(since = "2.6", forRemoval = true)
+    public OdiseeClient setArchive(final boolean database, final boolean filesystem) {
         return setArchive(actualRequest, database, filesystem);
     }
 
-    public OdiseeClient setLatestTemplate(final Request request, final String template, final String outputFormat) {
-        final Template requestTemplate = request.getTemplate();
+    public OdiseeClient setLatestTemplate(final String template, final OutputFormat outputFormat) {
+        final Template requestTemplate = actualRequest.getTemplate();
         if (null == requestTemplate) {
             actualRequest.setTemplate(factory.createTemplate());
         }
-        request.getTemplate().setName(template);
-        request.getTemplate().setRevision("LATEST");
-        request.getTemplate().setOutputFormat(outputFormat);
+        actualRequest.getTemplate().setName(template);
+        actualRequest.getTemplate().setRevision("LATEST");
+        actualRequest.getTemplate().setOutputFormat(outputFormat.name());
         return this;
     }
 
-    public OdiseeClient setLatestTemplate(final String template, final String outputFormat) {
-        return setLatestTemplate(actualRequest, template, outputFormat);
-    }
-
-    public OdiseeClient setLatestTemplate(final String template) {
-        return setLatestTemplate(template, "pdf");
-    }
-
-    public Request createRequest() {
-        actualRequest = factory.createRequest();
+    public Request createRequest(final String template, final OutputFormat outputFormat) {
         odisee.getRequest().add(actualRequest);
+        setLatestTemplate(template, outputFormat);
         return actualRequest;
     }
 
-    public Request createRequest(final String template, final String outputFormat) {
-        final Request request = createRequest();
-        setLatestTemplate(request, template, outputFormat);
-        return request;
-    }
-
-    public Request createRequest(final String template) {
-        return createRequest(template, "pdf");
-    }
-
-    public byte[] process(final boolean sendCompressed) throws OdiseeClientException {
-        byte[] result;
+    public byte[] process(final boolean sendCompressed) {
         try {
             final Writer odiseeXml = new StringWriter();
             OdiseeJaxbHelper.marshal(Odisee.class, odisee, odiseeXml);
-            if (sendCompressed) {
-                result = httpHelper.postCompressed(new URL(serviceURL), odiseeXml.toString());
-            } else {
-                result = httpHelper.post(new URL(serviceURL), odiseeXml.toString());
-            }
+            return sendCompressed
+                    ? httpHelper.postCompressed(new URL(serviceURL), odiseeXml.toString())
+                    : httpHelper.post(new URL(serviceURL), odiseeXml.toString());
         } catch (IOException e) {
             throw new OdiseeClientException(e);
         }
-        return result;
     }
 
-    public void saveCompressedRequestTo(final Path path) throws OdiseeClientException {
+    public void saveCompressedRequestTo(final Path path) {
         try (final GZIPOutputStream gzipOutputStream = new GZIPOutputStream(new FileOutputStream(path.toFile()))) {
             final String odiseeXmlString = getOdiseeXmlAsString();
             gzipOutputStream.write(odiseeXmlString.getBytes());
@@ -272,10 +202,10 @@ public final class OdiseeClient {
         }
     }
 
-    public void saveRequestTo(final Path path) throws OdiseeClientException {
-        try {
+    public void saveRequestTo(final Path path) {
+        try (final OutputStream outputStream = Files.newOutputStream(path, CREATE)) {
             final String odiseeXmlString = getOdiseeXmlAsString();
-            Files.newOutputStream(path, CREATE).write(odiseeXmlString.getBytes());
+            outputStream.write(odiseeXmlString.getBytes());
         } catch (IOException e) {
             throw new OdiseeClientException(e);
         }

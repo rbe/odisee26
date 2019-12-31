@@ -12,7 +12,7 @@
 
 package org.odisee.client;
 
-public final class OdiseeClientException extends Exception {
+public final class OdiseeClientException extends RuntimeException {
 
     public OdiseeClientException() {
         super();
