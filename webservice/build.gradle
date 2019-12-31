@@ -108,7 +108,6 @@ bootRun {
     systemProperty springProfilesActive, System.getProperty(springProfilesActive)
     // ODISEE_HOME
     System.setProperty('ODISEE_HOME', 'src/main/docker')
-    systemProperties = System.properties
     println "ODISEE_HOME=${System.getProperty('ODISEE_HOME')}"
 }
 
