@@ -3,12 +3,33 @@ import static org.apache.tools.ant.taskdefs.condition.Os.FAMILY_WINDOWS
 import static org.apache.tools.ant.taskdefs.condition.Os.isFamily
 
 plugins {
+    id 'jacoco'
+    id 'java'
+    id 'org.sonarqube' version '2.8'
     id 'de.undercouch.download' version '3.4.0'
     //id 'io.freefair.compress.ar' version '4.1.4'
 }
 
 group 'org.odisee'
 version '2.6'
+
+jacoco {
+    toolVersion = '0.8.5'
+    reportsDir = file("${buildDir}/coverage-reports")
+    //html.destination file("${buildDir}/coverage-reports-html")
+}
+jacocoTestReport {
+    reports {
+        xml.enabled true
+    }
+}
+
+sonarqube {
+    properties {
+        property 'sonar.sourceEncoding', 'UTF-8'
+    }
+}
+tasks.'sonarqube'.group('verification')
 
 task osInfo {
     group 'Odisee'
