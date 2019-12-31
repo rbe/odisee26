@@ -22,10 +22,9 @@ configurations.antlibs.each { File f ->
     antClassLoader.addURL(f.toURI().toURL())
 }
 ant.importBuild('Odisee/build.xml') { String oldTargetName ->
-    //return oldTargetName == 'build' ? 'ant_build' : oldTargetName  // (1)
-    return "ant_${oldTargetName}" as String
+    return "ant-${oldTargetName}" as String
 }
-task buildExtension(dependsOn: 'ant_world') {
+task buildExtension(dependsOn: 'ant-world') {
     group 'Odisee'
     doLast {
         def antTargetsNames = ant.references.get("ant.targets").collect { it.name }
