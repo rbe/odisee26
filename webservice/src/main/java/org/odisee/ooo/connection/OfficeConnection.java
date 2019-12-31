@@ -51,6 +51,7 @@ import java.util.List;
 
 import static com.sun.star.uno.UnoRuntime.queryInterface;
 
+@SuppressWarnings("java:S1191")
 public class OfficeConnection {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OfficeConnection.class);
@@ -98,7 +99,7 @@ public class OfficeConnection {
      * Constructor.
      */
     OfficeConnection(InetSocketAddress socketAddress) {
-        managedDocuments = new ArrayList<OfficeDocument>();
+        managedDocuments = new ArrayList<>();
         this.socketAddress = socketAddress;
     }
 
@@ -157,12 +158,6 @@ public class OfficeConnection {
      * @throws OdiseeServerException
      */
     private void bootstrap(InetSocketAddress socketAddress, boolean start) throws OdiseeServerException {
-        /*
-        // Check state
-        if (null != socketAddress) {
-            throw new OdiseeServerException("Already bootstrapped, address is " + socketAddress);
-        }
-        */
         this.socketAddress = socketAddress;
         unoURL = UnoHelper.makeUnoUrl(socketAddress);
         // Start a process if address is 127.0.0.1
@@ -188,7 +183,6 @@ public class OfficeConnection {
     void connect() throws OdiseeServerException {
         // Check state
         if (isConnected() && initializationCompleted()) {
-            //throw new OdiseeServerRuntimeException("Cannot initialize twice");
             return;
         }
         // Create default local component context
@@ -213,34 +207,33 @@ public class OfficeConnection {
         }
         XBridgeFactory factory = queryInterface(XBridgeFactory.class, oBridgeFactory);
         UnoUrl parsedUnoUrl = null;
+        final String UNO_PARSE_ERROR = "Could not parse UNOHelper url: ";
         try {
             parsedUnoUrl = UnoUrl.parseUnoUrl(unoURL);
         } catch (com.sun.star.lang.IllegalArgumentException e) {
-            throw new OdiseeServerException("Could not parse UNOHelper url: " + unoURL, e);
+            throw new OdiseeServerException(UNO_PARSE_ERROR + unoURL, e);
         }
         if (null == parsedUnoUrl) {
-            throw new OdiseeServerException("Could not parse UNOHelper url: " + unoURL);
+            throw new OdiseeServerException(UNO_PARSE_ERROR + unoURL);
         }
         //
         // XConnection
         //
         XConnection xConnection = null;
+        final String CONNECT_ERROR = "Could not connect to ";
         try {
             xConnection = Connector.create(xLocalContext).connect(parsedUnoUrl.getConnectionAndParametersAsString());
-        } catch (NoConnectException e) {
-            throw new OdiseeServerException("Could not connect to " + unoURL, e);
-        } catch (ConnectionSetupException e) {
-            throw new OdiseeServerException("Could not connect to " + unoURL, e);
+        } catch (NoConnectException | ConnectionSetupException e) {
+            throw new OdiseeServerException(CONNECT_ERROR + unoURL, e);
         }
         if (null == xConnection) {
-            throw new OdiseeServerException("Could not connect to " + unoURL);
+            throw new OdiseeServerException(CONNECT_ERROR + unoURL);
         }
+        final String XBRIGE_ERROR = "Could not setup XBridge";
         try {
             xBridge = factory.createBridge("", parsedUnoUrl.getProtocolAndParametersAsString(), xConnection, null);
-        } catch (BridgeExistsException e) {
-            throw new OdiseeServerException("Could not setup XBridge", e);
-        } catch (com.sun.star.lang.IllegalArgumentException e) {
-            throw new OdiseeServerException("Could not setup XBridge", e);
+        } catch (BridgeExistsException | com.sun.star.lang.IllegalArgumentException e) {
+            throw new OdiseeServerException(XBRIGE_ERROR, e);
         }
         //
         // Get the remote service manager
@@ -249,15 +242,14 @@ public class OfficeConnection {
         xRemoteServiceManager = queryInterface(XMultiComponentFactory.class, o);
         // Retrieve the component context (it's not yet exported from the office)
         // Query for the XPropertySet interface.
-        XPropertySet xProperySet = (XPropertySet) queryInterface(XPropertySet.class, xRemoteServiceManager);
+        XPropertySet xProperySet = queryInterface(XPropertySet.class, xRemoteServiceManager);
         // Get the default context from the office server.
         Object oDefaultContext = null;
+        final String DEFAULTCONTEXT_ERROR = "Cannot get DefaultContext";
         try {
             oDefaultContext = xProperySet.getPropertyValue("DefaultContext");
-        } catch (UnknownPropertyException e) {
-            throw new OdiseeServerException("Cannot get DefaultContext", e);
-        } catch (WrappedTargetException e) {
-            throw new OdiseeServerException("Cannot get DefaultContext", e);
+        } catch (UnknownPropertyException | WrappedTargetException e) {
+            throw new OdiseeServerException(DEFAULTCONTEXT_ERROR, e);
         }
         // Query for the interface XComponentContext.
         XComponentContext xComponentContext = queryInterface(XComponentContext.class, oDefaultContext);
@@ -334,11 +326,12 @@ public class OfficeConnection {
         */
     }
 
-    public void setFaulted(boolean faulted) {
+    public void setFaulted(final boolean faulted) {
         if (faulted) {
             try {
                 close();
             } catch (Exception e) {
+                LOGGER.error("", e);
             }
         }
     }
@@ -349,7 +342,6 @@ public class OfficeConnection {
         for (OfficeDocument officeDocument : managedDocuments) {
             try {
                 closeDocument(officeDocument, true);
-                //officeDocument.closeDocument(true);
             } catch (OdiseeServerException e) {
                 // ignore
             }
@@ -377,26 +369,23 @@ public class OfficeConnection {
     //<editor-fold desc="Getters...">
 
     private XDesktop getXDesktop() {
-        // Check state
-        if (!initializationCompleted()) {
-            throw new OdiseeServerRuntimeException("Not initialized");
-        }
+        assertInitialized();
         return queryInterface(XDesktop.class, desktop);
     }
 
-    public XMultiComponentFactory getXRemoteServiceManager() {
-        // Check state
+    private void assertInitialized() {
         if (!initializationCompleted()) {
             throw new OdiseeServerRuntimeException("Not initialized");
         }
+    }
+
+    public XMultiComponentFactory getXRemoteServiceManager() {
+        assertInitialized();
         return xRemoteServiceManager;
     }
 
     public XComponentLoader getXComponentLoader() {
-        // Check state
-        if (!initializationCompleted()) {
-            throw new OdiseeServerRuntimeException("Not initialized");
-        }
+        assertInitialized();
         return xComponentLoader;
     }
 
@@ -406,16 +395,14 @@ public class OfficeConnection {
 
     public OfficeDocument createDocument(OfficeDocumentType type) throws OdiseeServerException {
         OfficeDocument officeDocument = new OfficeDocument(this);
-        /*XComponent xComponent = */
-        officeDocument.newDocument(type);
+        /*XComponent xComponent = */officeDocument.newDocument(type);
         managedDocuments.add(officeDocument);
         return officeDocument;
     }
 
     private OfficeDocument createDocument(URL url) throws OdiseeServerException {
         OfficeDocument officeDocument = new OfficeDocument(this);
-        /*XComponent xComponent = */
-        officeDocument.newDocument(url);
+        /*XComponent xComponent = */officeDocument.newDocument(url);
         managedDocuments.add(officeDocument);
         return officeDocument;
     }
@@ -460,9 +447,7 @@ public class OfficeConnection {
                     Any any = (Any) xEnumeration.nextElement();
                     xComponent = (XComponent) any.getObject();
                     queryInterface(XCloseable.class, xComponent).close(true);
-                } catch (NoSuchElementException e) {
-                    // ignore
-                } catch (WrappedTargetException e) {
+                } catch (NoSuchElementException | WrappedTargetException e) {
                     // ignore
                 } catch (CloseVetoException e) {
                     throw new OdiseeServerException("Component " + xComponent + "does not agree to close", e);
@@ -473,29 +458,26 @@ public class OfficeConnection {
 
     //</editor-fold>
 
-    private void enumerateComponents(String action) {
+    private void enumerateComponents(final String action) {
         try {
-            XEnumerationAccess xEnumerationAccess = getXDesktop().getComponents();
+            final XEnumerationAccess xEnumerationAccess = getXDesktop().getComponents();
             if (xEnumerationAccess.hasElements()) {
                 XEnumeration xEnumeration = xEnumerationAccess.createEnumeration();
                 while (xEnumeration.hasMoreElements()) {
-                    try {
-                        LOGGER.debug("{} [{}] Found {}", action, unoURL, xEnumeration.nextElement());
-                        /*
-                        Any any = (Any) xEnumeration.nextElement();
-                        xComponent = (XComponent) any.getObject();
-                        LOGGER.debug("Closing {}", xComponent.toString());
-                        close(xComponent);
-                        */
-                    } catch (NoSuchElementException e) {
-                        // ignore
-                    } catch (WrappedTargetException e) {
-                        // ignore
-                    }
+                    debugLogXEnumerationComponent(action, xEnumeration);
                 }
             }
         } catch (Exception e) {
             // ignore
+        }
+    }
+
+    private void debugLogXEnumerationComponent(final String action, final XEnumeration xEnumeration) {
+        try {
+            final Object o = xEnumeration.nextElement();
+            LOGGER.debug("[{}] {} found {}", unoURL, action, o);
+        } catch (NoSuchElementException | WrappedTargetException e) {
+            LOGGER.error("");
         }
     }
 

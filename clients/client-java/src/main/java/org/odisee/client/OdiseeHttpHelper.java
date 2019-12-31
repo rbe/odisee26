@@ -25,7 +25,6 @@ import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.HttpURLConnection;
 import java.net.PasswordAuthentication;
-import java.net.ProtocolException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
@@ -35,7 +34,7 @@ final class OdiseeHttpHelper {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OdiseeHttpHelper.class);
 
-    private static final int BUF_SIZE = 128 << 10;
+    public static final byte[] EMPY_BYTES = new byte[0];
 
     private final String username;
 
@@ -67,7 +66,7 @@ final class OdiseeHttpHelper {
             return baos.toByteArray();
         } catch (IOException e) {
             LOGGER.warn("", e);
-            return null;
+            return EMPY_BYTES;
         }
     }
 
@@ -88,7 +87,7 @@ final class OdiseeHttpHelper {
             return baos.toByteArray();
         } catch (IOException e) {
             LOGGER.warn("", e);
-            return null;
+            return EMPY_BYTES;
         }
     }
 
@@ -105,8 +104,6 @@ final class OdiseeHttpHelper {
             System.setProperty("http.maxRedirects", "3");
             Authenticator.setDefault(new UserPassAuthenticator(username, password));
             return connection;
-        } catch (ProtocolException e) {
-            LOGGER.warn("", e);
         } catch (IOException e) {
             LOGGER.warn("", e);
         }
@@ -124,6 +121,7 @@ final class OdiseeHttpHelper {
             this.pass = pass;
         }
 
+        @Override
         protected PasswordAuthentication getPasswordAuthentication() {
             return new PasswordAuthentication(user, pass.toCharArray());
         }

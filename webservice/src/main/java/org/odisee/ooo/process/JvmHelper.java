@@ -12,7 +12,6 @@
 package org.odisee.ooo.process;
 
 import org.odisee.ooo.connection.OdiseeServerException;
-import org.odisee.shared.OdiseeConstant;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,17 +23,11 @@ public class JvmHelper {
      */
     public static final String OS_NAME = System.getProperty("os.name");
 
-    /*
-    public static Path findJar(String jar) {
-        String[] classpath = System.getProperty(OdiseeConstant.JAVA_CLASS_PATH).split(File.pathSeparator);
-        for (String p : classpath) {
-            if (p.endsWith(jar)) {
-                return Paths.get(p);
-            }
-        }
-        return null;
+    private static final String[] TMP_DIR_NAMES = {"TMP", "TMPDIR", "TEMP"};
+
+    private JvmHelper() {
+        throw new AssertionError();
     }
-    */
 
     public static Path findArchiveOfClass(Class<?> clazz) throws ClassNotFoundException {
         String path = clazz.getProtectionDomain().getCodeSource().getLocation().getPath();
@@ -55,7 +48,7 @@ public class JvmHelper {
             odiseeTmp = System.getProperty("java.io.tmpdir");
         }
         if (null == odiseeTmp) {
-            for (String t : OdiseeConstant.TMP_DIR_NAMES) {
+            for (String t : TMP_DIR_NAMES) {
                 if (null == odiseeTmp) {
                     odiseeTmp = System.getenv(t);
                 } else {
@@ -66,11 +59,11 @@ public class JvmHelper {
         if (null == odiseeTmp) {
             throw new OdiseeServerException("Cannot find temporary directory, please set ODISEE_TMP");
         }
-        String _odiseeTmp = odiseeTmp.replace('\\', '/');
-        if (_odiseeTmp.endsWith("/")) {
-            _odiseeTmp = _odiseeTmp.substring(0, _odiseeTmp.length() - 1);
+        String odiseeTmpWithSlash = odiseeTmp.replace('\\', '/');
+        if (odiseeTmpWithSlash.endsWith("/")) {
+            odiseeTmpWithSlash = odiseeTmpWithSlash.substring(0, odiseeTmpWithSlash.length() - 1);
         }
-        return _odiseeTmp;
+        return odiseeTmpWithSlash;
     }
 
 }

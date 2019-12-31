@@ -13,6 +13,10 @@ package org.odisee.document;
 
 final class MimeTypeConstant {
 
+    private MimeTypeConstant() {
+        throw new AssertionError();
+    }
+
     public static final String MIME_TYPE_OCTET_STREAM = "application/octet-stream";
 
     public static final String MIME_TYPE_ODT = "application/vnd.oasis.opendocument.text";

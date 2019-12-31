@@ -12,12 +12,13 @@
 package org.odisee.ooo.connection;
 
 import groovy.lang.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,13 +29,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Singleton
 public class OfficeConnectionFactory {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(OfficeConnectionFactory.class);
+
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
     private String groupname;
 
-    private final int QUEUE_POLL_TIMEOUT = 5;
+    private static final int QUEUE_POLL_TIMEOUT = 5;
 
-    private final TimeUnit QUEUE_POLL_TIMEUNIT = TimeUnit.SECONDS;
+    private static final TimeUnit QUEUE_POLL_TIMEUNIT = TimeUnit.SECONDS;
 
     private List<InetSocketAddress> addresses;
 
@@ -42,16 +45,16 @@ public class OfficeConnectionFactory {
 
     private static final OfficeConnectionFactory OFFICE_CONNECTION_FACTORY = new OfficeConnectionFactory();
 
-    public static OfficeConnectionFactory getInstance(String groupname, List<InetSocketAddress> addresses) {
+    public static OfficeConnectionFactory getInstance(final String groupname, final List<InetSocketAddress> addresses) {
         OFFICE_CONNECTION_FACTORY.groupname = groupname;
         OFFICE_CONNECTION_FACTORY.addresses = addresses;
         OFFICE_CONNECTION_FACTORY.initializeConnections();
         return OFFICE_CONNECTION_FACTORY;
     }
 
-    public static OfficeConnectionFactory getInstance(String groupname, String host, int basePort, int count) {
+    public static OfficeConnectionFactory getInstance(final String groupname, final String host, final int basePort, final int count) {
         OFFICE_CONNECTION_FACTORY.groupname = groupname;
-        OFFICE_CONNECTION_FACTORY.addresses = new ArrayList<InetSocketAddress>();
+        OFFICE_CONNECTION_FACTORY.addresses = new ArrayList<>();
         OFFICE_CONNECTION_FACTORY.addConnections(host, basePort, count);
         OFFICE_CONNECTION_FACTORY.initializeConnections();
         return OFFICE_CONNECTION_FACTORY;
@@ -60,13 +63,13 @@ public class OfficeConnectionFactory {
     private OfficeConnectionFactory() {
     }
 
-    public void addConnections(String host, int basePort, int count) {
+    public void addConnections(final String host, final int basePort, final int count) {
         for (int i = 0; i < count; i++) {
             addresses.add(new InetSocketAddress(host, basePort + i));
         }
     }
 
-    public OfficeConnection fetchConnection(boolean waitForever) throws OdiseeServerException {
+    public OfficeConnection fetchConnection(final boolean waitForever) throws OdiseeServerException {
         // Check state
         if (shuttingDown.get()) {
             throw new OdiseeServerException("Shutdown in progress");
@@ -79,18 +82,10 @@ public class OfficeConnectionFactory {
             } else {
                 officeConnection = connections.take();
             }
-            //dumpNextConnection("fetch", officeConnection);
         } catch (InterruptedException e) {
             // ignore
             Thread.currentThread().interrupt();
         }
-        /*
-        // TODO No connection polled and queue has capacity, create a new one
-        if (null == officeConnection && connections.remainingCapacity() > 0) {
-            officeConnection = new OfficeConnection();
-            officeConnection.connect(unoURL);
-        }
-        */
         // Check if we could get an OfficeConnection
         if (null == officeConnection) {
             throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", groupname));
@@ -114,7 +109,7 @@ public class OfficeConnectionFactory {
         return officeConnection;
     }
 
-    public void repositConnection(OfficeConnection officeConnection) throws OdiseeServerException {
+    public void repositConnection(final OfficeConnection officeConnection) throws OdiseeServerException {
         if (null == officeConnection) {
             return;
         }
@@ -126,7 +121,6 @@ public class OfficeConnectionFactory {
         int i = 0;
         while (i++ < 3 && !connectionWasPutBack) {
             connectionWasPutBack = connections.offer(officeConnection);
-            //dumpNextConnection("reposit", officeConnection);
         }
         if (!connectionWasPutBack) {
             throw new OdiseeServerException(String.format("[group=%s] Could not reposit connection, I tried it more than once, sorry.", groupname));
@@ -137,7 +131,7 @@ public class OfficeConnectionFactory {
      * Shutdown all connections and the factory.
      * @param cleanup If false, OfficeConnection objects remain in the pool, otherwise they are removed.
      */
-    public void shutdown(boolean cleanup) {
+    public void shutdown(final boolean cleanup) {
         shuttingDown.getAndSet(true);
         Iterator<OfficeConnection> iter = connections.iterator();
         while (iter.hasNext()) {
@@ -154,30 +148,26 @@ public class OfficeConnectionFactory {
 
     private synchronized void initializeConnections() {
         // Check state
-        if (null == addresses || addresses.size() == 0) {
+        if (null == addresses || addresses.isEmpty()) {
             throw new OdiseeServerRuntimeException("Initialization error");
         }
         // Setup queue for connections
-        connections = new LinkedBlockingQueue<OfficeConnection>(addresses.size());
+        connections = new LinkedBlockingQueue<>(addresses.size());
         // Process all TCP/IP addresses
-        for (InetSocketAddress socketAddress : addresses) {
-            OfficeConnection officeConnection = new OfficeConnection(socketAddress);
+        for (final InetSocketAddress socketAddress : addresses) {
+            final OfficeConnection officeConnection = new OfficeConnection(socketAddress);
             try {
                 officeConnection.bootstrap(false);
-                connections.offer(officeConnection);
+                final boolean offer = connections.offer(officeConnection);
+                if (offer) {
+                    LOGGER.info("Added connection {} to queue", officeConnection);
+                } else {
+                    LOGGER.error("Could not add connection {} to queue", officeConnection);
+                }
             } catch (OdiseeServerException e) {
-                // ignore
-                System.err.printf("[group=%s] Could not bootstrap connection to %s: %s%n", groupname, socketAddress, e.getLocalizedMessage());
+                LOGGER.error("[group=%{}] Could not bootstrap connection to {}: {}",
+                        groupname, socketAddress, e.getLocalizedMessage());
             }
-        }
-    }
-
-    private void dumpNextConnection(String action, OfficeConnection officeConnection) {
-        try {
-            System.out.printf("%s [group=%s] %s: %s, next is %s, %d available%n", Thread.currentThread().getName(), groupname, action, officeConnection, connections.element(), connections.size());
-        } catch (NoSuchElementException e) {
-            // ignore
-            System.out.printf("%s [group=%s] %s: %s, no more connections available%n", Thread.currentThread().getName(), groupname, action, officeConnection);
         }
     }
 

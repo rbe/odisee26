@@ -28,6 +28,8 @@ import org.odisee.ooo.connection.OdiseeServerException;
 import org.odisee.ooo.connection.OdiseeServerRuntimeException;
 import org.odisee.ooo.connection.OfficeConnection;
 import org.odisee.shared.OdiseeConstant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,7 +42,10 @@ import java.util.List;
 import static com.sun.star.uno.UnoRuntime.queryInterface;
 import static org.odisee.uno.UnoHelper.makePropertyValue;
 
+@SuppressWarnings("java:S1191")
 public class OfficeDocument {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OfficeDocument.class);
 
     /**
      * The connection to use for dealing with the document.
@@ -163,7 +168,7 @@ public class OfficeDocument {
         }
     }
 
-    public XComponent getXComponent() throws OdiseeServerException {
+    public XComponent getXComponent() {
         return xComponent;
     }
 
@@ -178,30 +183,28 @@ public class OfficeDocument {
     private XFrame getXFrame() throws OdiseeServerException {
         XFrame xFrame = null;
         final XController xController = queryInterface(XController.class, xComponent);
-        if (null != xController) {
-            if (xController.suspend(true)) {
-                xFrame = xController.getFrame();
-                if (null == xFrame) {
-                    throw new OdiseeServerException("There is no XFrame");
-                }
+        if (null != xController && xController.suspend(true)) {
+            xFrame = xController.getFrame();
+            if (null == xFrame) {
+                throw new OdiseeServerException("There is no XFrame");
             }
         }
         return xFrame;
     }
 
-    public void refreshAll() throws OdiseeServerException {
+    public void refreshAll() {
         refreshTextFields();
         refreshDocument();
     }
 
-    private void refreshTextFields() throws OdiseeServerException {
+    private void refreshTextFields() {
         final XTextFieldsSupplier xTextFieldsSupplier = queryInterface(XTextFieldsSupplier.class, xComponent);
         final XEnumerationAccess xEnumeratedFields = xTextFieldsSupplier.getTextFields();
         final XRefreshable xRefreshable = queryInterface(XRefreshable.class, xEnumeratedFields);
         xRefreshable.refresh();
     }
 
-    private void refreshDocument() throws OdiseeServerException {
+    private void refreshDocument() {
         final XRefreshable xRefresh = queryInterface(XRefreshable.class, xComponent);
         xRefresh.refresh();
     }
@@ -268,82 +271,104 @@ public class OfficeDocument {
      * @return Boolean to indicate closing was successful.
      * @throws OdiseeServerException
      */
-    public boolean closeDocument(boolean force) throws OdiseeServerException {
-        boolean bClosed = false;
+    public boolean closeDocument(final boolean force) throws OdiseeServerException {
+        boolean bClosed;
         try {
             // Set modified flag in case we should forcibly close the document
             if (force) {
                 setModified(false);
             }
-            //
             // Try 1: Close document though XModel/XCloseable
-            // Get XModel
-            final XModel xModel = queryInterface(XModel.class, xComponent);
-            if (null != xModel) {
-                final XCloseable xCloseable = queryInterface(XCloseable.class, xModel);
-                try {
-                    xCloseable.close(true);
-                    // Calling xModel.dispose(); results in com.sun.star.lang.DisposedException
-                    bClosed = true;
-                } catch (CloseVetoException e) {
-                    bClosed = false;
-                }
-            }
-            //
+            bClosed = maybeCloseByXModel();
             if (!bClosed) {
                 // Try 2: Close document though XFrame/XCloseable
-                // Get XFrame
-                final XFrame xFrame = getXFrame();
-                if (null != xFrame) {
-                    // First try the new way: use new interface XCloseable
-                    // It replaced the deprecated XTask::close() and should be preferred ... if it can be queried.
-                    final XCloseable xCloseable = queryInterface(XCloseable.class, xFrame);
-                    if (xCloseable != null) {
-                        // We deliver the owner ship of this frame not to the (possible) source which throw a CloseVetoException.
-                        // We whishto have it under our own control.
-                        try {
-                            xCloseable.close(false);
-                            bClosed = true;
-                        } catch (CloseVetoException e) {
-                            bClosed = false;
-                        }
-                    }
-                }
+                bClosed = maybeCloseByXFrame();
             }
-            //
             if (!bClosed) {
                 // Try 3: Close document though XController/XCloseable
-                try {
-                    // It's a document which supports a controller .. or may by a pure window only.
-                    // If it's at least a controller - we can try to suspend it. But - it can disagree with that!
-                    final XController xController = queryInterface(XController.class, xComponent);
-                    if (xController != null) {
-                        if (xController.suspend(true)) {
-                            // Note: Don't dispose the controller - destroy the frame to make it right!
-                            // Get XFrame
-                            final XFrame xFrame = getXFrame();
-                            if (null != xFrame) {
-                                xFrame.dispose();
-                                bClosed = true;
-                            }
-                        }
-                    }
-                } catch (com.sun.star.uno.RuntimeException e) {
-                    // DisposedException
-                    // If an UNO object was already disposed before - he throw this special runtime exception.
-                    // Of course every UNO call must be look for that - but it's a question of error handling.
-                    // For demonstration this exception is handled here.
-                    // RuntimeException
-                    // Every UNO call can throw that.
-                    // Do nothing - closing failed - that's it.
-                    throw new OdiseeServerException(e);
-                }
+                bClosed = maybeCloseByXController();
             }
         } catch (com.sun.star.uno.RuntimeException e) {
             throw new OdiseeServerException("Could not close document", e);
         }
         // Return
         return bClosed;
+    }
+
+    private boolean maybeCloseByXController() throws OdiseeServerException {
+        try {
+            // It's a document which supports a controller .. or may by a pure window only.
+            // If it's at least a controller - we can try to suspend it. But - it can disagree with that!
+            final XController xController = queryInterface(XController.class, xComponent);
+            if (null != xController) {
+                if (xController.suspend(true)) {
+                    // Note: Don't dispose the controller - destroy the frame to make it right!
+                    final XFrame xFrame = getXFrame();
+                    if (null != xFrame) {
+                        xFrame.dispose();
+                        return true;
+                    } else {
+                        LOGGER.error("No XFrame");
+                        return false;
+                    }
+                }
+            } else {
+                LOGGER.error("No XController");
+                return false;
+            }
+        } catch (com.sun.star.uno.RuntimeException e) {
+            // DisposedException
+            // If an UNO object was already disposed before - he throw this special runtime exception.
+            // Of course every UNO call must look for that - but it's a question of error handling.
+            // Every UNO call can throw that.
+            // Do nothing - closing failed - that's it.
+            throw new OdiseeServerException(e);
+        }
+        return false;
+    }
+
+    private boolean maybeCloseByXFrame() throws OdiseeServerException {
+        final XFrame xFrame = getXFrame();
+        if (null != xFrame) {
+            // First try the new way: use new interface XCloseable
+            // It replaced the deprecated XTask::close() and should be preferred ... if it can be queried.
+            final XCloseable xCloseable = queryInterface(XCloseable.class, xFrame);
+            if (null != xCloseable) {
+                // We deliver the ownership of this frame not to the (possible) source which throw a CloseVetoException.
+                // We whishto have it under our own control.
+                try {
+                    xCloseable.close(false);
+                    return true;
+                } catch (CloseVetoException e) {
+                    LOGGER.error("", e);
+                    return false;
+                }
+            } else {
+                LOGGER.error("No XCloseable");
+                return false;
+            }
+        } else {
+            LOGGER.error("No XFrame");
+            return false;
+        }
+    }
+
+    private boolean maybeCloseByXModel() {
+        // Calling xModel.dispose(); results in com.sun.star.lang.DisposedException
+        final XModel xModel = queryInterface(XModel.class, xComponent);
+        if (null != xModel) {
+            final XCloseable xCloseable = queryInterface(XCloseable.class, xModel);
+            try {
+                xCloseable.close(true);
+                return true;
+            } catch (CloseVetoException e) {
+                LOGGER.error("", e);
+                return false;
+            }
+        } else {
+            LOGGER.error("No XModel");
+            return false;
+        }
     }
 
 }

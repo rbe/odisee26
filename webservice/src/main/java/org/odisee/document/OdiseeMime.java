@@ -11,65 +11,80 @@
 
 package org.odisee.document;
 
-/**
- * TODO Use Beetlejuice.MimeType
- */
 public class OdiseeMime {
 
     /**
      * Mime types. See http://de.selfhtml.org/diverses/mimetypen.htm.
      */
-    public static final String[][] mimeTypes;
+    protected static final String[][] mimeTypes;
+
+    public static final String IMAGE_JPEG = "image/jpeg";
+
+    public static final String IMAGE_TIF = "image/tif";
+
+    public static final String APPLICATION_PDF = "application/pdf";
+
+    public static final String APPLICATION_MSWORD = "application/msword";
+
+    public static final String APPLICATION_OCTET_STREAM = "application/octet-stream";
+
+    public static final String APPLICATION_VND_MS_EXCEL = "application/vnd.ms-excel";
+
+    public static final String APPLICATION_VND_MS_POWERPOINT = "application/vnd.ms-powerpoint";
+
+    private OdiseeMime() {
+        throw new AssertionError();
+    }
 
     static {
         mimeTypes = new String[][]{
-                {"Unknown".intern(), "*".intern(), "application/octet-stream".intern()},
-                {"OpenOffice.org Writer (odt)".intern(), "odt".intern(), "application/vnd.oasis.opendocument.text".intern()},
-                {"OpenOffice.org Writer Template (ott)".intern(), "ott".intern(), "application/vnd.oasis.opendocument.text-template".intern()},
-                {"OpenOffice.org Writer Web (oth)".intern(), "oth".intern(), "application/vnd.oasis.opendocument.text-web".intern()},
-                {"OpenOffice.org Writer Masterdocument (odm)".intern(), "odm".intern(), "application/vnd.oasis.opendocument.text-master".intern()},
-                {"OpenOffice.org Draw (odg)".intern(), "odg".intern(), "application/vnd.oasis.opendocument.graphics".intern()},
-                {"OpenOffice.org Draw Template (otg)".intern(), "otg".intern(), "application/vnd.oasis.opendocument.graphics-template".intern()},
-                {"OpenOffice.org Impress (odp)".intern(), "odp".intern(), "application/vnd.oasis.opendocument.presentation".intern()},
-                {"OpenOffice.org Impress Template (otp)".intern(), "otp".intern(), "application/vnd.oasis.opendocument.presentation-template".intern()},
-                {"OpenOffice.org Calc (ods)".intern(), "ods".intern(), "application/vnd.oasis.opendocument.spreadsheet".intern()},
-                {"OpenOffice.org Calc Template (ots)".intern(), "ots".intern(), "application/vnd.oasis.opendocument.spreadsheet-template".intern()},
-                {"OpenOffice.org Chart (odc)".intern(), "odc".intern(), "application/vnd.oasis.opendocument.chart".intern()},
-                {"OpenOffice.org Formula (odf)".intern(), "odf".intern(), "application/vnd.oasis.opendocument.formula".intern()},
-                {"OpenOffice.org Image (odi)".intern(), "odi".intern(), "application/vnd.oasis.opendocument.image".intern()},
-                {"JPEG (jpg)".intern(), "jpg".intern(), "image/jpeg".intern()},
-                {"JPEG (jpeg)".intern(), "jpeg".intern(), "image/jpeg".intern()},
-                {"TIFF (tif)".intern(), "tif".intern(), "image/tif".intern()},
-                {"TIFF (tiff)".intern(), "tiff".intern(), "image/tif".intern()},
-                {"Portable Network Graphics (png)".intern(), "png".intern(), "image/png".intern()},
-                {"Portable Document Format (pdf)".intern(), "pdf".intern(), "application/pdf".intern()},
-                {"Rich Text Format (rtf)".intern(), "rtf".intern(), "application/rtf".intern()},
-                {"Microsoft Office Word 97-2003 (doc)".intern(), "doc".intern(), "application/msword".intern()},
-                {"Microsoft Office Word 97-2003 Template (dot)".intern(), "dot".intern(), "application/msword".intern()},
-                {"Microsoft Office Excel 97-2003 (xls)".intern(), "xls".intern(), "application/vnd.ms-excel".intern()},
-                {"Microsoft Office Excel 97-2003 Template (xlt)".intern(), "xlt".intern(), "application/vnd.ms-excel".intern()},
-                {"Microsoft Office Excel 97-2003 Addin (xla)".intern(), "xla".intern(), "application/vnd.ms-excel".intern()},
-                {"Microsoft Office PowerPoint 97-2003 (ppt)".intern(), "ppt".intern(), "application/vnd.ms-powerpoint".intern()},
-                {"Microsoft Office PowerPoint 97-2003 Template (pot)".intern(), "pot".intern(), "application/vnd.ms-powerpoint".intern()},
-                {"Microsoft Office PowerPoint 97-2003 (pps)".intern(), "pps".intern(), "application/vnd.ms-powerpoint".intern()},
-                {"Microsoft Office PowerPoint 97-2003 (ppa)".intern(), "ppa".intern(), "application/vnd.ms-powerpoint".intern()},
-                {"Microsoft Office Word 2007 (docx)".intern(), "docx".intern(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document".intern()},
-                {"Microsoft Office Word 2007 Template (dotx)".intern(), "dotx".intern(), "application/vnd.openxmlformats-officedocument.wordprocessingml.template".intern()},
-                {"Microsoft Office Word 2007 (docm)".intern(), "docm".intern(), "application/vnd.ms-word.document.macroEnabled.12".intern()},
-                {"Microsoft Office Word 2007 Template (dotm)".intern(), "dotm".intern(), "application/vnd.ms-word.template.macroEnabled.12".intern()},
-                {"Microsoft Office Excel 2007 (xlsx)".intern(), "xlsx".intern(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".intern()},
-                {"Microsoft Office Excel 2007 Template (xltx)".intern(), "xltx".intern(), "application/vnd.openxmlformats-officedocument.spreadsheetml.template".intern()},
-                {"Microsoft Office Excel 2007 (xlsm)".intern(), "xlsm".intern(), "application/vnd.ms-excel.sheet.macroEnabled.12".intern()},
-                {"Microsoft Office Excel 2007 Template (xltm)".intern(), "xltm".intern(), "application/vnd.ms-excel.template.macroEnabled.12".intern()},
-                {"Microsoft Office Excel 2007 Addin (xlam)".intern(), "xlam".intern(), "application/vnd.ms-excel.addin.macroEnabled.12".intern()},
-                {"Microsoft Office Excel 2007 Binary (xlsb)".intern(), "xlsb".intern(), "application/vnd.ms-excel.sheet.binary.macroEnabled.12".intern()},
-                {"Microsoft Office PowerPoint 2007 (pptx)".intern(), "pptx".intern(), "application/vnd.openxmlformats-officedocument.presentationml.presentation".intern()},
-                {"Microsoft Office PowerPoint 2007 Template (potx)".intern(), "potx".intern(), "application/vnd.openxmlformats-officedocument.presentationml.template".intern()},
-                {"Microsoft Office PowerPoint 2007 (ppsx)".intern(), "ppsx".intern(), "application/vnd.openxmlformats-officedocument.presentationml.slideshow".intern()},
-                {"Microsoft Office PowerPoint 2007 Addin (ppam)".intern(), "ppam".intern(), "application/vnd.ms-powerpoint.addin.macroEnabled.12".intern()},
-                {"Microsoft Office PowerPoint 2007 (pptm)".intern(), "pptm".intern(), "application/vnd.ms-powerpoint.presentation.macroEnabled.12".intern()},
-                {"Microsoft Office PowerPoint 2007 Template (potm)".intern(), "potm".intern(), "application/vnd.ms-powerpoint.template.macroEnabled.12".intern()},
-                {"Microsoft Office PowerPoint 2007 Slideshow (ppsm)".intern(), "ppsm".intern(), "application/vnd.ms-powerpoint.slideshow.macroEnabled.12".intern()}
+                {"Unknown", "*", APPLICATION_OCTET_STREAM},
+                {"OpenOffice.org Writer (odt)", "odt", "application/vnd.oasis.opendocument.text"},
+                {"OpenOffice.org Writer Template (ott)", "ott", "application/vnd.oasis.opendocument.text-template"},
+                {"OpenOffice.org Writer Web (oth)", "oth", "application/vnd.oasis.opendocument.text-web"},
+                {"OpenOffice.org Writer Masterdocument (odm)", "odm", "application/vnd.oasis.opendocument.text-master"},
+                {"OpenOffice.org Draw (odg)", "odg", "application/vnd.oasis.opendocument.graphics"},
+                {"OpenOffice.org Draw Template (otg)", "otg", "application/vnd.oasis.opendocument.graphics-template"},
+                {"OpenOffice.org Impress (odp)", "odp", "application/vnd.oasis.opendocument.presentation"},
+                {"OpenOffice.org Impress Template (otp)", "otp", "application/vnd.oasis.opendocument.presentation-template"},
+                {"OpenOffice.org Calc (ods)", "ods", "application/vnd.oasis.opendocument.spreadsheet"},
+                {"OpenOffice.org Calc Template (ots)", "ots", "application/vnd.oasis.opendocument.spreadsheet-template"},
+                {"OpenOffice.org Chart (odc)", "odc", "application/vnd.oasis.opendocument.chart"},
+                {"OpenOffice.org Formula (odf)", "odf", "application/vnd.oasis.opendocument.formula"},
+                {"OpenOffice.org Image (odi)", "odi", "application/vnd.oasis.opendocument.image"},
+                {"JPEG (jpg)", "jpg", IMAGE_JPEG},
+                {"JPEG (jpeg)", "jpeg", IMAGE_JPEG},
+                {"TIFF (tif)", "tif", IMAGE_TIF},
+                {"TIFF (tiff)", "tiff", IMAGE_TIF},
+                {"Portable Network Graphics (png)", "png", "image/png"},
+                {"Portable Document Format (pdf)", "pdf", APPLICATION_PDF},
+                {"Rich Text Format (rtf)", "rtf", "application/rtf"},
+                {"Microsoft Office Word 97-2003 (doc)", "doc", APPLICATION_MSWORD},
+                {"Microsoft Office Word 97-2003 Template (dot)", "dot", APPLICATION_MSWORD},
+                {"Microsoft Office Excel 97-2003 (xls)", "xls", APPLICATION_VND_MS_EXCEL},
+                {"Microsoft Office Excel 97-2003 Template (xlt)", "xlt", APPLICATION_VND_MS_EXCEL},
+                {"Microsoft Office Excel 97-2003 Addin (xla)", "xla", APPLICATION_VND_MS_EXCEL},
+                {"Microsoft Office PowerPoint 97-2003 (ppt)", "ppt", APPLICATION_VND_MS_POWERPOINT},
+                {"Microsoft Office PowerPoint 97-2003 Template (pot)", "pot", APPLICATION_VND_MS_POWERPOINT},
+                {"Microsoft Office PowerPoint 97-2003 (pps)", "pps", APPLICATION_VND_MS_POWERPOINT},
+                {"Microsoft Office PowerPoint 97-2003 (ppa)", "ppa", APPLICATION_VND_MS_POWERPOINT},
+                {"Microsoft Office Word 2007 (docx)", "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+                {"Microsoft Office Word 2007 Template (dotx)", "dotx", "application/vnd.openxmlformats-officedocument.wordprocessingml.template"},
+                {"Microsoft Office Word 2007 (docm)", "docm", "application/vnd.ms-word.document.macroEnabled.12"},
+                {"Microsoft Office Word 2007 Template (dotm)", "dotm", "application/vnd.ms-word.template.macroEnabled.12"},
+                {"Microsoft Office Excel 2007 (xlsx)", "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+                {"Microsoft Office Excel 2007 Template (xltx)", "xltx", "application/vnd.openxmlformats-officedocument.spreadsheetml.template"},
+                {"Microsoft Office Excel 2007 (xlsm)", "xlsm", "application/vnd.ms-excel.sheet.macroEnabled.12"},
+                {"Microsoft Office Excel 2007 Template (xltm)", "xltm", "application/vnd.ms-excel.template.macroEnabled.12"},
+                {"Microsoft Office Excel 2007 Addin (xlam)", "xlam", "application/vnd.ms-excel.addin.macroEnabled.12"},
+                {"Microsoft Office Excel 2007 Binary (xlsb)", "xlsb", "application/vnd.ms-excel.sheet.binary.macroEnabled.12"},
+                {"Microsoft Office PowerPoint 2007 (pptx)", "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+                {"Microsoft Office PowerPoint 2007 Template (potx)", "potx", "application/vnd.openxmlformats-officedocument.presentationml.template"},
+                {"Microsoft Office PowerPoint 2007 (ppsx)", "ppsx", "application/vnd.openxmlformats-officedocument.presentationml.slideshow"},
+                {"Microsoft Office PowerPoint 2007 Addin (ppam)", "ppam", "application/vnd.ms-powerpoint.addin.macroEnabled.12"},
+                {"Microsoft Office PowerPoint 2007 (pptm)", "pptm", "application/vnd.ms-powerpoint.presentation.macroEnabled.12"},
+                {"Microsoft Office PowerPoint 2007 Template (potm)", "potm", "application/vnd.ms-powerpoint.template.macroEnabled.12"},
+                {"Microsoft Office PowerPoint 2007 Slideshow (ppsm)", "ppsm", "application/vnd.ms-powerpoint.slideshow.macroEnabled.12"}
         };
     }
 

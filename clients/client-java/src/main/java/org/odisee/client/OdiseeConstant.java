@@ -12,7 +12,11 @@
 
 package org.odisee.client;
 
-public class OdiseeConstant {
+public final class OdiseeConstant {
+
+    private OdiseeConstant() {
+        throw new AssertionError();
+    }
 
     /**
      * XPath for last request below &lt;odisee> root element.
