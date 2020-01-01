@@ -8,6 +8,7 @@ oxt/Odisee/dist/
 clients/client-vbnet/src/.vs/
 clients/client-vbnet/src/vb/OdiseeClient/bin/
 clients/client-vbnet/src/vb/OdiseeClient/obj/
+clients/client-vbnet/src/vb/OdiseeClient/publish/
 
 # Docker
 .env
