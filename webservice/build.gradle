@@ -34,6 +34,7 @@ apply plugin: 'de.undercouch.download'
 apply plugin: 'com.bmuschko.docker-remote-api'
 
 repositories {
+    mavenCentral()
     maven {
         url "https://repo.grails.org/grails/core"
     }
@@ -56,7 +57,11 @@ def libreOfficeVariant = 'still'
 dependencies {
     antlibs 'org.apache.ant:ant-xz:1.10.7'
     antlibs 'org.tukaani:xz:1.8'
-    implementation fileTree(dir: "${buildDir}/libs/libreoffice-${libreOfficeVersion}", include: '**/*.jar')
+    implementation "org.libreoffice:juh:${libreOfficeVersion}"
+    implementation "org.libreoffice:jurt:${libreOfficeVersion}"
+    implementation "org.libreoffice:ridl:${libreOfficeVersion}"
+    implementation "org.libreoffice:unoil:${libreOfficeVersion}"
+    implementation "org.libreoffice:unoloader:${libreOfficeVersion}"
     implementation 'org.apache.pdfbox:pdfbox:2.0.16'
     implementation 'org.codehaus.groovy:groovy-dateutil:2.5.8'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -233,7 +238,7 @@ task downloadAndUnpackLibreOffice {
         }
     }
 }
-compileJava.dependsOn('downloadAndUnpackLibreOffice')
+// The UNO jars come from Maven. This task remains for an offline unpack of a LibreOffice deb.
 
 //
 // Docker
@@ -275,3 +280,7 @@ task buildOdiseeImage(type: DockerBuildImage, dependsOn: prepareOdiseeDocker) {
 }
 
 assemble.dependsOn('buildOdiseeImage')
+
+test {
+    systemProperty 'ODISEE_HOME', file("${buildDir}/odisee-test-home").absolutePath
+}

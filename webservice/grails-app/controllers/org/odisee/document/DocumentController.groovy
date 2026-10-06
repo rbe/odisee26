@@ -15,6 +15,7 @@ import org.odisee.api.OdiseeException
 import org.odisee.debug.WallTime
 import org.odisee.io.Compression
 import org.odisee.io.OdiseePath
+import org.odisee.ooo.connection.OdiseeServerException
 import org.odisee.xml.XmlHelper
 import org.w3c.dom.Element
 
@@ -40,7 +41,8 @@ class DocumentController {
             final InputStream decompressedInputStream = Compression.decompress(request.inputStream)
             final Element xml = XmlHelper.convertToXmlElement(decompressedInputStream)
             if (null != xml) {
-                final Document document = processXmlRequest(/*request.userPrincipal*/ principal, xml)
+                final Principal caller = request.userPrincipal ?: principal
+                final Document document = processXmlRequest(caller, xml)
                 if (null == document) {
                     throw new OdiseeException('Cannot send stream, no document')
                 } else {
@@ -83,7 +85,7 @@ class DocumentController {
                 log.error msg, throwable
             }
             response.reset()
-            response.status = 400
+            response.status = statusFor(throwable)
             if (null != msg) {
                 response.outputStream << String.format('%s%n', msg)
             }
@@ -91,6 +93,20 @@ class DocumentController {
         } catch (e) {
             log.error 'Could not send error message to client', e
         }
+    }
+
+    private static int statusFor(Throwable throwable) {
+        Throwable current = throwable
+        while (current != null) {
+            if (current instanceof OdiseeServerException) {
+                return 503
+            }
+            if (current instanceof OdiseeException) {
+                return ((OdiseeException) current).httpStatus ?: OdiseeException.BAD_REQUEST
+            }
+            current = current.cause
+        }
+        return OdiseeException.BAD_REQUEST
     }
 
 }

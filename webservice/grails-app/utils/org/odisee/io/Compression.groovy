@@ -33,14 +33,18 @@ final class Compression {
     public static InputStream decompress(InputStream input) {
         PushbackInputStream pushbackInputStream = new PushbackInputStream(input, 2);
         byte[] signature = new byte[2];
-        pushbackInputStream.read(signature);
-        pushbackInputStream.unread(signature);
-        if (signature[0] == (byte) 0x1f && signature[1] == (byte) 0x8b) {
-            GZIPInputStream stream = new GZIPInputStream(pushbackInputStream);
-            return stream;
-        } else {
+        int read = pushbackInputStream.read(signature);
+        if (read < 2) {
+            if (read > 0) {
+                pushbackInputStream.unread(signature, 0, read);
+            }
             return pushbackInputStream;
         }
+        pushbackInputStream.unread(signature);
+        if (signature[0] == (byte) 0x1f && signature[1] == (byte) 0x8b) {
+            return new GZIPInputStream(pushbackInputStream);
+        }
+        return pushbackInputStream;
     }
 
     public static InputStream decompress(final byte[] bytes) {

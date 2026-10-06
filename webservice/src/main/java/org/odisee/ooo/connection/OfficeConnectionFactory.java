@@ -70,43 +70,48 @@ public class OfficeConnectionFactory {
     }
 
     public OfficeConnection fetchConnection(final boolean waitForever) throws OdiseeServerException {
-        // Check state
         if (shuttingDown.get()) {
             throw new OdiseeServerException("Shutdown in progress");
         }
-        OfficeConnection officeConnection = null;
-        // Poll a connection from queue, waiting some seconds if necessary
+        int poolSize = addresses == null ? 1 : Math.max(1, addresses.size());
+        OdiseeServerException lastFailure = null;
+        for (int attempt = 0; attempt < poolSize; attempt++) {
+            OfficeConnection officeConnection = pollConnection(waitForever && attempt == 0);
+            if (officeConnection == null) {
+                break;
+            }
+            try {
+                officeConnection.connect();
+                if (officeConnection.isConnected()) {
+                    return officeConnection;
+                }
+                repositConnection(officeConnection);
+            } catch (OdiseeServerException e) {
+                lastFailure = e;
+                officeConnection.setFaulted(true);
+                repositConnection(officeConnection);
+            } catch (RuntimeException e) {
+                lastFailure = new OdiseeServerException("Office connection failed", e);
+                officeConnection.setFaulted(true);
+                repositConnection(officeConnection);
+            }
+        }
+        if (lastFailure != null) {
+            throw lastFailure;
+        }
+        throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", groupname));
+    }
+
+    private OfficeConnection pollConnection(final boolean waitForever) throws OdiseeServerException {
         try {
             if (!waitForever) {
-                officeConnection = connections.poll(QUEUE_POLL_TIMEOUT, QUEUE_POLL_TIMEUNIT);
-            } else {
-                officeConnection = connections.take();
+                return connections.poll(QUEUE_POLL_TIMEOUT, QUEUE_POLL_TIMEUNIT);
             }
+            return connections.take();
         } catch (InterruptedException e) {
-            // ignore
             Thread.currentThread().interrupt();
+            throw new OdiseeServerException("Interrupted while waiting for an office connection", e);
         }
-        // Check if we could get an OfficeConnection
-        if (null == officeConnection) {
-            throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", groupname));
-        }
-        try {
-            officeConnection.connect();
-            if (!officeConnection.isConnected()) {
-                // Put connection back into pool, better luck next time
-                repositConnection(officeConnection);
-                // Do not return a connection
-                officeConnection = null;
-            }
-        } catch (OdiseeServerException e) {
-            officeConnection.setFaulted(true);
-            // Put connection back into pool, better luck next time
-            repositConnection(officeConnection);
-            // Do not return a connection
-            officeConnection = null;
-        }
-        // Return connection
-        return officeConnection;
     }
 
     public void repositConnection(final OfficeConnection officeConnection) throws OdiseeServerException {
@@ -165,9 +170,13 @@ public class OfficeConnectionFactory {
                     LOGGER.error("Could not add connection {} to queue", officeConnection);
                 }
             } catch (OdiseeServerException e) {
-                LOGGER.error("[group=%{}] Could not bootstrap connection to {}: {}",
+                LOGGER.error("[group={}] Could not bootstrap connection to {}: {}",
                         groupname, socketAddress, e.getLocalizedMessage());
             }
+        }
+        if (connections.isEmpty()) {
+            throw new OdiseeServerRuntimeException(String.format(
+                    "[group=%s] No office connections could be bootstrapped", groupname));
         }
     }
 
