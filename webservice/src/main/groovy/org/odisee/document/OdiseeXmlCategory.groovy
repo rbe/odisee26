@@ -516,7 +516,7 @@ class OdiseeXmlCategory {
         if (error instanceof OdiseeException && ((OdiseeException) error).httpStatus == OdiseeException.BAD_REQUEST) {
             throw (OdiseeException) error
         }
-        log.error "Odisee: Could not execute instruction '${detail}'", error
+        log.log(java.util.logging.Level.SEVERE, "Odisee: Could not execute instruction '${detail}'", error)
         failures << "${detail}: ${error.message ?: error.class.simpleName}"
         factory?.recordInstructionFailure()
     }

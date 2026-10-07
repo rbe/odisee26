@@ -1,16 +1,24 @@
 package org.odisee.document
 
+import com.sun.star.lang.XComponent
 import groovy.test.GroovyTestCase
 import groovy.xml.XmlSlurper
 import org.odisee.api.OdiseeException
 import org.odisee.ooo.connection.UnoDeadlineExceeded
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Proxy
+
 class MacroNameTest extends GroovyTestCase {
 
     void testPlainMacroNameReachesExecuteMacro() {
         def macro = new XmlSlurper().parseText('<macro name="Standard.Module1.myMacro" location="document" language="Basic"/>')
+        XComponent template = (XComponent) Proxy.newProxyInstance(
+                XComponent.classLoader,
+                [XComponent] as Class[],
+                { Object proxy, java.lang.reflect.Method method, Object[] args -> null } as InvocationHandler)
 
-        OdiseeXmlCategory.processMacro(null, [:], macro)
+        OdiseeXmlCategory.processMacro(template, [:], macro)
     }
 
     void testBadMacroNameIs400() {

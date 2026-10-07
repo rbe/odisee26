@@ -119,13 +119,13 @@ class TenancyTest extends GroovyTestCase {
         service.templateService = new TemplateService()
         service.requestService = new RequestService()
         try {
-            service.generateDocument(principal('ada'), request())
+            service.generateDocument(principal('cara'), request())
             fail('missing template')
         } catch (OdiseeException e) {
             assertEquals(OdiseeException.NOT_FOUND, e.httpStatus)
-            assertTrue(e.message.contains("user 'ada'"))
+            assertTrue(e.message.contains("user 'cara'"))
         }
-        Path output = TenantPaths.outputDir('ada')
+        Path output = TenantPaths.outputDir('cara')
         assertTrue(Files.isDirectory(output))
         Files.newDirectoryStream(output).withCloseable { stream ->
             assertTrue(stream.iterator().hasNext())
