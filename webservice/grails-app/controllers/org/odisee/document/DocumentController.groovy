@@ -15,7 +15,6 @@ import org.odisee.api.OdiseeException
 import org.odisee.debug.WallTime
 import org.odisee.io.Compression
 import org.odisee.io.OdiseePath
-import org.odisee.ooo.connection.OdiseeServerException
 import org.odisee.xml.XmlHelper
 import org.w3c.dom.Element
 
@@ -84,29 +83,10 @@ class DocumentController {
                 msg = throwable.message
                 log.error msg, throwable
             }
-            response.reset()
-            response.status = statusFor(throwable)
-            if (null != msg) {
-                response.outputStream << String.format('%s%n', msg)
-            }
-            response.outputStream.flush()
+            HttpStatuses.apply(response, throwable)
         } catch (e) {
             log.error 'Could not send error message to client', e
         }
-    }
-
-    private static int statusFor(Throwable throwable) {
-        Throwable current = throwable
-        while (current != null) {
-            if (current instanceof OdiseeServerException) {
-                return 503
-            }
-            if (current instanceof OdiseeException) {
-                return ((OdiseeException) current).httpStatus ?: OdiseeException.BAD_REQUEST
-            }
-            current = current.cause
-        }
-        return OdiseeException.BAD_REQUEST
     }
 
 }

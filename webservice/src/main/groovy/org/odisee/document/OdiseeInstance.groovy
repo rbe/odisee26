@@ -34,7 +34,7 @@ final class OdiseeInstance {
         if (!Files.exists(odiinstPath)) {
             throw new OdiseeException('No odiinst found', OdiseeException.SERVER_ERROR)
         }
-        final List<String[]> odiinst = OdiinstParser.parse(odiinstPath.getText(S_UTF8))
+        final List<String[]> odiinst = OdiinstParser.parse(odiinstPath.toFile().getText(S_UTF8))
         final Map<String, List<String>> ipPortGroup = [:]
         odiinst.groupBy { it[1] }.each { host, rows ->
             ipPortGroup[host] = rows.collect { it[2] }

@@ -49,8 +49,25 @@ Build, so this wave can be compiled here:
 
 ## Wave 5 — Prove a document
 
-- Fixture template plus XML, assert field text in the PDF (F12, B30).
-- Run the same request through the Java client.
+Tests 1–5 from the basis list:
+
+| Test | Where | Needs LibreOffice |
+|---|---|---|
+| 1 Two calls do not share documents | `GenerationBasisTest` | yes |
+| 2 Two requests stay in order, then merge | `GenerationBasisTest` | yes |
+| 3 A bad instruction does not save, and the next request still runs | `GenerationBasisTest` | yes |
+| 4 Status 404 / 400 / 503, body is the message | `HttpStatusTest` | no |
+| 5 The pool skips a dead slot | `OfficeConnectionPoolTest` | no |
+
+Tests 1–3 use a Writer template with the user field `Hallo` and read the text back out of the PDF. LibreOffice runs in Docker, headless, on port 2002. The test home is mounted into the container at the same path, so the file URL the server sends is the file LibreOffice opens.
+
+```
+./gradlew :webservice:libreOfficeTest
+```
+
+That builds `webservice/src/test/docker/libreoffice`, starts the container, and runs tests 1–3. `./gradlew :webservice:test` runs tests 4 and 5 with the other unit tests and does not start Docker.
+
+Still open: the same request through the Java client, and Calc/Impress.
 
 ## Wave 6 — Features
 

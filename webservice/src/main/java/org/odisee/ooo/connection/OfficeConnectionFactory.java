@@ -63,6 +63,28 @@ public class OfficeConnectionFactory {
     private OfficeConnectionFactory() {
     }
 
+    /**
+     * A pool that does not dial LibreOffice. Tests supply the connections.
+     */
+    public static OfficeConnectionFactory forTest(final List<OfficeConnection> ready) {
+        OfficeConnectionFactory factory = new OfficeConnectionFactory();
+        factory.groupname = "test";
+        factory.addresses = new ArrayList<>();
+        factory.connections = new LinkedBlockingQueue<>(Math.max(1, ready.size()));
+        factory.shuttingDown.set(false);
+        for (OfficeConnection connection : ready) {
+            factory.addresses.add(new InetSocketAddress("127.0.0.1", 9));
+            if (!factory.connections.offer(connection)) {
+                throw new OdiseeServerRuntimeException("test pool rejected a connection");
+            }
+        }
+        return factory;
+    }
+
+    int waiting() {
+        return connections == null ? 0 : connections.size();
+    }
+
     public void addConnections(final String host, final int basePort, final int count) {
         for (int i = 0; i < count; i++) {
             addresses.add(new InetSocketAddress(host, basePort + i));
@@ -152,6 +174,7 @@ public class OfficeConnectionFactory {
     }
 
     private synchronized void initializeConnections() {
+        shuttingDown.set(false);
         // Check state
         if (null == addresses || addresses.isEmpty()) {
             throw new OdiseeServerRuntimeException("Initialization error");

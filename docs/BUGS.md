@@ -62,7 +62,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B27 | major | open | The service depends on `com.sun.org.apache.xerces.internal.dom.DeferredNode` (`RequestService`). That package is encapsulated on current JDKs. |
 | B28 | minor | open | `OdiseePath` calls `Path.of(System.getProperty("ODISEE_HOME"))` when the environment variable is unset. A missing property throws `NullPointerException` instead of `OdiseeException`. |
 | B29 | minor | open | `SPREADSHEET` is the only Calc hint, and the instruction set is Writer-only. Calc/Impress are listed in `OdiseeFileFormat` and then stop. |
-| B30 | major | open | Automated coverage is `CoordinateTestCase` and `OfficeProcessTest`. Wave 1 adds unit tests for the helpers below. The generation path still has no test that opens a real template. |
+| B30 | major | partial | Wave 1 covers the helpers. Tests 1–3 open a real template in LibreOffice (`GenerationBasisTest`, Docker). Tests 4–5 cover HTTP status and the pool. The Java client still has no assertion against a local server. |
 
 ## Tests added in wave 1
 
