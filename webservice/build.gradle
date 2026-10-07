@@ -34,6 +34,7 @@ apply plugin: 'de.undercouch.download'
 apply plugin: 'com.bmuschko.docker-remote-api'
 
 repositories {
+    mavenCentral()
     maven {
         url "https://repo.grails.org/grails/core"
     }
@@ -56,7 +57,11 @@ def libreOfficeVariant = 'still'
 dependencies {
     antlibs 'org.apache.ant:ant-xz:1.10.7'
     antlibs 'org.tukaani:xz:1.8'
-    implementation fileTree(dir: "${buildDir}/libs/libreoffice-${libreOfficeVersion}", include: '**/*.jar')
+    implementation "org.libreoffice:juh:${libreOfficeVersion}"
+    implementation "org.libreoffice:jurt:${libreOfficeVersion}"
+    implementation "org.libreoffice:ridl:${libreOfficeVersion}"
+    implementation "org.libreoffice:unoil:${libreOfficeVersion}"
+    implementation "org.libreoffice:unoloader:${libreOfficeVersion}"
     implementation 'org.apache.pdfbox:pdfbox:2.0.16'
     implementation 'org.codehaus.groovy:groovy-dateutil:2.5.8'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -233,7 +238,7 @@ task downloadAndUnpackLibreOffice {
         }
     }
 }
-compileJava.dependsOn('downloadAndUnpackLibreOffice')
+// The UNO jars come from Maven. This task remains for an offline unpack of a LibreOffice deb.
 
 //
 // Docker
@@ -275,3 +280,53 @@ task buildOdiseeImage(type: DockerBuildImage, dependsOn: prepareOdiseeDocker) {
 }
 
 assemble.dependsOn('buildOdiseeImage')
+
+def odiseeTestHome = file("${buildDir}/odisee-test-home")
+
+test {
+    systemProperty 'ODISEE_HOME', odiseeTestHome.absolutePath
+    // Talks to LibreOffice. Run it with libreOfficeTest.
+    exclude '**/GenerationBasisTest.class'
+}
+
+task buildLibreOfficeImage(type: Exec) {
+    group = 'Odisee'
+    description = 'Build the headless LibreOffice image used by libreOfficeTest'
+    workingDir file('src/test/docker/libreoffice')
+    commandLine 'docker', 'build', '-t', 'odisee-libreoffice-test:local', '.'
+}
+
+task startLibreOffice(type: Exec, dependsOn: buildLibreOfficeImage) {
+    group = 'Odisee'
+    description = 'Run LibreOffice in Docker on port 2002, with ODISEE_HOME mounted at the same path'
+    def home = odiseeTestHome.absolutePath
+    doFirst {
+        odiseeTestHome.mkdirs()
+    }
+    commandLine 'bash', '-lc', """
+        set -eu
+        docker rm -f odisee-lo-test >/dev/null 2>&1 || true
+        docker run -d --name odisee-lo-test --network host \\
+            -v '${home}:${home}' \\
+            odisee-libreoffice-test:local
+        for i in \$(seq 1 90); do
+            if bash -c 'echo >/dev/tcp/127.0.0.1/2002' 2>/dev/null; then
+                exit 0
+            fi
+            sleep 1
+        done
+        echo 'LibreOffice did not open port 2002' >&2
+        docker logs odisee-lo-test >&2 || true
+        exit 1
+    """
+}
+
+task libreOfficeTest(type: Test, dependsOn: [startLibreOffice, testClasses]) {
+    group = 'Odisee'
+    description = 'Tests 1-3 against LibreOffice in Docker'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/GenerationBasisTest.class'
+    systemProperty 'ODISEE_HOME', odiseeTestHome.absolutePath
+    systemProperty 'odisee.libreoffice.port', '2002'
+}

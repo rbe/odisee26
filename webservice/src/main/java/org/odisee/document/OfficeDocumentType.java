@@ -14,7 +14,7 @@ package org.odisee.document;
 public enum OfficeDocumentType {
 
     TEXT("Text document", "swriter", "ott", "odt", "writer_pdf_Export"),
-    SPREADSHEET("Spreadsheet", "scalc", "ots", "ots", "calc_pdf_Export");
+    SPREADSHEET("Spreadsheet", "scalc", "ots", "ods", "calc_pdf_Export");
 
     private final String description;
     private final String internalType;

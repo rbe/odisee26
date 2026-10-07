@@ -17,18 +17,29 @@ ext {
     ]
 }
 
-ClassLoader antClassLoader = org.apache.tools.ant.Project.class.classLoader
-configurations.antlibs.each { File f ->
-    antClassLoader.addURL(f.toURI().toURL())
-}
-ant.importBuild('Odisee/build.xml') { String oldTargetName ->
-    return "ant-${oldTargetName}" as String
-}
-task buildExtension(dependsOn: 'ant-world') {
-    group 'Odisee'
-    doLast {
-        def antTargetsNames = ant.references.get("ant.targets").collect { it.name }
-        println "Ant Targets: ${antTargetsNames}"
+File antlibDir = file('antlib')
+boolean hasAntlibs = antlibDir.directory && antlibDir.listFiles()?.any { it.name.endsWith('.jar') }
+if (hasAntlibs) {
+    ClassLoader antClassLoader = org.apache.tools.ant.Project.class.classLoader
+    configurations.antlibs.each { File f ->
+        antClassLoader.addURL(f.toURI().toURL())
+    }
+    ant.importBuild('Odisee/build.xml') { String oldTargetName ->
+        return "ant-${oldTargetName}" as String
+    }
+    task buildExtension(dependsOn: 'ant-world') {
+        group 'Odisee'
+        doLast {
+            def antTargetsNames = ant.references.get("ant.targets").collect { it.name }
+            println "Ant Targets: ${antTargetsNames}"
+        }
+    }
+    assemble.dependsOn 'buildExtension'
+} else {
+    task buildExtension {
+        group 'Odisee'
+        doLast {
+            throw new GradleException('Missing oxt/antlib jars (ant-contrib, xmltask). Put them in oxt/antlib to build the extension.')
+        }
     }
 }
-assemble.dependsOn 'buildExtension'

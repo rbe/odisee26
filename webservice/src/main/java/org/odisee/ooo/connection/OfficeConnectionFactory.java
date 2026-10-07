@@ -63,6 +63,28 @@ public class OfficeConnectionFactory {
     private OfficeConnectionFactory() {
     }
 
+    /**
+     * A pool that does not dial LibreOffice. Tests supply the connections.
+     */
+    public static OfficeConnectionFactory forTest(final List<OfficeConnection> ready) {
+        OfficeConnectionFactory factory = new OfficeConnectionFactory();
+        factory.groupname = "test";
+        factory.addresses = new ArrayList<>();
+        factory.connections = new LinkedBlockingQueue<>(Math.max(1, ready.size()));
+        factory.shuttingDown.set(false);
+        for (OfficeConnection connection : ready) {
+            factory.addresses.add(new InetSocketAddress("127.0.0.1", 9));
+            if (!factory.connections.offer(connection)) {
+                throw new OdiseeServerRuntimeException("test pool rejected a connection");
+            }
+        }
+        return factory;
+    }
+
+    int waiting() {
+        return connections == null ? 0 : connections.size();
+    }
+
     public void addConnections(final String host, final int basePort, final int count) {
         for (int i = 0; i < count; i++) {
             addresses.add(new InetSocketAddress(host, basePort + i));
@@ -70,43 +92,48 @@ public class OfficeConnectionFactory {
     }
 
     public OfficeConnection fetchConnection(final boolean waitForever) throws OdiseeServerException {
-        // Check state
         if (shuttingDown.get()) {
             throw new OdiseeServerException("Shutdown in progress");
         }
-        OfficeConnection officeConnection = null;
-        // Poll a connection from queue, waiting some seconds if necessary
+        int poolSize = addresses == null ? 1 : Math.max(1, addresses.size());
+        OdiseeServerException lastFailure = null;
+        for (int attempt = 0; attempt < poolSize; attempt++) {
+            OfficeConnection officeConnection = pollConnection(waitForever && attempt == 0);
+            if (officeConnection == null) {
+                break;
+            }
+            try {
+                officeConnection.connect();
+                if (officeConnection.isConnected()) {
+                    return officeConnection;
+                }
+                repositConnection(officeConnection);
+            } catch (OdiseeServerException e) {
+                lastFailure = e;
+                officeConnection.setFaulted(true);
+                repositConnection(officeConnection);
+            } catch (RuntimeException e) {
+                lastFailure = new OdiseeServerException("Office connection failed", e);
+                officeConnection.setFaulted(true);
+                repositConnection(officeConnection);
+            }
+        }
+        if (lastFailure != null) {
+            throw lastFailure;
+        }
+        throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", groupname));
+    }
+
+    private OfficeConnection pollConnection(final boolean waitForever) throws OdiseeServerException {
         try {
             if (!waitForever) {
-                officeConnection = connections.poll(QUEUE_POLL_TIMEOUT, QUEUE_POLL_TIMEUNIT);
-            } else {
-                officeConnection = connections.take();
+                return connections.poll(QUEUE_POLL_TIMEOUT, QUEUE_POLL_TIMEUNIT);
             }
+            return connections.take();
         } catch (InterruptedException e) {
-            // ignore
             Thread.currentThread().interrupt();
+            throw new OdiseeServerException("Interrupted while waiting for an office connection", e);
         }
-        // Check if we could get an OfficeConnection
-        if (null == officeConnection) {
-            throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", groupname));
-        }
-        try {
-            officeConnection.connect();
-            if (!officeConnection.isConnected()) {
-                // Put connection back into pool, better luck next time
-                repositConnection(officeConnection);
-                // Do not return a connection
-                officeConnection = null;
-            }
-        } catch (OdiseeServerException e) {
-            officeConnection.setFaulted(true);
-            // Put connection back into pool, better luck next time
-            repositConnection(officeConnection);
-            // Do not return a connection
-            officeConnection = null;
-        }
-        // Return connection
-        return officeConnection;
     }
 
     public void repositConnection(final OfficeConnection officeConnection) throws OdiseeServerException {
@@ -147,6 +174,7 @@ public class OfficeConnectionFactory {
     }
 
     private synchronized void initializeConnections() {
+        shuttingDown.set(false);
         // Check state
         if (null == addresses || addresses.isEmpty()) {
             throw new OdiseeServerRuntimeException("Initialization error");
@@ -165,9 +193,13 @@ public class OfficeConnectionFactory {
                     LOGGER.error("Could not add connection {} to queue", officeConnection);
                 }
             } catch (OdiseeServerException e) {
-                LOGGER.error("[group=%{}] Could not bootstrap connection to {}: {}",
+                LOGGER.error("[group={}] Could not bootstrap connection to {}: {}",
                         groupname, socketAddress, e.getLocalizedMessage());
             }
+        }
+        if (connections.isEmpty()) {
+            throw new OdiseeServerRuntimeException(String.format(
+                    "[group=%s] No office connections could be bootstrapped", groupname));
         }
     }
 

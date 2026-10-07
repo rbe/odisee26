@@ -15,7 +15,6 @@ import org.odisee.io.OdiseePath
 import org.odisee.shared.OdiseeConstant
 import groovy.xml.dom.DOMCategory
 
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -32,12 +31,8 @@ class TemplateService {
                 request.setAttribute(OdiseeConstant.S_ID, dateBasedId)
             }
             arg.id = request.'@id'.toString()
-            arg.template = template.'@name'
-            arg.revision = template.'@revision' ?: OdiseeConstant.S_LATEST
-            if (!arg.revision || arg.revision == OdiseeConstant.S_LATEST) {
-                arg.revision = 1
-                template.setAttribute(OdiseeConstant.S_REVISION, arg.revision.toString())
-            }
+            arg.template = template.'@name'?.toString()
+            arg.revision = template.'@revision'?.toString() ?: OdiseeConstant.S_LATEST
         }
     }
 
@@ -46,9 +41,8 @@ class TemplateService {
             def request = arg.xml.request[arg.activeIndex]
             def template = request.template[0]
             template.setAttribute('path', arg.templateFile.toAbsolutePath().toString())
-            if (!template.'@outputPath') {
-                template.setAttribute('outputPath', arg.documentDir.toString())
-            }
+            template.setAttribute(OdiseeConstant.S_REVISION, arg.revision.toString())
+            template.setAttribute('outputPath', arg.documentDir.toString())
             if (request.'@name') {
                 arg.documentName = request.'@name'
             } else {
@@ -60,16 +54,15 @@ class TemplateService {
     void copyTemplateToRequest(Map<String, Object> arg) {
         arg.documentDir = arg.requestDir
         arg.templateDir = Paths.get("${OdiseePath.ODISEE_VAR}", OdiseeConstant.S_TEMPLATE)
-        arg.revision = 1
-        Path localTemplate = arg.templateDir.resolve("${arg.template}.ott")
-        if (!Files.exists(localTemplate)) {
-            localTemplate = arg.templateDir.resolve("${arg.template}_rev${arg.revision}.ott")
-        }
-        final boolean templateExists = Files.exists(localTemplate)
-        if (templateExists) {
+        try {
+            Path localTemplate = TemplateLocator.locate(arg.templateDir, arg.template?.toString(), arg.revision?.toString())
             arg.templateFile = localTemplate
-        } else {
-            throw new OdiseeException("Template '${arg.template}' does not exist for user '${arg.principal.name}'")
+            arg.revision = TemplateLocator.revisionOf(localTemplate)
+        } catch (OdiseeException e) {
+            if (e.httpStatus == OdiseeException.NOT_FOUND) {
+                throw new OdiseeException("Template '${arg.template}' does not exist for user '${arg.principal?.name}'", OdiseeException.NOT_FOUND)
+            }
+            throw e
         }
     }
 

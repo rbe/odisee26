@@ -18,6 +18,7 @@ import org.odisee.ooo.connection.OfficeConnectionFactory
 import groovy.xml.XmlUtil
 import org.springframework.beans.factory.InitializingBean
 
+import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -29,11 +30,10 @@ class RequestService implements InitializingBean {
 
     @Override
     void afterPropertiesSet() {
-        final List<String> odiinst = OdiseeInstance.instance.readOdiinst()
+        final List odiinst = OdiseeInstance.instance.readOdiinst()
         try {
-            final String localhost = odiinst[0][1]
-            final int portbase = 2001
-            officeConnectionFactory = OfficeConnectionFactory.getInstance(OdiseeConstant.S_GROUP0, localhost, portbase, odiinst.size())
+            final List<InetSocketAddress> addresses = OdiinstParser.addresses(odiinst)
+            officeConnectionFactory = OfficeConnectionFactory.getInstance(OdiseeConstant.S_GROUP0, addresses)
         } catch (e) {
             throw new IllegalStateException('Cannot setup Office connection factory, please check instance configuration', e)
         }
