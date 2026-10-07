@@ -28,6 +28,10 @@ class RequestService implements InitializingBean {
 
     private OfficeConnectionFactory officeConnectionFactory
 
+    OfficeConnectionFactory getOfficeConnectionFactory() {
+        officeConnectionFactory
+    }
+
     @Override
     void afterPropertiesSet() {
         final List odiinst = OdiseeInstance.instance.readOdiinst()

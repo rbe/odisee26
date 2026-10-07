@@ -17,11 +17,18 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Provide OfficeConnections, provide a pool for them and act as a watchdog.
@@ -42,6 +49,16 @@ public class OfficeConnectionFactory {
     private List<InetSocketAddress> addresses;
 
     private LinkedBlockingQueue<OfficeConnection> connections;
+
+    private final Set<OfficeConnection> checkedOut = ConcurrentHashMap.newKeySet();
+
+    private final Set<OfficeConnection> dropped = new CopyOnWriteArraySet<>();
+
+    private final AtomicLong generationMillis = new AtomicLong();
+
+    private final LongAdder instructionFailures = new LongAdder();
+
+    private final LongAdder sofficeRestarts = new LongAdder();
 
     private static final OfficeConnectionFactory OFFICE_CONNECTION_FACTORY = new OfficeConnectionFactory();
 
@@ -95,6 +112,7 @@ public class OfficeConnectionFactory {
         if (shuttingDown.get()) {
             throw new OdiseeServerException("Shutdown in progress");
         }
+        recoverDropped();
         int poolSize = addresses == null ? 1 : Math.max(1, addresses.size());
         OdiseeServerException lastFailure = null;
         for (int attempt = 0; attempt < poolSize; attempt++) {
@@ -105,6 +123,7 @@ public class OfficeConnectionFactory {
             try {
                 officeConnection.connect();
                 if (officeConnection.isConnected()) {
+                    checkedOut.add(officeConnection);
                     return officeConnection;
                 }
                 repositConnection(officeConnection);
@@ -140,6 +159,10 @@ public class OfficeConnectionFactory {
         if (null == officeConnection) {
             return;
         }
+        checkedOut.remove(officeConnection);
+        if (officeConnection.wasDropped()) {
+            return;
+        }
         // Check state
         if (shuttingDown.get()) {
             throw new OdiseeServerException("Shutdown in progress");
@@ -151,6 +174,131 @@ public class OfficeConnectionFactory {
         }
         if (!connectionWasPutBack) {
             throw new OdiseeServerException(String.format("[group=%s] Could not reposit connection, I tried it more than once, sorry.", groupname));
+        }
+    }
+
+    /**
+     * A UNO deadline fired. Close is the caller's job. This slot does not return to the queue.
+     * The local soffice is stopped so {@code odiwatchdog} restarts it.
+     */
+    public void dropSlot(final OfficeConnection officeConnection) {
+        if (officeConnection == null || !dropped.add(officeConnection)) {
+            return;
+        }
+        checkedOut.remove(officeConnection);
+        officeConnection.markDropped();
+        boolean signaled = false;
+        try {
+            signaled = officeConnection.releaseForWatchdog();
+        } catch (RuntimeException e) {
+            LOGGER.error("Could not release {} for an soffice restart", officeConnection, e);
+        }
+        if (signaled) {
+            sofficeRestarts.increment();
+            LOGGER.info("Dropped {} after a UNO deadline; odiwatchdog restarts soffice", officeConnection);
+        }
+    }
+
+    /**
+     * Try to put dropped slots back once their office accepts a connection again.
+     * @return how many slots rejoined the queue
+     */
+    public int recoverDropped() {
+        if (connections == null || dropped.isEmpty()) {
+            return 0;
+        }
+        int recovered = 0;
+        for (OfficeConnection connection : dropped) {
+            try {
+                UnoCall.within("recover", UnoCall.recoverDeadlineMillis(), () -> {
+                    connection.connect();
+                    return null;
+                });
+            } catch (OdiseeServerException | RuntimeException e) {
+                continue;
+            }
+            if (!connection.isConnected()) {
+                continue;
+            }
+            connection.clearDropped();
+            if (connections.offer(connection)) {
+                dropped.remove(connection);
+                recovered++;
+            } else {
+                connection.markDropped();
+            }
+        }
+        return recovered;
+    }
+
+    /**
+     * True when at least one office port accepts a UNO connection.
+     * A slot that is checked out already did. Otherwise an idle slot is probed.
+     */
+    public boolean acceptsUnoConnection() {
+        if (shuttingDown.get() || connections == null) {
+            return false;
+        }
+        try {
+            recoverDropped();
+        } catch (RuntimeException e) {
+            LOGGER.error("Could not recover a dropped office slot", e);
+        }
+        int slots = addresses == null ? 0 : addresses.size();
+        Set<OfficeConnection> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (int i = 0; i < slots; i++) {
+            OfficeConnection connection = connections.poll();
+            if (connection == null) {
+                break;
+            }
+            if (!seen.add(connection)) {
+                offerQuietly(connection);
+                break;
+            }
+            boolean accepted = false;
+            try {
+                accepted = UnoCall.within("probe", UnoCall.recoverDeadlineMillis(), connection::responds);
+            } catch (UnoDeadlineExceeded e) {
+                dropSlot(connection);
+            } catch (OdiseeServerException | RuntimeException e) {
+                connection.setFaulted(true);
+            } finally {
+                offerQuietly(connection);
+            }
+            if (accepted) {
+                return true;
+            }
+        }
+        return !checkedOut.isEmpty();
+    }
+
+    public void recordGenerationMillis(final long millis) {
+        generationMillis.set(Math.max(0L, millis));
+    }
+
+    public void recordInstructionFailure() {
+        instructionFailures.increment();
+    }
+
+    public PoolGauges gauges() {
+        return new PoolGauges(poolSize(), inUse(), generationMillis.get(), instructionFailures.sum(), sofficeRestarts.sum());
+    }
+
+    public int poolSize() {
+        return addresses == null ? 0 : addresses.size();
+    }
+
+    public int inUse() {
+        return checkedOut.size();
+    }
+
+    int droppedCount() {
+        return dropped.size();
+    }
+
+    private void offerQuietly(final OfficeConnection connection) {
+        if (connection != null && connections != null && !connection.wasDropped()) {
+            connections.offer(connection);
         }
     }
 
@@ -175,6 +323,8 @@ public class OfficeConnectionFactory {
 
     private synchronized void initializeConnections() {
         shuttingDown.set(false);
+        checkedOut.clear();
+        dropped.clear();
         // Check state
         if (null == addresses || addresses.isEmpty()) {
             throw new OdiseeServerRuntimeException("Initialization error");

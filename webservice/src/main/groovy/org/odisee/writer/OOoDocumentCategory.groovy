@@ -328,7 +328,6 @@ class OOoDocumentCategory {
         Profile.time "OOoDocumentCategory.executeDispatch($name)", {
             use(UnoCategory) {
                 // Get XMultiComponentFactory
-                // TODO ? OOoConnection oooConnection = (OOoConnection) component.oooConnection
                 OfficeConnection oooConnection = (OfficeConnection) component.oooConnection
                 if (oooConnection) {
                     Object o = oooConnection.xMultiComponentFactory.createInstanceWithContext('com.sun.star.frame.DispatchHelper', oooConnection.xOfficeComponentContext)

@@ -4,6 +4,7 @@ import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import org.odisee.ooo.connection.OdiseeServerException
+import org.odisee.ooo.connection.UnoDeadlineExceeded
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -41,6 +42,11 @@ class HttpStatusTest extends GroovyTestCase {
 
     void testOfficePoolFailureIsUnavailable() {
         OdiseeServerException error = new OdiseeServerException('Could not fetch connection from pool, sorry.')
+        assertBody(error, 503)
+    }
+
+    void testOfficeDeadlineIsUnavailable() {
+        UnoDeadlineExceeded error = new UnoDeadlineExceeded('save', 120000)
         assertBody(error, 503)
     }
 

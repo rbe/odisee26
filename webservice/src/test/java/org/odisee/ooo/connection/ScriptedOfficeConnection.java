@@ -7,13 +7,29 @@ import java.net.InetSocketAddress;
  */
 public final class ScriptedOfficeConnection extends OfficeConnection {
 
-    private final boolean failConnect;
+    private boolean failConnect;
 
     private boolean connected;
+
+    private boolean retired;
+
+    private boolean hangProbe;
 
     public ScriptedOfficeConnection(final boolean failConnect) {
         super(new InetSocketAddress("127.0.0.1", 9));
         this.failConnect = failConnect;
+    }
+
+    public void setFailConnect(final boolean failConnect) {
+        this.failConnect = failConnect;
+    }
+
+    public void setHangProbe(final boolean hangProbe) {
+        this.hangProbe = hangProbe;
+    }
+
+    public boolean retired() {
+        return retired;
     }
 
     @Override
@@ -30,6 +46,20 @@ public final class ScriptedOfficeConnection extends OfficeConnection {
     }
 
     @Override
+    public boolean responds() throws OdiseeServerException {
+        if (hangProbe) {
+            try {
+                Thread.sleep(5_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new OdiseeServerException("interrupted", e);
+            }
+        }
+        connect();
+        return isConnected();
+    }
+
+    @Override
     public void setFaulted(final boolean faulted) {
         if (faulted) {
             connected = false;
@@ -39,6 +69,13 @@ public final class ScriptedOfficeConnection extends OfficeConnection {
     @Override
     public void close() {
         connected = false;
+    }
+
+    @Override
+    public boolean releaseForWatchdog() {
+        connected = false;
+        retired = true;
+        return true;
     }
 
 }
