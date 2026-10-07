@@ -1,0 +1,24 @@
+{
+  "request": {
+    "name": "HalloOdisee",
+    "template": {
+      "name": "HalloOdisee",
+      "outputFormat": "odt"
+    },
+    "archive": {
+      "files": false
+    },
+    "instructions": [
+      {
+        "instruction": "userfield",
+        "name": "Hallo",
+        "value": "art of coding UG (haftungsbeschränkt)"
+      },
+      {
+        "instruction": "userfield",
+        "name": "Tabelle1!A4",
+        "value": "support@odisee.de"
+      }
+    ]
+  }
+}

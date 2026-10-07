@@ -8,11 +8,17 @@
  */
 package org.odisee.document
 
+import groovy.json.JsonException
 import org.odisee.api.OdiseeException
 import org.odisee.ooo.connection.OdiseeServerException
+import org.xml.sax.SAXException
+
+import java.util.zip.ZipException
 
 /**
  * HTTP status and body for a failed generation.
+ * Client errors are 400 (the request itself) or 422 (an instruction the schema allowed).
+ * This is the only place that chooses the status.
  */
 final class HttpStatuses {
 
@@ -27,6 +33,9 @@ final class HttpStatuses {
             }
             if (current instanceof OdiseeException) {
                 return ((OdiseeException) current).httpStatus ?: OdiseeException.BAD_REQUEST
+            }
+            if (current instanceof SAXException || current instanceof JsonException || current instanceof ZipException) {
+                return OdiseeException.BAD_REQUEST
             }
             current = current.cause
         }

@@ -135,6 +135,7 @@
     <Compile Include="OdiseeSimpleClient.vb" />
     <Compile Include="OdiseeConstant.vb" />
     <Compile Include="OdiseeHelper.HttpPost.vb" />
+    <Compile Include="OdiseeHelper.Json.vb" />
     <Compile Include="OdiseeClient.vb" />
     <Compile Include="OdiseeTester.vb">
       <SubType>Form</SubType>

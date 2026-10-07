@@ -25,6 +25,18 @@
     // Generate document, PDF by default
     $document = $odisee->process();
 
+## JSON
+
+XML is the default. Call `useJson()` before `process()` to POST `application/json`.
+The service converts that JSON into the XML request it already executes.
+
+    :::php
+    $odisee = Odisee::createClient('http://service.odisee.de', 'username', 'password');
+    $odisee->useJson();
+    $request = $odisee->createRequest('HalloOdisee');
+    $odisee->setUserfield($request, 'hallo', 'Odisee');
+    $document = $odisee->process();
+
 ## Using the fluent API
 
     :::php

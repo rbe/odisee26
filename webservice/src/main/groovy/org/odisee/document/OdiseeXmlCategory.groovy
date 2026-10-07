@@ -282,17 +282,7 @@ class OdiseeXmlCategory {
      */
     static Map readRequest(Path file, int requestNumber) {
         Map arg = [:]
-        /*
-        // TODO Use validating XmlSlurper
-        validator = javax.xml.validation.SchemaFactory
-                .newInstance(javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI)
-                .newSchema(new javax.xml.transform.stream.StreamSource(xsdStream))
-                .newValidator()
-        // XmlSlurper for reading XML
-        xmlSlurper = new XmlSlurper()
-        // Read XML using locally cached DTDs
-        xmlSlurper.setEntityResolver(com.bensmann.griffon.CachedDTD.entityResolver)
-        */
+        // The HTTP body was validated against the v2 schema before this file was written.
         final String xmlText = file.toFile().getText(OdiseeConstant.S_UTF8)
         arg.xml = new XmlSlurper().parseText(xmlText)
         //

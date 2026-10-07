@@ -20,8 +20,8 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B5 | major | fixed in wave 1 | `OdiseeXmlCategory.findLatestRevision` called `Path.listFiles()`, which does not exist, then indexed `[0]` on an empty directory. Revision strings were compared lexicographically (`rev9` > `rev10`). `findTemplate` also dereferenced a null path when revision was `LATEST`. |
 | B6 | major | fixed in wave 1 | The runtime only read `template/@outputFormat` (v2). A v3 request that uses `output/format/@type` produced no file and failed with "Got zero bytes from office process". |
 | B7 | minor | fixed in wave 1 | `OfficeDocumentType.SPREADSHEET` sets the document extension to `ots` (the template extension). It is `ods`. |
-| B8 | major | open | XML is not validated. The schema check in `readRequest` is commented out. v2, v2.6, and v3 schemas still ship together. |
-| B9 | major | open | `DOMBuilder.parse` and `XmlSlurper` are used with parser defaults. External entities are not explicitly disabled. |
+| B8 | major | fixed in wave 2 | XML is validated against the v2 request schema before generation. v3 and v2.6 are HTTP 400. Those request schemas are no longer shipped. |
+| B9 | major | fixed in wave 2 | The request parser rejects a `DOCTYPE` and does not resolve external entities. |
 
 ## Office pool
 
@@ -41,8 +41,8 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 |---|---|---|---|
 | B17 | major | fixed in wave 1 | A failed instruction was logged and the document was still saved and returned as HTTP 200. |
 | B18 | major | fixed in wave 1 | Every error, including "office unreachable", was HTTP 400. |
-| B19 | major | open | `Compression.decompress` used to ignore a short read. Wave 1 fixes the short read. There is still no cap on the decompressed body, so a gzip bomb is limited only by the heap. |
-| B20 | minor | open | `DocumentController` closes `response.outputStream` in `finally` even after `processThrowable` already wrote the error body. |
+| B19 | major | fixed in wave 2 | The raw body is capped at 8 MiB and the expanded body at 32 MiB. Either cap is HTTP 400. |
+| B20 | minor | fixed in wave 2 | `DocumentController` closes `response.outputStream` only on the success path. The error body written by `HttpStatuses` is left in place. |
 
 ## Security and tenancy
 

@@ -61,6 +61,11 @@ Public Class OdiseeClient
     Private Property authKey As String
 
     ''' <summary>
+    ''' xml (default) or json.
+    ''' </summary>
+    Private requestFormat As String = "xml"
+
+    ''' <summary>
     ''' The Odisee request XML document.
     ''' </summary>
     ''' <value></value>
@@ -170,6 +175,22 @@ Public Class OdiseeClient
     End Function
 
 #End Region
+
+    ''' <summary>
+    ''' Post the request as JSON. The service converts it back to the XML generator input.
+    ''' </summary>
+    Public Function useJson() As OdiseeClient
+        requestFormat = "json"
+        Return Me
+    End Function
+
+    ''' <summary>
+    ''' Post the request as XML. This is the default.
+    ''' </summary>
+    Public Function useXml() As OdiseeClient
+        requestFormat = "xml"
+        Return Me
+    End Function
 
 #Region "Odisee Client API"
 
@@ -434,16 +455,22 @@ Public Class OdiseeClient
         If Not IsNothing(username) And IsNothing(password) Then
             Throw New Exception(OdiseeConstant.ERR_NO_AUTH_INFO)
         End If
-        ' Send Odisee request XML document through HTTP POST
+        ' Send Odisee request through HTTP POST
         Dim webResponse As HttpWebResponse = Nothing
+        Dim body As String = __xmlDoc.OuterXml
+        Dim contentType As String = "text/xml; charset=UTF-8"
+        If requestFormat = "json" Then
+            body = Helper.Json.FromXml(__xmlDoc)
+            contentType = "application/json; charset=UTF-8"
+        End If
         If Not IsNothing(username) And Not IsNothing(password) Then
             If authType = "BASIC" Then
-                webResponse = Helper.HttpPost.doBasicAuthPost(__xmlDoc, New Uri(serviceURL), username, password, timeout)
+                webResponse = Helper.HttpPost.doBasicAuthPost(body, contentType, New Uri(serviceURL), username, password, timeout)
             ElseIf authType = "DIGEST" Then
-                webResponse = Helper.HttpPost.doDigestAuthPost(__xmlDoc, New Uri(serviceURL), username, password, timeout)
+                webResponse = Helper.HttpPost.doDigestAuthPost(body, contentType, New Uri(serviceURL), username, password, timeout)
             End If
         Else
-            webResponse = Helper.HttpPost.doBasicAuthPost(__xmlDoc, New Uri(serviceURL), "odisee", "odisee")
+            webResponse = Helper.HttpPost.doBasicAuthPost(body, contentType, New Uri(serviceURL), "odisee", "odisee")
         End If
         ' Return response from Odisee HTTP server
         Return webResponse

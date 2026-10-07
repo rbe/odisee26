@@ -63,6 +63,11 @@ class Odisee
     private $actualRequest;
 
     /**
+     * @var string xml or json. XML is the default.
+     */
+    private $requestFormat = 'xml';
+
+    /**
      * Private constructor, setup XML document.
      * @param string $serviceURL URL of Odisee service.
      * @param string $username The username.
@@ -149,6 +154,26 @@ class Odisee
     private function appendInstruction(&$request, $instruction)
     {
         $this->getInstructions($request)->appendChild($instruction);
+    }
+
+    /**
+     * Post the request as JSON. The service converts it back to the XML generator input.
+     * @return Odisee
+     */
+    public function &useJson()
+    {
+        $this->requestFormat = 'json';
+        return $this;
+    }
+
+    /**
+     * Post the request as XML. This is the default.
+     * @return Odisee
+     */
+    public function &useXml()
+    {
+        $this->requestFormat = 'xml';
+        return $this;
     }
 
     //<editor-fold desc="Odisee Client API">
@@ -295,17 +320,26 @@ class Odisee
     public function process($debug = FALSE)
     {
         if (OdiseeStringHelper::checkStr($this->serviceURL) && strpos($this->serviceURL, 'http') == 0) {
-            if ($debug) {
-                $this->xmlDoc->formatOutput = TRUE;
-                echo $this->xmlDoc->saveXML();
-                $this->xmlDoc->formatOutput = FALSE;
-            }
+            $contentType = 'text/xml; charset=UTF-8';
             $data = $this->xmlDoc->saveXML();
+            if ($this->requestFormat === 'json') {
+                $data = OdiseeJson::fromDom($this->xmlDoc);
+                $contentType = 'application/json; charset=UTF-8';
+            }
+            if ($debug) {
+                if ($this->requestFormat === 'json') {
+                    echo $data;
+                } else {
+                    $this->xmlDoc->formatOutput = TRUE;
+                    echo $this->xmlDoc->saveXML();
+                    $this->xmlDoc->formatOutput = FALSE;
+                }
+            }
             $referer = '';
             if (isset($_SERVER['SERVER_PROTOCOL']) && isset($_SERVER['SERVER_NAME']) && isset($_SERVER['SERVER_PORT'])) {
                 $referer = $_SERVER['SERVER_PROTOCOL'] . '://' . $_SERVER['SERVER_NAME'] . ':' . $_SERVER['SERVER_PORT'];
             }
-            $document = OdiseeHttpHelper::post($this->serviceURL, $this->username, $this->password, $referer, $data);
+            $document = OdiseeHttpHelper::post($this->serviceURL, $this->username, $this->password, $referer, $data, $contentType);
             return $document;
         } else {
             throw new OdiseeException('Incorrect service URL!');

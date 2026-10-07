@@ -21,4 +21,5 @@ dependencies {
 
 xjc {
     xsdDir.set(layout.projectDirectory.dir('src/main/schema'))
+    bindingFiles.from(layout.projectDirectory.file('src/main/schema/bindings.xjb'))
 }

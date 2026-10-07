@@ -22,6 +22,7 @@ import de.odisee.xml.server.request.Odisee;
 import de.odisee.xml.server.request.Parameter;
 import de.odisee.xml.server.request.PostProcess;
 import de.odisee.xml.server.request.Request;
+import de.odisee.xml.server.request.ResultPlaceholder;
 import de.odisee.xml.server.request.Template;
 import de.odisee.xml.server.request.Userfield;
 
@@ -31,6 +32,7 @@ import java.io.OutputStream;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -55,6 +57,8 @@ public final class OdiseeClient {
 
     private OdiseeHttpHelper httpHelper;
 
+    private RequestFormat format = RequestFormat.XML;
+
     private OdiseeClient() {
         factory = new ObjectFactory();
         odisee = factory.createOdisee();
@@ -76,6 +80,26 @@ public final class OdiseeClient {
         httpHelper = new OdiseeHttpHelper(username, password);
     }
 
+    /**
+     * Post the request as JSON. The service converts it back to the XML generator input.
+     */
+    public OdiseeClient useJson() {
+        this.format = RequestFormat.JSON;
+        return this;
+    }
+
+    /**
+     * Post the request as XML. This is the default.
+     */
+    public OdiseeClient useXml() {
+        this.format = RequestFormat.XML;
+        return this;
+    }
+
+    public RequestFormat format() {
+        return format;
+    }
+
     private Instructions getInstructions(final Request request) {
         final List<Instructions> allInstructions = request.getInstructions();
         Instructions instructions;
@@ -87,19 +111,22 @@ public final class OdiseeClient {
     }
 
     private List<Object> getInstructionsObject(final Request request) {
-        return getInstructions(request).getAutotextAndBookmarkAndMacro();
+        return getInstructions(request).getInstruction();
     }
 
     public OdiseeClient mergeDocumentAtEnd(final Path path) {
-        final PostProcess postProcess = factory.createPostProcess();
+        PostProcess postProcess = odisee.getPostProcess();
+        if (postProcess == null) {
+            postProcess = factory.createPostProcess();
+            odisee.setPostProcess(postProcess);
+        }
         final Action action = factory.createAction();
         action.setType("merge-with");
-        action.setResultPlaceholder("");
+        action.getResultPlaceholder().add(new ResultPlaceholder());
         final Input input = factory.createInput();
         input.setFilename(path.toString());
-        action.setInput(input);
+        action.getInput().add(input);
         postProcess.getAction().add(action);
-        odisee.getPostProcess().add(postProcess);
         return this;
     }
 
@@ -183,11 +210,11 @@ public final class OdiseeClient {
 
     public byte[] process(final boolean sendCompressed) {
         try {
-            final Writer odiseeXml = new StringWriter();
-            OdiseeJaxbHelper.marshal(Odisee.class, odisee, odiseeXml);
+            final String body = getRequestBody();
+            final String contentType = contentType();
             return sendCompressed
-                    ? httpHelper.postCompressed(new URL(serviceURL), odiseeXml.toString())
-                    : httpHelper.post(new URL(serviceURL), odiseeXml.toString());
+                    ? httpHelper.postCompressed(new URL(serviceURL), body, contentType)
+                    : httpHelper.post(new URL(serviceURL), body, contentType);
         } catch (IOException e) {
             throw new OdiseeClientException(e);
         }
@@ -195,8 +222,7 @@ public final class OdiseeClient {
 
     public void saveCompressedRequestTo(final Path path) {
         try (final GZIPOutputStream gzipOutputStream = new GZIPOutputStream(new FileOutputStream(path.toFile()))) {
-            final String odiseeXmlString = getOdiseeXmlAsString();
-            gzipOutputStream.write(odiseeXmlString.getBytes());
+            gzipOutputStream.write(getRequestBody().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new OdiseeClientException(e);
         }
@@ -204,11 +230,24 @@ public final class OdiseeClient {
 
     public void saveRequestTo(final Path path) {
         try (final OutputStream outputStream = Files.newOutputStream(path, CREATE)) {
-            final String odiseeXmlString = getOdiseeXmlAsString();
-            outputStream.write(odiseeXmlString.getBytes());
+            outputStream.write(getRequestBody().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new OdiseeClientException(e);
         }
+    }
+
+    private String getRequestBody() {
+        final String xml = getOdiseeXmlAsString();
+        if (format == RequestFormat.JSON) {
+            return OdiseeJson.fromXml(xml);
+        }
+        return xml;
+    }
+
+    private String contentType() {
+        return format == RequestFormat.JSON
+                ? "application/json; charset=UTF-8"
+                : "text/xml; charset=UTF-8";
     }
 
     private String getOdiseeXmlAsString() {

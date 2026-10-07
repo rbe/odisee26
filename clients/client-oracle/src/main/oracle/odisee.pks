@@ -11,6 +11,19 @@ AS
     -- Where is the Odisee service?
     odisee_service_url VARCHAR(1000);
     /*
+     * Wire format for generate(): 'xml' (default) or 'json'.
+     * Call use_json before header when posting JSON.
+     */
+    request_format VARCHAR2(10) := 'xml';
+    /*
+     * Post the next request as JSON. The service converts it to XML.
+     */
+    PROCEDURE use_json;
+    /*
+     * Post the next request as XML. This is the default.
+     */
+    PROCEDURE use_xml;
+    /*
      * Create header for XML request.
      */
     PROCEDURE header(
