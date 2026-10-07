@@ -16,7 +16,22 @@ package org.odisee.api
  */
 class OdiseeException extends RuntimeException {
 
+    static final int BAD_REQUEST = 400
+
+    static final int NOT_FOUND = 404
+
+    static final int UNPROCESSABLE = 422
+
+    static final int SERVER_ERROR = 500
+
+    int httpStatus = BAD_REQUEST
+
     OdiseeException() {
+    }
+
+    OdiseeException(String message, int httpStatus) {
+        super(message)
+        this.httpStatus = httpStatus
     }
 
     OdiseeException(Throwable throwable) {

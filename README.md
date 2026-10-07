@@ -5,10 +5,10 @@ Make Your Documents Smile.
 
 ## Build, test, and package
 
-Java 11 is required. Gradle 6.0.1 and Grails 4.0.1 do not run on Java 17 or newer.
+JDK 21, Gradle 8.14.5, and Grails 7.2.4. LibreOffice UNO is `org.libreoffice:libreoffice` 26.2.2 from Maven Central (the current 26.2 still line published there).
 
 ```bash
-export JAVA_HOME=/path/to/jdk-11
+export JAVA_HOME=/path/to/jdk-21
 ./gradlew build
 ```
 
@@ -26,7 +26,7 @@ LibreOffice must already be installed. `etc/odiinst` points at `/usr/lib/libreof
 
 ```bash
 export ODISEE_HOME=/opt/odisee
-export JAVA_HOME=/path/to/jdk-11
+export JAVA_HOME=/path/to/jdk-21
 unzip odisee-2.6-linux-x86_64.zip -d "$ODISEE_HOME"
 "$ODISEE_HOME/bin/odictl" -q start
 ```

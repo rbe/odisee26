@@ -40,7 +40,8 @@ class DocumentController {
             final InputStream decompressedInputStream = Compression.decompress(request.inputStream)
             final Element xml = XmlHelper.convertToXmlElement(decompressedInputStream)
             if (null != xml) {
-                final Document document = processXmlRequest(/*request.userPrincipal*/ principal, xml)
+                final Principal caller = request.userPrincipal ?: principal
+                final Document document = processXmlRequest(caller, xml)
                 if (null == document) {
                     throw new OdiseeException('Cannot send stream, no document')
                 } else {
@@ -82,12 +83,7 @@ class DocumentController {
                 msg = throwable.message
                 log.error msg, throwable
             }
-            response.reset()
-            response.status = 400
-            if (null != msg) {
-                response.outputStream << String.format('%s%n', msg)
-            }
-            response.outputStream.flush()
+            HttpStatuses.apply(response, throwable)
         } catch (e) {
             log.error 'Could not send error message to client', e
         }

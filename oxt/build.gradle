@@ -1,8 +1,7 @@
-group rootProject.group
-version rootProject.version
+group = rootProject.group
+version = rootProject.version
 
-def antlibDir = file('antlib')
-antlibDir.mkdirs()
+apply plugin: 'base'
 
 def fetchLibrary = { String url, File dest ->
     if (dest.isFile() && dest.length() > 1024) {
@@ -40,38 +39,20 @@ def fetchLibrary = { String url, File dest ->
     }
 }
 
-fetchLibrary(
-        'https://repo1.maven.org/maven2/ant-contrib/ant-contrib/1.0b3/ant-contrib-1.0b3.jar',
-        new File(antlibDir, 'ant-contrib-1.0b3.jar'))
-fetchLibrary(
-        'https://downloads.sourceforge.net/project/xmltask/xmltask/1.16/xmltask.jar',
-        new File(antlibDir, 'xmltask.jar'))
-
-configurations {
-    antlibs
-}
-dependencies {
-    antlibs fileTree(dir: antlibDir, include: '**/*.jar')
-}
-
-apply plugin: 'base'
-
-ClassLoader antClassLoader = org.apache.tools.ant.Project.class.classLoader
-configurations.antlibs.each { File f ->
-    antClassLoader.addURL(f.toURI().toURL())
-}
-ant.importBuild('Odisee/build.xml') { String oldTargetName ->
-    return "ant-${oldTargetName}" as String
-}
-
-// world-production writes Odisee.oxt without incrementing ext.release.build.
-// ant-world still increments that number for a manual release build.
-task buildExtension(dependsOn: 'ant-world-production') {
-    group 'Odisee'
-    description 'Build the LibreOffice extension (Odisee.oxt)'
+task buildExtension {
+    group = 'Odisee'
+    description = 'Build the LibreOffice extension (Odisee.oxt)'
+    outputs.file('Odisee/dist/Odisee.oxt')
     doLast {
-        def antTargetsNames = ant.references.get('ant.targets').collect { it.name }
-        println "Ant Targets: ${antTargetsNames}"
+        def antlibDir = file('antlib')
+        fetchLibrary(
+                'https://repo1.maven.org/maven2/ant-contrib/ant-contrib/1.0b3/ant-contrib-1.0b3.jar',
+                new File(antlibDir, 'ant-contrib-1.0b3.jar'))
+        fetchLibrary(
+                'https://downloads.sourceforge.net/project/xmltask/xmltask/1.16/xmltask.jar',
+                new File(antlibDir, 'xmltask.jar'))
+        ant.ant(antfile: 'build.xml', target: 'world-production', dir: file('Odisee'))
     }
 }
+
 assemble.dependsOn 'buildExtension'

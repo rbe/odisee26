@@ -9,17 +9,17 @@ See file://src/main/asciidoc/Odisee.adoc[Odisee.adoc]
 
 === Building
 
-Java 11 is required. Gradle 6.0.1 and Grails 4.0.1 do not run on Java 17 or newer.
+JDK 21, Gradle 8.14.5, and Grails 7.2.4. LibreOffice UNO is `org.libreoffice:libreoffice` 26.2.2 from Maven Central.
 
 .Steps
 
 1. Optional: Configure HTTP proxy (see below)
-2. Point `JAVA_HOME` at a JDK 11
+2. Point `JAVA_HOME` at a JDK 21
 3. Execute following build tasks:
 +
 [source,text]
 ----
-export JAVA_HOME=/path/to/jdk-11
+export JAVA_HOME=/path/to/jdk-21
 ./gradlew build
 ----
 

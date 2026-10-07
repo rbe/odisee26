@@ -190,7 +190,7 @@ class OOoConnection implements XEventListener {
                 }
             }
         } else {
-            throw new OdiseeException("Connection to ${oooProcess.unoURL} sleeping for additional ${diff}")
+            throw new OdiseeException("Connection to ${oooProcess.unoURL} is not usable yet")
         }
     }
 
