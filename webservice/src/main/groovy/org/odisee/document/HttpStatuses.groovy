@@ -16,9 +16,10 @@ import org.xml.sax.SAXException
 import java.util.zip.ZipException
 
 /**
- * HTTP status and body for a failed generation.
- * Client errors are 400 (the request itself) or 422 (an instruction the schema allowed).
- * This is the only place that chooses the status.
+ * HTTP status and body for a failed request.
+ * 400 is a bad request. 401 is no login. 403 is a logged-in user who is not an admin.
+ * 404 is a missing template. 409 is an existing user. 422 is an instruction the schema allowed.
+ * 503 is the office pool. This is the only place that chooses the status.
  */
 final class HttpStatuses {
 

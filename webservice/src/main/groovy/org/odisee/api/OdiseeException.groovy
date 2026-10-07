@@ -18,7 +18,13 @@ class OdiseeException extends RuntimeException {
 
     static final int BAD_REQUEST = 400
 
+    static final int UNAUTHORIZED = 401
+
+    static final int FORBIDDEN = 403
+
     static final int NOT_FOUND = 404
+
+    static final int CONFLICT = 409
 
     static final int UNPROCESSABLE = 422
 

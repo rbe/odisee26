@@ -65,20 +65,25 @@ class OdiseePath {
 
     public static final String S_ETC_ODIINST = "etc/odiinst";
 
+    /**
+     * Environment wins and is absolute. A missing or blank value is an {@link OdiseeException}.
+     * Do not call {@code Path.of} on null.
+     */
+    static Path resolveHome(String envValue, String systemProperty) {
+        String env = envValue == null ? null : envValue.trim()
+        if (env) {
+            return Paths.get(env).toAbsolutePath()
+        }
+        String prop = systemProperty == null ? null : systemProperty.trim()
+        if (!prop) {
+            throw new OdiseeException('ODISEE_HOME not set')
+        }
+        return Paths.get(prop)
+    }
+
     static {
         // ODISEE_HOME
-        // Is Odisee home set?
-        String envOdiseeHome = System.getenv(OdiseeConstant.S_ODISEE_HOME)
-        if (!envOdiseeHome) {
-            String systemPropOdiseeHome = Path.of(System.getProperty(OdiseeConstant.S_ODISEE_HOME))
-            if (systemPropOdiseeHome) {
-                ODISEE_HOME = Path.of(systemPropOdiseeHome)
-            } else {
-                throw new OdiseeException("ODISEE_HOME not set")
-            }
-        } else {
-            ODISEE_HOME = Paths.get(envOdiseeHome).toAbsolutePath()
-        }
+        ODISEE_HOME = resolveHome(System.getenv(OdiseeConstant.S_ODISEE_HOME), System.getProperty(OdiseeConstant.S_ODISEE_HOME))
         // ODISEE_DEPLOY
         String envOdiseeDeploy = System.getenv(OdiseeConstant.S_ODISEE_DEPLOY)
         if (envOdiseeDeploy) {

@@ -3,6 +3,9 @@ package org.odisee.document
 import groovy.test.GroovyTestCase
 import groovy.xml.DOMBuilder
 import org.odisee.api.OdiseeException
+import org.odisee.io.TenantPaths
+
+import java.nio.file.Path
 
 class PostProcessServiceTest extends GroovyTestCase {
 
@@ -24,6 +27,13 @@ class PostProcessServiceTest extends GroovyTestCase {
         assertTrue(error.message.contains('outside'))
     }
 
+    void testMergeInputStaysUnderTheUserWorkDirectory() {
+        Path resolved = service.mergeInput([principal: [getName: { 'ada' }] as java.security.Principal], 'merge/AGB.pdf')
+
+        assertTrue(resolved.normalize().startsWith(TenantPaths.workDir('ada').normalize()))
+        assertTrue(resolved.toString().endsWith("merge${File.separator}AGB.pdf"))
+    }
+
     private OdiseeException runAction(String actionXml, Map result = null) {
         def document = DOMBuilder.parse(new StringReader("""
             <odisee><request><post-process>${actionXml}</post-process></request></odisee>
@@ -31,7 +41,8 @@ class PostProcessServiceTest extends GroovyTestCase {
         Map arg = [
                 xml        : document.documentElement,
                 activeIndex: 0,
-                result     : result
+                result     : result,
+                principal  : [getName: { 'odisee' }] as java.security.Principal
         ]
         try {
             service.postProcessRequest(arg)

@@ -48,11 +48,11 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 
 | ID | Severity | Status | Bug |
 |---|---|---|---|
-| B21 | blocker | open | The Grails app has no authentication. `java -jar` (the Docker entrypoint) does not load Tomcat's `odisee-users.xml`. The endpoint runs StarBasic macros named by the client. |
-| B22 | major | partial in wave 1 | `DocumentController` ignored `request.userPrincipal`. Wave 1 uses the container principal when one exists, and still falls back to a hardcoded user named `odisee` when it does not. |
+| B21 | blocker | fixed in wave 4 | The Grails app had no authentication. `java -jar` does not load Tomcat's `odisee-users.xml`. Spring Security now reads bcrypt hashes from `$ODISEE_HOME/etc/users`. Any authenticated user may run a macro. |
+| B22 | major | fixed in wave 4 | `DocumentController` fell back to a hardcoded user named `odisee`. No login is HTTP 401 and does not generate a document. |
 | B23 | major | fixed in wave 1 | Template names were joined onto the template directory with `Path.resolve`. A name containing `..` or a separator could escape that directory. Merge `input/@filename` accepted an absolute path because `Path.resolve` replaces the base. A client-supplied `outputPath` is overwritten with the request directory. |
 | B24 | major | fixed in wave 1 | Post-process `action/@type` was turned into a method name (`process${Type}`). An unexpected type failed at runtime or could hit an existing method. Instruction tag names were dispatched the same way. |
-| B25 | major | open | Request `@name` is used as a filename. Wave 1 rejects separators and `..`. A full allow-list (and the same check on macro URLs) is still open. |
+| B25 | major | partial in wave 4 | Request `@name` is used as a filename. Wave 1 rejects separators and `..`. Macro name, library, and language use that same check and a bad name is HTTP 400. A stricter allow-list is still open. |
 
 ## Structure
 
@@ -60,7 +60,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 |---|---|---|---|
 | B26 | major | fixed in wave 3 | Two office stacks are compiled: `OfficeConnection` / `OfficeConnectionFactory` (used) and `OOoConnection` / `OOoConnectionManager` / `OOoProcess` (not used by the request path). The unused stack is deleted. |
 | B27 | major | fixed with the toolchain update | `RequestService` no longer uses `com.sun.org.apache.xerces.internal.dom.DeferredNode`. XML is written through `GPathResult` and `org.w3c.dom.Node`, which JDK 21 allows. |
-| B28 | minor | open | `OdiseePath` calls `Path.of(System.getProperty("ODISEE_HOME"))` when the environment variable is unset. A missing property throws `NullPointerException` instead of `OdiseeException`. |
+| B28 | minor | fixed in wave 4 | A missing or blank `ODISEE_HOME` is an `OdiseeException`. The environment value wins and is absolute. |
 | B29 | minor | open | `SPREADSHEET` is the only Calc hint, and the instruction set is Writer-only. Calc/Impress are listed in `OdiseeFileFormat` and then stop. |
 | B30 | major | partial | Wave 1 covers the helpers. Tests 1–3 open a real template in LibreOffice (`GenerationBasisTest`, Docker). Tests 4–5 cover HTTP status and the pool. The Java client still has no assertion against a local server. |
 

@@ -54,9 +54,9 @@ Pair with F1. The request names a URL. Odisee POSTs the status and a download ha
 
 ### F9. Authenticated multi-tenancy
 
-The admin guide describes per-user SFTP homes and HTTP Basic Auth. The running service does not enforce either (B21, B22). Each principal gets a template directory under `var/user/{name}/template`, and macro execution is a separate privilege.
+Wave 4 requires HTTP Basic. Passwords are bcrypt hashes in `$ODISEE_HOME/etc/users`. Each user has `var/user/{name}/template`, `var/user/{name}/work`, and `var/user/{name}/output`. Any authenticated user may run macros. SFTP homes are not implemented. OpenID Connect is not implemented.
 
-Depends on: wave 4.
+Depends on: wave 4 (authentication and per-user directories are done).
 
 ### F10. Office pool from configuration, including remote hosts
 

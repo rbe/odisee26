@@ -38,7 +38,7 @@ class GenerationBasisTest extends GroovyTestCase {
         Files.createDirectories(home.resolve('etc'))
         Files.write(home.resolve('etc/odiinst'),
                 "odi1|127.0.0.1|${PORT}|/usr/lib/libreoffice||nologo|true\n".getBytes('UTF-8'))
-        Path templates = OdiseePath.ODISEE_VAR.resolve('template')
+        Path templates = OdiseePath.ODISEE_VAR.resolve('user').resolve('odisee').resolve('template')
         Files.createDirectories(templates)
         MinimalTemplate.write(templates.resolve('Letter.ott'))
 
@@ -104,7 +104,7 @@ class GenerationBasisTest extends GroovyTestCase {
         } catch (OdiseeException e) {
             assertEquals(OdiseeException.UNPROCESSABLE, e.httpStatus)
         }
-        Path documents = OdiseePath.ODISEE_VAR.resolve('document')
+        Path documents = OdiseePath.ODISEE_VAR.resolve('user').resolve('odisee').resolve('output')
         if (Files.exists(documents)) {
             Files.walk(documents).withCloseable { stream ->
                 assertFalse(stream.any { it.fileName.toString() == 'Bad.pdf' })

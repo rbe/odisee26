@@ -19,17 +19,21 @@ class HttpStatusTest extends GroovyTestCase {
     void testMissingTemplateIsNotFound() {
         Path requestDir = Files.createTempDirectory('odisee-request')
         try {
+            Path shared = OdiseePath.ODISEE_VAR.resolve('template')
+            Files.createDirectories(shared)
+            Files.write(shared.resolve('DoesNotExist.ott'), 'shared'.getBytes('UTF-8'))
+            Files.createDirectories(OdiseePath.ODISEE_VAR.resolve('user').resolve('odisee').resolve('template'))
             TemplateService templates = new TemplateService()
             Map arg = RequestContext.create()
             arg.principal = [getName: { 'odisee' }] as java.security.Principal
             arg.requestDir = requestDir
             arg.template = 'DoesNotExist'
             arg.revision = '1'
-            Files.createDirectories(OdiseePath.ODISEE_VAR.resolve('template'))
             templates.copyTemplateToRequest(arg)
             fail('template is missing')
         } catch (OdiseeException e) {
             assertEquals(OdiseeException.NOT_FOUND, e.httpStatus)
+            assertTrue(e.message.contains("user 'odisee'"))
             assertBody(e, OdiseeException.NOT_FOUND)
         } finally {
             requestDir.toFile().deleteDir()
@@ -54,6 +58,21 @@ class HttpStatusTest extends GroovyTestCase {
     void testParseFailureIsBadRequest() {
         SAXException error = new SAXException('DOCTYPE is disallowed')
         assertBody(error, OdiseeException.BAD_REQUEST)
+    }
+
+    void testNoLoginIsUnauthorized() {
+        OdiseeException error = new OdiseeException('Authentication required', OdiseeException.UNAUTHORIZED)
+        assertBody(error, OdiseeException.UNAUTHORIZED)
+    }
+
+    void testForbiddenIsForbidden() {
+        OdiseeException error = new OdiseeException('Admin role required', OdiseeException.FORBIDDEN)
+        assertBody(error, OdiseeException.FORBIDDEN)
+    }
+
+    void testExistingUserIsConflict() {
+        OdiseeException error = new OdiseeException("User 'ada' already exists", OdiseeException.CONFLICT)
+        assertBody(error, OdiseeException.CONFLICT)
     }
 
     void testInstructionFailureIsUnprocessable() {

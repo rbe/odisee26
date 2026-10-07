@@ -39,8 +39,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Apply values and instructions from a simple XML file to generate an OpenOffice document.
  * A document is an instance of a certain revision of a template.
- * $ODISEE_VAR/template/name without extension/revision/name_revision.ott
- * $ODISEE_VAR/document/name without extension/name_revision.odt, .pdf
+ * Templates, merge inputs, and output live under $ODISEE_VAR/user/{name}/.
  */
 @Log
 class OdiseeXmlCategory {
@@ -108,18 +107,20 @@ class OdiseeXmlCategory {
      * Process something: execute a closure and call a macro.
      */
     static void processInstruction(XComponent template, closure, macro = null) {
-        // Execute pre-macro
-        if (macro?.pre?.name) {
+        String pre = macro?.pre?.name?.toString()?.trim()
+        if (pre) {
+            MacroNames.requireReference(pre)
             use(OOoDocumentCategory) {
-                template.executeMacro(macro.pre.name, (macro.pre.params ?: []) as Object[])
+                template.executeMacro(pre, (macro.pre.params ?: []) as Object[])
             }
         }
         // Execute closure
         closure(template)
-        // Execute post-macro
-        if (macro?.post?.name) {
+        String post = macro?.post?.name?.toString()?.trim()
+        if (post) {
+            MacroNames.requireReference(post)
             use(OOoDocumentCategory) {
-                template.executeMacro(macro.post.name, (macro.post.params ?: []) as Object[])
+                template.executeMacro(post, (macro.post.params ?: []) as Object[])
             }
         }
     }
@@ -255,11 +256,12 @@ class OdiseeXmlCategory {
      * Execute a macro.
      */
     static void processMacro(XComponent template, Map arg, macro) {
-        // Get name, location and language of macro
+        // Get name, library, and language of macro. A bad name is HTTP 400.
         String macroName = macro.'@name'.toString()
-        String location = macro.'@location'.toString() ?: 'document'
+        String library = macro.'@location'.toString() ?: 'document'
         String language = macro.'@language'.toString() ?: 'Basic'
-        String macroUrl = "${macroName}?language=${language}&location=${location}"
+        MacroNames.requireParts(macroName, library, language)
+        String macroUrl = "${macroName}?language=${language}&location=${library}"
         OdiseeXmlCategory.processInstruction template, { t ->
             int paramCount = macro.parameter.size()
             Object[] params = null
@@ -356,12 +358,8 @@ class OdiseeXmlCategory {
                         withinOffice('instruction', UnoCall.deadlineMillis()) {
                             try {
                                 OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
-                            } catch (UnoDeadlineExceeded deadline) {
-                                throw deadline
                             } catch (Throwable e) {
-                                log.error "Odisee: Could not execute instruction '${tagName} ${instruction}'", e
-                                failures << "${tagName} ${instruction}: ${e.message ?: e.class.simpleName}"
-                                officeConnectionFactory?.recordInstructionFailure()
+                                keepOrRecord(e, failures, "${tagName} ${instruction}", officeConnectionFactory)
                             }
                             null
                         }
@@ -376,8 +374,9 @@ class OdiseeXmlCategory {
                     }
                     null
                 }
-                final String preSaveMacro = template.'@pre-save-macro'.toString()
+                final String preSaveMacro = template.'@pre-save-macro'.toString()?.trim()
                 if (preSaveMacro) {
+                    MacroNames.requireReference(preSaveMacro)
                     withinOffice('instruction', UnoCall.deadlineMillis()) {
                         use(OOoDocumentCategory) {
                             xComponent.executeMacro(preSaveMacro)
@@ -399,8 +398,9 @@ class OdiseeXmlCategory {
                         null
                     }
                 }
-                final String postSaveMacro = template.'@post-save-macro'.toString()
+                final String postSaveMacro = template.'@post-save-macro'.toString()?.trim()
                 if (postSaveMacro) {
+                    MacroNames.requireReference(postSaveMacro)
                     withinOffice('instruction', UnoCall.deadlineMillis()) {
                         use(OOoDocumentCategory) {
                             xComponent.executeMacro(postSaveMacro)
@@ -408,9 +408,11 @@ class OdiseeXmlCategory {
                         null
                     }
                 }
-            } catch (UnoDeadlineExceeded deadline) {
-                leavePool = true
-                throw deadline
+            } catch (Throwable error) {
+                if (dropsSlot(error)) {
+                    leavePool = true
+                }
+                throw error
             } finally {
                 if (xComponent != null) {
                     long closeBudget = leavePool ? UnoCall.closeDeadlineMillis() : UnoCall.deadlineMillis()
@@ -495,6 +497,28 @@ class OdiseeXmlCategory {
             }
         }
         result
+    }
+
+    /**
+     * A deadline drops the office slot. A bad macro name does not.
+     */
+    static boolean dropsSlot(Throwable error) {
+        error instanceof UnoDeadlineExceeded
+    }
+
+    /**
+     * A bad name stays HTTP 400. An ordinary instruction failure is recorded and becomes HTTP 422.
+     */
+    static void keepOrRecord(Throwable error, List<String> failures, String detail, OfficeConnectionFactory factory) {
+        if (error instanceof UnoDeadlineExceeded) {
+            throw (UnoDeadlineExceeded) error
+        }
+        if (error instanceof OdiseeException && ((OdiseeException) error).httpStatus == OdiseeException.BAD_REQUEST) {
+            throw (OdiseeException) error
+        }
+        log.error "Odisee: Could not execute instruction '${detail}'", error
+        failures << "${detail}: ${error.message ?: error.class.simpleName}"
+        factory?.recordInstructionFailure()
     }
 
     /**

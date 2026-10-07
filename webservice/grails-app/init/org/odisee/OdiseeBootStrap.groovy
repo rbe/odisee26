@@ -10,12 +10,14 @@
 package org.odisee
 
 import org.odisee.io.OdiseePath
+import org.odisee.security.PasswordFile
 
 class OdiseeBootStrap {
 
     def grailsApplication
 
     def init = { servletContext ->
+        PasswordFile.bootstrapFromEnvironment()
         def version = grailsApplication.config.odisee.version
         println """
            _ \\      |_)               
