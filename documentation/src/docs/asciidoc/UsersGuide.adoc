@@ -101,8 +101,7 @@ curl -u odisee:odisee \
   http://127.0.0.1:8080/document/generate
 ----
 
-A failed JSON request returns HTTP 400 and a JSON object, `{"error":"..."}`.
-XML requests still get the plain-text error they got before.
+A failed JSON request uses the same error response as XML: the status comes from the exception, and the body is the plain-text message.
 
 The shape is described by `webservice/src/main/resources/json/request.schema.json`.
 A request object needs `template.name`.

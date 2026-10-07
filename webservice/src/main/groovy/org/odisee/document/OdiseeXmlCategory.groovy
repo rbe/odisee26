@@ -13,16 +13,16 @@ package org.odisee.document
 
 import com.sun.star.lang.XComponent
 import groovy.util.logging.Log
+import groovy.xml.XmlSlurper
 import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
+import org.odisee.io.SafePaths
 import org.odisee.ooo.connection.OdiseeServerRuntimeException
 import org.odisee.ooo.connection.OfficeConnection
 import org.odisee.ooo.connection.OfficeConnectionFactory
 import org.odisee.shared.OdiseeConstant
 import org.odisee.writer.*
 
-import javax.xml.bind.DatatypeConverter
-import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -41,54 +41,63 @@ import java.util.concurrent.TimeUnit
 @Log
 class OdiseeXmlCategory {
 
+    private static final Set<String> INSTRUCTION_METHODS = [
+            'Userfield', 'Texttable', 'Image', 'Autotext', 'Bookmark', 'Macro'
+    ] as Set
+
     /**
-     * Find latest revision of a file with name following this convention:
-     * name_revN.ext
+     * Highest {@code *_revN.ott} in a directory. Numeric order, so revision 10 outranks 9.
      */
     static Path findLatestRevision(Path dir) {
-        if (!Files.exists(dir)) {
-            throw new OdiseeException("Cannot find template in directory '${dir}'")
+        Path directory = dir != null && Files.isDirectory(dir) ? dir : dir?.parent
+        if (directory == null || !Files.isDirectory(directory)) {
+            throw new OdiseeException("Cannot find template in directory '${dir}'", OdiseeException.NOT_FOUND)
         }
-        Path[] fs = dir.listFiles()
-        // TODO NullPointer when cN == directory
-        fs.inject fs[0], { Path o, Path n ->
-            // Strip extension and find _rev in filename
-            def c1 = (o.name - ~OdiseeConstant.WRITER_EXT_REGEX).split(OdiseeConstant.S_UNDERSCORE).find { it ==~ OdiseeConstant.REVISION_REGEX }
-            def c2 = (n.name - ~OdiseeConstant.WRITER_EXT_REGEX).split(OdiseeConstant.S_UNDERSCORE).find { it ==~ OdiseeConstant.REVISION_REGEX }
-            c2.compareTo(c1) == 1 ? n : o
+        Path best = null
+        int bestRevision = -1
+        Files.newDirectoryStream(directory, '*_rev*.ott').withCloseable { stream ->
+            stream.each { Path candidate ->
+                def matcher = (candidate.fileName.toString() =~ /_rev(\d+)\.ott$/)
+                if (matcher.find()) {
+                    int revision = Integer.parseInt(matcher.group(1))
+                    if (revision > bestRevision) {
+                        bestRevision = revision
+                        best = candidate
+                    }
+                }
+            }
         }
+        if (best == null) {
+            throw new OdiseeException("Cannot find a revised template in '${directory}'", OdiseeException.NOT_FOUND)
+        }
+        best
     }
 
     /**
      * Find OpenOffice template by revision and return File object.
+     * A concrete path and revision were stored on the template element by {@link TemplateService}.
+     * {@code LATEST} falls back to {@link TemplateLocator}.
      * @param xmlTemplate Node xml.request.template from request XML.
      */
     static Path findTemplate(xmlTemplate) {
-        // Check argument
         if (!xmlTemplate) {
-            throw new OdiseeException('No template specified')
+            throw new OdiseeException('No template specified', OdiseeException.BAD_REQUEST)
         }
-        // Get data
-        String templatePath = xmlTemplate.'@path'?.toString()
+        String templatePath = xmlTemplate.'@path'?.toString()?.trim()
         if (!templatePath) {
-            throw new OdiseeException('No path to template given')
+            throw new OdiseeException('No path to template given', OdiseeException.BAD_REQUEST)
         }
-        String revision = xmlTemplate.'@revision'?.toString()?.toUpperCase()
-        // Get template
-        Path template = null
-        if (templatePath && revision != OdiseeConstant.S_LATEST) {
-            template = Paths.get(templatePath)
+        String revision = xmlTemplate.'@revision'?.toString()?.trim()
+        String name = xmlTemplate.'@name'?.toString()?.trim()
+        Path hinted = Paths.get(templatePath)
+        if (revision && !revision.equalsIgnoreCase(OdiseeConstant.S_LATEST)) {
+            if (!Files.exists(hinted)) {
+                throw new OdiseeException("Odisee: Template '${hinted}' does not exist!", OdiseeException.NOT_FOUND)
+            }
+            return hinted
         }
-        // Find latest revision of template
-        if (!revision || revision == OdiseeConstant.S_LATEST) {
-            Path p = template.parent.resolve(template.fileName)
-            template = OdiseeXmlCategory.findLatestRevision(p)
-        }
-        // Does template exist?
-        if (!Files.exists(template)) {
-            throw new OdiseeException("Odisee: Template '${template}' does not exist!")
-        }
-        template
+        Path directory = Files.isDirectory(hinted) ? hinted : hinted.parent
+        TemplateLocator.locate(directory, name, OdiseeConstant.S_LATEST)
     }
 
     /**
@@ -218,7 +227,7 @@ class OdiseeXmlCategory {
     }
 
     private static String saveImageToFile(Map arg, String imageType, String imageContent) {
-        byte[] imageData = DatatypeConverter.parseBase64Binary(imageContent)
+        byte[] imageData = Base64.decoder.decode(imageContent.toString().trim())
         Path outputPath = Paths.get(arg.outputPath)
         FileAttribute<Set<PosixFilePermission>> fileAttribute = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))
         String extension
@@ -289,8 +298,7 @@ class OdiseeXmlCategory {
         arg.id ?: (arg.id = new Date().format(OdiseeConstant.FILE_DATEFORMAT_SSSS))
         // Get File reference to certain or latest revision of template
         arg.template = OdiseeXmlCategory.findTemplate(request.template)
-        // Set revision from found template
-        arg.revision = (arg.template.fileName.toString() - ~OdiseeConstant.WRITER_EXT_REGEX).split('_rev').last()
+        arg.revision = TemplateLocator.revisionOf(arg.template)
         // Return map
         arg
     }
@@ -306,16 +314,22 @@ class OdiseeXmlCategory {
         // Set basename for document(s) to generate: dir for template, name of template including revision and ID
         // TODO name must be generated to avoid name clashes with multiple requests
         String documentBasename = null
-        if (request.'@name') {
-            documentBasename = request.'@name'.toString()
-            final Charset utf8 = Charset.forName('UTF-8')
-            final byte[] requestNameAsUTF8 = documentBasename.getBytes(utf8)
-            documentBasename = new String(requestNameAsUTF8, utf8)
+        if (request.'@name'?.toString()?.trim()) {
+            documentBasename = SafePaths.requireSimpleName(request.'@name'.toString(), 'document name')
         } else {
             final String filename = arg.template.fileName.toString()
             final List strings = filename.split('\\.')[0..-2]
             final String join = strings.join('.')
             documentBasename = "${join}-id${arg.id}"
+        }
+        List<String> formats = OutputFormats.fromRequest(request)
+        if (!formats) {
+            throw new OdiseeException('No output format specified', OdiseeException.UNPROCESSABLE)
+        }
+        final Path outputDir = Paths.get(outputPath)
+        formats.each { String format ->
+            String extension = SafePaths.requireSimpleName(format, 'output format')
+            output << outputDir.resolve("${documentBasename}.${extension}")
         }
         use(OOoDocumentCategory) {
             // Should we hide OpenOffice?
@@ -326,54 +340,59 @@ class OdiseeXmlCategory {
                 // local-debug="true" ... so OpenOffice's window should shown (Hidden attribute is false)
                 hidden = !localDebug
             }
-            // Create new document from template
-            final XComponent xComponent = arg.template.open(oooConnection, [Hidden: hidden])
-            // Process all instructions
-            String methodName = null
-            request.instructions.'*'.each { instr ->
-                String tagName = instr.name()
-                String instruction = instr.'@name'
-                Profile.time "OdiseeXmlCategory.toDocument(${request.'@name'}, instruction ${instruction})", {
+            XComponent xComponent = null
+            try {
+                xComponent = arg.template.open(oooConnection, [Hidden: hidden])
+                List<String> failures = []
+                request.instructions.'*'.each { instr ->
+                    String tagName = instr.name()?.toString() ?: ''
+                    String instruction = instr.'@name'?.toString() ?: ''
+                    String methodName = tagName ? tagName[0].toUpperCase() + (tagName.length() > 1 ? tagName[1..-1] : '') : ''
+                    Profile.time "OdiseeXmlCategory.toDocument(${request.'@name'}, instruction ${instruction})", {
+                        if (!INSTRUCTION_METHODS.contains(methodName)) {
+                            failures << "Unsupported instruction '${tagName}'"
+                            return
+                        }
+                        try {
+                            OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
+                        } catch (Throwable e) {
+                            log.error "Odisee: Could not execute instruction '${tagName} ${instruction}'", e
+                            failures << "${tagName} ${instruction}: ${e.message ?: e.class.simpleName}"
+                        }
+                    }
+                }
+                if (failures) {
+                    throw new OdiseeException("Document instructions failed: ${failures.join('; ')}", OdiseeException.UNPROCESSABLE)
+                }
+                use(OOoFieldCategory) {
+                    xComponent.refreshTextFields()
+                }
+                final String preSaveMacro = template.'@pre-save-macro'.toString()
+                if (preSaveMacro) {
+                    xComponent.executeMacro(preSaveMacro)
+                }
+                output.each { Path file ->
+                    Files.createDirectories(file.parent)
+                    boolean isPDFA = file.toString().endsWith('.pdfa')
+                    if (isPDFA) {
+                        xComponent.saveAsPDF_A(file)
+                    } else {
+                        xComponent.saveAs(file)
+                    }
+                }
+                final String postSaveMacro = template.'@post-save-macro'.toString()
+                if (postSaveMacro) {
+                    xComponent.executeMacro(postSaveMacro)
+                }
+            } finally {
+                if (xComponent != null) {
                     try {
-                        // Construct method name from element name
-                        methodName = tagName[0].toUpperCase() + tagName[1..-1]
-                        OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
-                    } catch (e) {
-                        log.error "Odisee: Could not execute instruction '${tagName} ${instruction}'", e
+                        xComponent.close()
+                    } catch (Throwable closeError) {
+                        log.error 'Odisee: Could not close the office document', closeError
                     }
                 }
             }
-            // Refresh text fields
-            use(OOoFieldCategory) {
-                xComponent.refreshTextFields()
-            }
-            // Execute pre-save macro
-            final String preSaveMacro = template.'@pre-save-macro'.toString()
-            if (preSaveMacro) {
-                xComponent.executeMacro(preSaveMacro)
-            }
-            // Create Path references for outputFormats from XML
-            final Path outputDir = Paths.get(outputPath)
-            template.'@outputFormat'?.toString()?.split(',')?.each { format ->
-                output << outputDir.resolve("${documentBasename}.${format}")
-            }
-            // Save document to disk
-            output.each { Path file ->
-                Files.createDirectories(file.parent)
-                boolean isPDFA = file.toString().endsWith('.pdfa')
-                if (isPDFA) {
-                    xComponent.saveAsPDF_A(file)
-                } else {
-                    xComponent.saveAs(file)
-                }
-            }
-            // Execute post-save macro
-            final String postSaveMacro = template.'@post-save-macro'.toString()
-            if (postSaveMacro) {
-                xComponent.executeMacro(postSaveMacro)
-            }
-            // Close document
-            xComponent.close()
         }
         // Return generated document(s)
         output

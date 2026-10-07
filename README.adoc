@@ -12,15 +12,27 @@ The JSON shape is `webservice/src/main/resources/json/request.schema.json`.
 
 === Building
 
-Steps to setup environment
+JDK 21, Gradle 8.14.5, and Grails 7.2.4. LibreOffice UNO is `org.libreoffice:libreoffice` 26.2.2 from Maven Central.
+
+.Steps
 
 1. Optional: Configure HTTP proxy (see below)
-2. Execute following build tasks:
+2. Point `JAVA_HOME` at a JDK 21
+3. Execute following build tasks:
 +
 [source,text]
 ----
+export JAVA_HOME=/path/to/jdk-21
 ./gradlew build
 ----
+
+`build` compiles every module, runs the unit tests, and writes `build/distributions/odisee-2.6-linux-x86_64.zip`.
+
+The zip contains `application.jar`, `bin/odictl`, `etc/`, the Java client, the LibreOffice extension, and the HTML documentation.
+
+Docker image tasks (`:docker:buildAllDockerImages`, `:webservice:buildOdiseeImage`) are not part of `build`. They need a local Docker daemon. The LibreOffice base images still use archived 2019 distribution snapshots.
+
+GitHub Actions runs the same `./gradlew build` and uploads the zip. A git tag `v*` also publishes that zip as a GitHub Release.
 
 ==== Proxy
 

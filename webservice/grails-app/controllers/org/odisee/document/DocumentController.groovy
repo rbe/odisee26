@@ -11,7 +11,6 @@
 
 package org.odisee.document
 
-import groovy.json.JsonOutput
 import org.odisee.api.OdiseeException
 import org.odisee.debug.WallTime
 import org.odisee.io.Compression
@@ -47,7 +46,8 @@ class DocumentController {
                     ? JsonRequest.toElement(new String(body, 'UTF-8'))
                     : XmlHelper.convertToXmlElement(new ByteArrayInputStream(body))
             if (null != xml) {
-                final Document document = processXmlRequest(/*request.userPrincipal*/ principal, xml)
+                final Principal caller = request.userPrincipal ?: principal
+                final Document document = processXmlRequest(caller, xml)
                 if (null == document) {
                     throw new OdiseeException('Cannot send stream, no document')
                 } else {
@@ -59,7 +59,7 @@ class DocumentController {
                         : 'Invalid or missing XML request')
             }
         } catch (e) {
-            processThrowable(e, jsonRequest)
+            processThrowable(e)
         } finally {
             // Prevent Grails from rendering generate.gsp (it does not exist)
             response.outputStream.close()
@@ -99,23 +99,14 @@ class DocumentController {
      * Handle an exception: extract message and write response to client.
      * @param throwable The exception to handle.
      */
-    private void processThrowable(final Throwable throwable, final boolean jsonRequest = false) {
+    private void processThrowable(final Throwable throwable) {
         try {
             String msg
             if (null != throwable) {
                 msg = throwable.message
                 log.error msg, throwable
             }
-            response.reset()
-            response.status = 400
-            if (jsonRequest) {
-                response.contentType = 'application/json; charset=UTF-8'
-                response.outputStream << JsonOutput.toJson([error: msg ?: 'Document generation failed'])
-                response.outputStream << '\n'
-            } else if (null != msg) {
-                response.outputStream << String.format('%s%n', msg)
-            }
-            response.outputStream.flush()
+            HttpStatuses.apply(response, throwable)
         } catch (e) {
             log.error 'Could not send error message to client', e
         }

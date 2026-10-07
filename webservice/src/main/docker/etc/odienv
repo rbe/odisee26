@@ -103,8 +103,14 @@ then
             JAVA_HOME=$(/usr/libexec/java_home)
         ;;
         *)
-            JAVA_HOME=$(readlink $(which java))
-            JAVA_HOME=${JAVA_HOME%/bin/java}
+            # Follow the alternatives chain (/usr/bin/java -> /etc/alternatives/java -> JRE).
+            _java_bin=$(command -v java || true)
+            if [ -n "${_java_bin}" ]
+            then
+                JAVA_HOME=$(readlink -f "${_java_bin}")
+                JAVA_HOME=${JAVA_HOME%/bin/java}
+            fi
+            unset _java_bin
         ;;
     esac
 fi

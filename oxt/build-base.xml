@@ -379,6 +379,7 @@
     </target>
     <!-- -->
     <target name="make-serverupdatexml">
+        <mkdir dir="${dist.dir}"/>
         <antcall target="-create-empty-serverxml"/>
         <antcall target="-add-identifier-to-serverxml"/>
         <antcall target="-add-version-to-serverxml"/>
@@ -609,10 +610,6 @@
                 </copy>
             </then>
         </if>
-        <!-- Set build date in build.properties -->
-        <propertyfile file="build.properties">
-            <entry key="ext.release.date" type="date" value="now" pattern="yyyyMMdd-HHmmss"/>
-        </propertyfile>
     </target>
     <!--
 

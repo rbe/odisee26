@@ -1,4 +1,4 @@
-FROM archlinux:20191105
+FROM archlinux:base
 
 LABEL maintainer="Ralf Bensmann <ralf@art-of-coding.eu>"
 LABEL vendor="Art of Coding UG"

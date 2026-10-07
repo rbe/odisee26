@@ -10,9 +10,10 @@
  */
 package org.odisee.xml
 
-import com.sun.org.apache.xerces.internal.dom.DeferredNode
-import groovy.util.slurpersupport.GPathResult
-import groovy.util.slurpersupport.NodeChild
+import groovy.xml.XmlNodePrinter
+import groovy.xml.XmlSlurper
+import groovy.xml.slurpersupport.GPathResult
+import groovy.xml.slurpersupport.NodeChild
 import groovy.xml.DOMBuilder
 import groovy.xml.StreamingMarkupBuilder
 import groovy.xml.XmlUtil
@@ -49,7 +50,7 @@ final class XmlHelper {
      */
 
     /**
-     * Convert XML string to object implementing DeferredNode.
+     * Convert an XML string to a DOM element.
      * @param xml String
      * @return org.w3c.dom.Element The document element.
      */
@@ -75,7 +76,7 @@ final class XmlHelper {
     }
 
     /**
-     * Convert XML string to object implementing DeferredNode.
+     * Convert an XML string to a DOM element.
      * @param xml String
      * @return org.w3c.dom.Element The document element.
      */
@@ -128,7 +129,7 @@ final class XmlHelper {
      * @param requestXML
      * @return
      */
-    static String asString(final DeferredNode requestXML) {
+    static String asString(final org.w3c.dom.Node requestXML) {
         //String h = XmlUtil.serialize(requestXML).split(S_NEWLINE)[0..-1].join(S_NEWLINE)
         final String h = XmlUtil.serialize(requestXML) - ~'<\\?xml.*?>'
         def builder = new StreamingMarkupBuilder()
@@ -143,7 +144,7 @@ final class XmlHelper {
      *
      * @param xml
      */
-    static String asString(final NodeChild xml) {
+    static String asString(final GPathResult xml) {
         new StreamingMarkupBuilder().bind {
             odisee {
                 mkp.yieldUnescaped xml

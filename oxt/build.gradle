@@ -1,34 +1,58 @@
-group rootProject.group
-version rootProject.version
-
-configurations {
-    antlibs
-}
-dependencies {
-    antlibs fileTree(dir: "antlib", include: '**/*.jar')
-}
+group = rootProject.group
+version = rootProject.version
 
 apply plugin: 'base'
 
-ext {
-    libs = [
-            'https://sourceforge.net/projects/ant-contrib/files/ant-contrib/1.0b3/ant-contrib-1.0b3-bin.zip/download',
-            'https://sourceforge.net/projects/xmltask/files/xmltask/1.16/xmltask.jar/download'
-    ]
-}
-
-ClassLoader antClassLoader = org.apache.tools.ant.Project.class.classLoader
-configurations.antlibs.each { File f ->
-    antClassLoader.addURL(f.toURI().toURL())
-}
-ant.importBuild('Odisee/build.xml') { String oldTargetName ->
-    return "ant-${oldTargetName}" as String
-}
-task buildExtension(dependsOn: 'ant-world') {
-    group 'Odisee'
-    doLast {
-        def antTargetsNames = ant.references.get("ant.targets").collect { it.name }
-        println "Ant Targets: ${antTargetsNames}"
+def fetchLibrary = { String url, File dest ->
+    if (dest.isFile() && dest.length() > 1024) {
+        return
+    }
+    println "Downloading ${dest.name}"
+    dest.parentFile.mkdirs()
+    def connection = new URL(url).openConnection()
+    connection.setRequestProperty('User-Agent', 'Odisee-build')
+    connection.setConnectTimeout(30000)
+    connection.setReadTimeout(120000)
+    connection.setInstanceFollowRedirects(true)
+    def code = connection.responseCode
+    if (code != 200) {
+        throw new GradleException("Failed to download ${url}: HTTP ${code}")
+    }
+    dest.withOutputStream { out ->
+        connection.inputStream.withCloseable { input ->
+            byte[] buf = new byte[8192]
+            int n
+            while ((n = input.read(buf)) > 0) {
+                out.write(buf, 0, n)
+            }
+        }
+    }
+    def header = new byte[2]
+    dest.withInputStream { input ->
+        if (input.read(header) != 2) {
+            throw new GradleException("Downloaded ${dest.name} is empty")
+        }
+    }
+    if (header[0] != (byte) 0x50 || header[1] != (byte) 0x4B) {
+        dest.delete()
+        throw new GradleException("${dest.name} is not a jar. The download URL may have returned an HTML page.")
     }
 }
+
+task buildExtension {
+    group = 'Odisee'
+    description = 'Build the LibreOffice extension (Odisee.oxt)'
+    outputs.file('Odisee/dist/Odisee.oxt')
+    doLast {
+        def antlibDir = file('antlib')
+        fetchLibrary(
+                'https://repo1.maven.org/maven2/ant-contrib/ant-contrib/1.0b3/ant-contrib-1.0b3.jar',
+                new File(antlibDir, 'ant-contrib-1.0b3.jar'))
+        fetchLibrary(
+                'https://downloads.sourceforge.net/project/xmltask/xmltask/1.16/xmltask.jar',
+                new File(antlibDir, 'xmltask.jar'))
+        ant.ant(antfile: 'build.xml', target: 'world-production', dir: file('Odisee'))
+    }
+}
+
 assemble.dependsOn 'buildExtension'

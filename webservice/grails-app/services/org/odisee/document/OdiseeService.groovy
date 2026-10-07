@@ -32,54 +32,13 @@ class OdiseeService {
 
     PostProcessService postProcessService
 
-    private final Map<String, Object> emptyArg = [
-            principal      : null,
-            xml            : null,
-            activeIndex    : -1,
-            uniqueRequestId: '',
-            requestDir     : null,
-            odiseeRequest  : null,
-            documentName   : null,
-            templateDir    : null,
-            documentDir    : null,
-            templateFile   : null,
-            id             : null,
-            template       : null,
-            revision       : 1,
-            document       : [],
-            data           : null,
-            bytes          : null,
-            filename       : null,
-            result         : []
-    ]
-
-    private static void resetRequest(final Map arg) {
-        [
-                OdiseeConstant.S_ID, OdiseeConstant.S_TEMPLATE, OdiseeConstant.S_REVISION,
-                'documentName',
-                'templateDir', 'templateFile',
-                'documentDir', 'document', 'data', 'bytes', 'filename'
-        ].each {
-            arg.remove(it)
-        }
-    }
-
-    def deepcopy(orig) {
-        bos = new ByteArrayOutputStream()
-        oos = new ObjectOutputStream(bos)
-        oos.writeObject(orig); oos.flush()
-        bin = new ByteArrayInputStream(bos.toByteArray())
-        ois = new ObjectInputStream(bin)
-        return ois.readObject()
-    }
-
     /**
      * Generate a document using document service and OOo service.
      * @param arg Map: xml: an XML request (see request.xsd in Odisee).
      * @return List with generated OooDocument instance(s).
      */
     List<Document> generateDocument(final Principal principal, final Element xml) {
-        Map<String, Object> arg = (Map<String, Object>) emptyArg.clone()
+        Map<String, Object> arg = RequestContext.create()
         final GString userDocumentDir = "${ODISEE_USER}/${OdiseeConstant.S_DOCUMENT}"
         arg.uniqueRequestId = UUID.randomUUID()
         arg.requestDir = Paths.get(userDocumentDir, arg.uniqueRequestId.toString())
@@ -90,7 +49,7 @@ class OdiseeService {
         use(DOMCategory) {
             arg.xml.'request'.eachWithIndex { request, i ->
                 arg.activeIndex = i
-                if (i > 0) resetRequest(arg)
+                if (i > 0) RequestContext.resetForNextRequest(arg)
                 templateService.extractTemplateFromRequest(arg)
                 templateService.copyTemplateToRequest(arg)
                 templateService.checkPaths(arg)
