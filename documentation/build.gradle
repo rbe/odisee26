@@ -1,11 +1,19 @@
 buildscript {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven { url "https://repo.grails.org/grails/core" }
+    }
     dependencies {
         classpath 'org.asciidoctor:asciidoctor-gradle-jvm:2.3.0'
     }
 }
 
-plugins {
-    id 'org.asciidoctor.convert' version '2.3.0'
+// Declare repositories before applying the plugin. Plugin 2.3.0 adds jcenter()
+// when the project has none, and jcenter no longer serves asciidoctorj-groovy-dsl:1.6.0.
+repositories {
+    mavenCentral()
+    maven { url "https://repo.grails.org/grails/core" }
 }
 
 apply plugin: 'base'
