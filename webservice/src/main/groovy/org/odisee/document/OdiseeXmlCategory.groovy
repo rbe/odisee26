@@ -20,6 +20,10 @@ import org.odisee.io.SafePaths
 import org.odisee.ooo.connection.OdiseeServerRuntimeException
 import org.odisee.ooo.connection.OfficeConnection
 import org.odisee.ooo.connection.OfficeConnectionFactory
+import org.odisee.ooo.connection.UnoCall
+import org.odisee.ooo.connection.UnoDeadlineExceeded
+
+import java.util.concurrent.Callable
 import org.odisee.shared.OdiseeConstant
 import org.odisee.writer.*
 
@@ -293,7 +297,7 @@ class OdiseeXmlCategory {
         arg
     }
 
-    static ArrayList processTemplate(Map arg, OfficeConnection oooConnection) {
+    static ArrayList processTemplate(Map arg, OfficeConnection oooConnection, OfficeConnectionFactory officeConnectionFactory) {
         // Result is one or more document(s)
         def output = []
         // Get XML request element
@@ -331,8 +335,13 @@ class OdiseeXmlCategory {
                 hidden = !localDebug
             }
             XComponent xComponent = null
+            boolean leavePool = false
             try {
-                xComponent = arg.template.open(oooConnection, [Hidden: hidden])
+                xComponent = (XComponent) withinOffice('open', UnoCall.deadlineMillis()) {
+                    use(OOoDocumentCategory) {
+                        arg.template.open(oooConnection, [Hidden: hidden])
+                    }
+                }
                 List<String> failures = []
                 request.instructions.'*'.each { instr ->
                     String tagName = instr.name()?.toString() ?: ''
@@ -341,46 +350,86 @@ class OdiseeXmlCategory {
                     Profile.time "OdiseeXmlCategory.toDocument(${request.'@name'}, instruction ${instruction})", {
                         if (!INSTRUCTION_METHODS.contains(methodName)) {
                             failures << "Unsupported instruction '${tagName}'"
+                            officeConnectionFactory?.recordInstructionFailure()
                             return
                         }
-                        try {
-                            OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
-                        } catch (Throwable e) {
-                            log.error "Odisee: Could not execute instruction '${tagName} ${instruction}'", e
-                            failures << "${tagName} ${instruction}: ${e.message ?: e.class.simpleName}"
+                        withinOffice('instruction', UnoCall.deadlineMillis()) {
+                            try {
+                                OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
+                            } catch (UnoDeadlineExceeded deadline) {
+                                throw deadline
+                            } catch (Throwable e) {
+                                log.error "Odisee: Could not execute instruction '${tagName} ${instruction}'", e
+                                failures << "${tagName} ${instruction}: ${e.message ?: e.class.simpleName}"
+                                officeConnectionFactory?.recordInstructionFailure()
+                            }
+                            null
                         }
                     }
                 }
                 if (failures) {
                     throw new OdiseeException("Document instructions failed: ${failures.join('; ')}", OdiseeException.UNPROCESSABLE)
                 }
-                use(OOoFieldCategory) {
-                    xComponent.refreshTextFields()
+                withinOffice('instruction', UnoCall.deadlineMillis()) {
+                    use(OOoFieldCategory) {
+                        xComponent.refreshTextFields()
+                    }
+                    null
                 }
                 final String preSaveMacro = template.'@pre-save-macro'.toString()
                 if (preSaveMacro) {
-                    xComponent.executeMacro(preSaveMacro)
+                    withinOffice('instruction', UnoCall.deadlineMillis()) {
+                        use(OOoDocumentCategory) {
+                            xComponent.executeMacro(preSaveMacro)
+                        }
+                        null
+                    }
                 }
                 output.each { Path file ->
                     Files.createDirectories(file.parent)
                     boolean isPDFA = file.toString().endsWith('.pdfa')
-                    if (isPDFA) {
-                        xComponent.saveAsPDF_A(file)
-                    } else {
-                        xComponent.saveAs(file)
+                    withinOffice('save', UnoCall.deadlineMillis()) {
+                        use(OOoDocumentCategory) {
+                            if (isPDFA) {
+                                xComponent.saveAsPDF_A(file)
+                            } else {
+                                xComponent.saveAs(file)
+                            }
+                        }
+                        null
                     }
                 }
                 final String postSaveMacro = template.'@post-save-macro'.toString()
                 if (postSaveMacro) {
-                    xComponent.executeMacro(postSaveMacro)
+                    withinOffice('instruction', UnoCall.deadlineMillis()) {
+                        use(OOoDocumentCategory) {
+                            xComponent.executeMacro(postSaveMacro)
+                        }
+                        null
+                    }
                 }
+            } catch (UnoDeadlineExceeded deadline) {
+                leavePool = true
+                throw deadline
             } finally {
                 if (xComponent != null) {
+                    long closeBudget = leavePool ? UnoCall.closeDeadlineMillis() : UnoCall.deadlineMillis()
                     try {
-                        xComponent.close()
+                        withinOffice('close', closeBudget) {
+                            use(OOoDocumentCategory) {
+                                xComponent.close()
+                            }
+                            null
+                        }
+                    } catch (UnoDeadlineExceeded closeDeadline) {
+                        leavePool = true
+                        log.error 'Odisee: Closing the office document exceeded its deadline', closeDeadline
                     } catch (Throwable closeError) {
                         log.error 'Odisee: Could not close the office document', closeError
                     }
+                }
+                if (leavePool) {
+                    officeConnectionFactory?.dropSlot(oooConnection)
                 }
             }
         }
@@ -418,7 +467,7 @@ class OdiseeXmlCategory {
                 throw new OdiseeException("Could not acquire connection from group '${group}'")
             } else {
                 // Process template
-                def output = OdiseeXmlCategory.processTemplate(arg, oooConnection)
+                def output = OdiseeXmlCategory.processTemplate(arg, oooConnection, officeConnectionFactory)
                 if (output) {
                     result.output += output
                 }
@@ -437,12 +486,27 @@ class OdiseeXmlCategory {
         } catch (e) {
             throw e
         } finally {
-            // Release connection to pool
-            if (oooConnection) {
+            if (officeConnectionFactory != null) {
+                officeConnectionFactory.recordGenerationMillis(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start))
+            }
+            // A deadline already removed the slot so odiwatchdog can restart soffice.
+            if (oooConnection && !oooConnection.wasDropped()) {
                 officeConnectionFactory.repositConnection(oooConnection)
             }
         }
         result
+    }
+
+    /**
+     * UNO work runs on another thread. Categories are thread-local, so the body applies its own.
+     */
+    private static Object withinOffice(String phase, long deadlineMs, Closure<?> body) {
+        UnoCall.within(phase, deadlineMs, new Callable<Object>() {
+            @Override
+            Object call() {
+                body.call()
+            }
+        })
     }
 
 }

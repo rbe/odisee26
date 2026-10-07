@@ -31,7 +31,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B11 | major | fixed in wave 1 | `OdiseeInstance.readOdiinst` replaced `oooGroup['group0']` on every host, so only the last host remained. Blank lines were parsed as rows. |
 | B12 | major | fixed in wave 1 | `OfficeConnectionFactory.fetchConnection` returned null after a connect failure. `toDocument` then failed even when another instance in the pool was healthy. |
 | B13 | major | fixed in wave 1 | If every bootstrap failed, the factory still started with an empty queue. The SLF4J message used `%{}` instead of `{}`. |
-| B14 | major | open | UNO calls have no deadline. A live but wedged `soffice` holds a pool slot until the JVM exits. `odiwatchdog` only helps after the process has exited. |
+| B14 | major | fixed in wave 3 | UNO calls have no deadline. A live but wedged `soffice` holds a pool slot until the JVM exits. `odiwatchdog` only helps after the process has exited. |
 | B15 | major | fixed in wave 1 | `processTemplate` called `xComponent.close()` only on the success path. A failure in `open` or `saveAs` left the document open inside LibreOffice. |
 | B16 | minor | fixed in wave 1 | `OOoConnection.connect` referenced `diff` in a branch that Groovy compiles but cannot run (`MissingPropertyException`). `isUsable()` already throws before that branch. |
 
@@ -58,7 +58,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 
 | ID | Severity | Status | Bug |
 |---|---|---|---|
-| B26 | major | open | Two office stacks are compiled: `OfficeConnection` / `OfficeConnectionFactory` (used) and `OOoConnection` / `OOoConnectionManager` / `OOoProcess` (not used by the request path). |
+| B26 | major | fixed in wave 3 | Two office stacks are compiled: `OfficeConnection` / `OfficeConnectionFactory` (used) and `OOoConnection` / `OOoConnectionManager` / `OOoProcess` (not used by the request path). The unused stack is deleted. |
 | B27 | major | fixed with the toolchain update | `RequestService` no longer uses `com.sun.org.apache.xerces.internal.dom.DeferredNode`. XML is written through `GPathResult` and `org.w3c.dom.Node`, which JDK 21 allows. |
 | B28 | minor | open | `OdiseePath` calls `Path.of(System.getProperty("ODISEE_HOME"))` when the environment variable is unset. A missing property throws `NullPointerException` instead of `OdiseeException`. |
 | B29 | minor | open | `SPREADSHEET` is the only Calc hint, and the instruction set is Writer-only. Calc/Impress are listed in `OdiseeFileFormat` and then stop. |

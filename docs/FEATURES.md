@@ -1,6 +1,6 @@
 # Odisee feature ideas
 
-These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F11 landed with wave 2. The rest are not implemented yet.
+These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F11 landed with wave 2. The rest are not implemented yet.
 
 ## Generation API
 
@@ -12,9 +12,9 @@ Depends on: wave 2 status codes, wave 3 pool deadlines.
 
 ### F2. Readiness and metrics
 
-`/ready` is healthy only when at least one office port accepts a UNO connection. Export pool size, in-use count, generation time, instruction failures, and `soffice` restarts. The watchdog becomes something an operator can see.
+Status: **landed in wave 3**.
 
-Depends on: wave 3.
+`GET /ready` (context path `/odisee`) is HTTP 200 only when at least one office port accepts a UNO connection, otherwise 503. The JSON body exports pool size, in-use count, the last generation time, instruction failures, and `soffice` restarts. The watchdog becomes something an operator can see.
 
 ### F3. Template catalog and dry run
 

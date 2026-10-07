@@ -44,10 +44,12 @@ The schema is v2 (`template/@outputFormat`, `webservice/src/main/resources/xml/v
 
 ## Wave 3 — Pool stays up
 
-- Deadline on UNO `open`, instruction, and `save`. On deadline, close the document, drop the slot, and let `odiwatchdog` restart `soffice` (B14).
-- `/ready` and pool gauges (F2).
-- Delete or quarantine `OOoConnection`, `OOoConnectionManager`, and `OOoProcess` so the next edit cannot land in the unused stack (B26).
-- `DeferredNode` is already gone (B27, toolchain update).
+Status: **landed in this change**.
+
+- Deadline on UNO `open`, instruction, and `save` (`UnoCall`, default 120s, `odisee.uno.deadline.ms`). On deadline, close the document (2s, `odisee.uno.close.deadline.ms`), drop the slot, and stop the local `soffice` so `odiwatchdog` sees the port close and restarts it (B14). A dropped slot rejoins after `connect()` succeeds again. `/ready` pings an idle slot the same way and drops it when the ping does not return (`odisee.uno.recover.deadline.ms`, default 500ms).
+- `GET /ready` is HTTP 200 only when at least one office port accepts a UNO connection, otherwise 503. The JSON body is the pool gauges: pool size, in-use count, last generation time, instruction failures, and `soffice` restarts (F2).
+- `OOoConnection`, `OOoConnectionManager`, and `OOoProcess` are deleted, so the next edit cannot land in the unused stack (B26).
+- `DeferredNode` stays gone (B27, toolchain update).
 
 ## Wave 4 — Tenancy
 

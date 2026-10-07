@@ -71,6 +71,11 @@ public class OfficeConnection {
     private InetSocketAddress socketAddress;
 
     /**
+     * Left the pool after a UNO deadline. {@code odiwatchdog} restarts the process.
+     */
+    private volatile boolean dropped;
+
+    /**
      * The UNO URL.
      */
     private String unoURL;
@@ -336,6 +341,39 @@ public class OfficeConnection {
         }
     }
 
+    public boolean wasDropped() {
+        return dropped;
+    }
+
+    void markDropped() {
+        dropped = true;
+    }
+
+    void clearDropped() {
+        dropped = false;
+    }
+
+    public InetSocketAddress socketAddress() {
+        return socketAddress;
+    }
+
+    /**
+     * Abandon the bridge without calling back into a wedged office, then stop the local soffice.
+     * @return true when a local soffice was signaled so {@code odiwatchdog} can restart it
+     */
+    public boolean releaseForWatchdog() {
+        connected = false;
+        wasBootstrappedAlready = false;
+        desktop = null;
+        xRemoteServiceManager = null;
+        xComponentLoader = null;
+        xBridge = null;
+        if (socketAddress == null) {
+            return false;
+        }
+        return SofficeWatchdog.terminate(socketAddress.getPort());
+    }
+
     public void close() throws OdiseeServerException {
         enumerateComponents("close");
         // Cleanup all managed documents
@@ -371,6 +409,19 @@ public class OfficeConnection {
     private XDesktop getXDesktop() {
         assertInitialized();
         return queryInterface(XDesktop.class, desktop);
+    }
+
+    /**
+     * Dial if needed, then ask the desktop for its components.
+     * A wedged soffice does not return from that call.
+     */
+    public boolean responds() throws OdiseeServerException {
+        connect();
+        if (!isConnected()) {
+            return false;
+        }
+        getXDesktop().getComponents();
+        return true;
     }
 
     private void assertInitialized() {
