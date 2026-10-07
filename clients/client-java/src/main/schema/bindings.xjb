@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jaxb:bindings version="3.0"
+               xmlns:jaxb="https://jakarta.ee/xml/ns/jaxb"
+               xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <jaxb:bindings schemaLocation="request.xsd" node="/xs:schema">
+        <jaxb:schemaBindings>
+            <jaxb:package name="de.odisee.xml.server.request"/>
+        </jaxb:schemaBindings>
+    </jaxb:bindings>
+    <jaxb:bindings schemaLocation="request.xsd" node="//xs:element[@name='instructions']/xs:complexType/xs:choice">
+        <jaxb:property name="instruction"/>
+    </jaxb:bindings>
+    <jaxb:bindings schemaLocation="request.xsd" node="//xs:complexType[@name='actionType']">
+        <jaxb:class name="Action"/>
+    </jaxb:bindings>
+    <jaxb:bindings schemaLocation="request.xsd" node="//xs:complexType[@name='postProcessType']">
+        <jaxb:class name="PostProcess"/>
+    </jaxb:bindings>
+</jaxb:bindings>

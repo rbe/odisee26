@@ -33,10 +33,14 @@ Build:
 
 ## Wave 2 — One request contract
 
-- Choose v2 or v3 as the schema the server validates, and reject the other with 400.
-- Disable external entities. Cap the compressed and the decompressed body (B9, B19).
-- Map the remaining client errors to 400 or 422 in one place. Stop closing the response twice (B20).
-- Publish the chosen schema to `clients/client-java` and delete the unused XSD copies (F11).
+Status: **landed in this change**.
+
+The schema is v2 (`template/@outputFormat`, `webservice/src/main/resources/xml/v2/request.xsd`). v3 and v2.6 are HTTP 400. A document with no namespace is the same v2 shape. `output/format` is rejected. Instructions may appear in any order. The legacy `ooo` element is accepted and ignored.
+
+- `RequestSchema` validates the body before generation. The parser rejects a `DOCTYPE` and does not read external entities (B8, B9).
+- `Compression.readLimited` caps the raw body at 8 MiB and the expanded body at 32 MiB (B19).
+- `HttpStatuses` is the only status decision: 400 for a bad request, 422 for an instruction the schema allowed, 404 for a missing template, 503 for the office pool. The controller does not close the stream after that error body is written (B20).
+- The Java client is generated from that schema (`clients/client-java/src/main/schema/request.xsd`). The v3 and v2.6 request schemas are gone (F11).
 
 ## Wave 3 — Pool stays up
 

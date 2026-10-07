@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
     xmlns:odisee="http://xmlns.odisee.de/v2/request"
     targetNamespace="http://xmlns.odisee.de/v2/request"
-    elementFormDefault="qualified"
-    vc:maxVersion="1.1" vc:minVersion="1.0">
+    elementFormDefault="qualified">
     <xs:element name="odisee">
         <xs:annotation>
             <xs:documentation>
@@ -32,6 +30,16 @@
         </xs:annotation>
         <xs:complexType>
             <xs:sequence>
+                <xs:element name="ooo" minOccurs="0" maxOccurs="1">
+                    <xs:annotation>
+                        <xs:documentation>
+                            Legacy client element. The server accepts it and does not read it.
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:complexType>
+                        <xs:attribute name="group" type="xs:string"/>
+                    </xs:complexType>
+                </xs:element>
                 <xs:element ref="odisee:group" minOccurs="0" maxOccurs="1"/>
                 <xs:element ref="odisee:template" minOccurs="1" maxOccurs="1"/>
                 <xs:element ref="odisee:archive" minOccurs="0" maxOccurs="1"/>
@@ -54,6 +62,8 @@
                     </xs:documentation>
                 </xs:annotation>
             </xs:attribute>
+            <xs:attribute name="id" use="optional" type="xs:string"/>
+            <xs:attribute name="local-debug" use="optional" type="xs:boolean"/>
         </xs:complexType>
     </xs:element>
     <xs:element name="group">
@@ -108,11 +118,18 @@
                     <xs:documentation>Execute macro just before saving file.</xs:documentation>
                 </xs:annotation>
             </xs:attribute>
+            <xs:attribute name="post-save-macro" use="optional" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Execute macro just after saving file.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
             <xs:attribute name="revision" use="optional" type="xs:string">
                 <xs:annotation>
                     <xs:documentation>Use LATEST or certain revision (number).</xs:documentation>
                 </xs:annotation>
             </xs:attribute>
+            <xs:attribute name="path" use="optional" type="xs:string"/>
+            <xs:attribute name="outputPath" use="optional" type="xs:string"/>
         </xs:complexType>
     </xs:element>
     <xs:element name="instructions">
@@ -120,14 +137,14 @@
             <xs:documentation>These instructions are executed in order.</xs:documentation>
         </xs:annotation>
         <xs:complexType>
-            <xs:sequence minOccurs="1" maxOccurs="unbounded">
-                <xs:element ref="odisee:image" minOccurs="0" maxOccurs="unbounded"/>
-                <xs:element ref="odisee:autotext" minOccurs="0" maxOccurs="unbounded"/>
-                <xs:element ref="odisee:bookmark" minOccurs="0" maxOccurs="unbounded"/>
-                <xs:element ref="odisee:macro" minOccurs="0" maxOccurs="unbounded"/>
-                <xs:element ref="odisee:userfield" minOccurs="0" maxOccurs="unbounded"/>
-                <xs:element ref="odisee:texttable" minOccurs="0" maxOccurs="unbounded"/>
-            </xs:sequence>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+                <xs:element ref="odisee:image"/>
+                <xs:element ref="odisee:autotext"/>
+                <xs:element ref="odisee:bookmark"/>
+                <xs:element ref="odisee:macro"/>
+                <xs:element ref="odisee:userfield"/>
+                <xs:element ref="odisee:texttable"/>
+            </xs:choice>
         </xs:complexType>
     </xs:element>
     <xs:element name="userfield">
@@ -249,6 +266,7 @@
                     <xs:documentation>Insert autotext at end of text/document?</xs:documentation>
                 </xs:annotation>
             </xs:attribute>
+            <xs:attribute name="post-macro" use="optional" type="xs:string"/>
         </xs:complexType>
     </xs:element>
     <xs:element name="bookmark">
@@ -299,10 +317,10 @@
         <xs:annotation>
             <xs:documentation>List of parameters, ordered by arity.</xs:documentation>
         </xs:annotation>
-        <xs:complexType>
-            <xs:attribute name="value" use="required" type="xs:string">
+        <xs:complexType mixed="true">
+            <xs:attribute name="value" use="optional" type="xs:string">
                 <xs:annotation>
-                    <xs:documentation>Value for the parameter.</xs:documentation>
+                    <xs:documentation>Value for the parameter. Element text is also accepted.</xs:documentation>
                 </xs:annotation>
             </xs:attribute>
         </xs:complexType>
@@ -311,6 +329,7 @@
         <xs:annotation>
             <xs:documentation>Placeholder for result of actual request.</xs:documentation>
         </xs:annotation>
+        <xs:complexType/>
     </xs:element>
     <xs:element name="input">
         <xs:annotation>

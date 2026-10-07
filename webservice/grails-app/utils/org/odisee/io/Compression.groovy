@@ -11,13 +11,43 @@
 
 package org.odisee.io
 
+import org.odisee.api.OdiseeException
+
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import java.util.zip.ZipException
 
 final class Compression {
 
+    /** Raw HTTP body, before gzip is expanded. */
+    static final int MAX_COMPRESSED_BYTES = 8 * 1024 * 1024
+
+    /** Body after gzip, or the raw body when it is not gzip. */
+    static final int MAX_PLAIN_BYTES = 32 * 1024 * 1024
+
     private Compression() {
         throw new AssertionError();
+    }
+
+    /**
+     * Read a request body, expanding gzip when the magic bytes are present.
+     * Either cap is HTTP 400.
+     */
+    static byte[] readLimited(InputStream input) {
+        readLimited(input, MAX_COMPRESSED_BYTES, MAX_PLAIN_BYTES)
+    }
+
+    static byte[] readLimited(InputStream input, int maxCompressed, int maxPlain) {
+        final byte[] raw = readAtMost(input, maxCompressed, 'Compressed request')
+        InputStream plain = null
+        try {
+            plain = decompress(new ByteArrayInputStream(raw))
+            return readAtMost(plain, maxPlain, 'Request body')
+        } catch (ZipException e) {
+            throw new OdiseeException('Compressed request is not valid gzip', OdiseeException.BAD_REQUEST)
+        } finally {
+            plain?.close()
+        }
     }
 
     public static isCompressedSignature(final byte[] bytes) {
@@ -82,6 +112,21 @@ final class Compression {
      */
     public static byte[] zip(String str) {
         return zip(str.bytes)
+    }
+
+    private static byte[] readAtMost(InputStream input, int max, String label) {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream()
+        final byte[] buffer = new byte[8192]
+        int total = 0
+        int read
+        while ((read = input.read(buffer)) >= 0) {
+            total += read
+            if (total > max) {
+                throw new OdiseeException("${label} exceeds ${max} bytes", OdiseeException.BAD_REQUEST)
+            }
+            out.write(buffer, 0, read)
+        }
+        out.toByteArray()
     }
 
 }

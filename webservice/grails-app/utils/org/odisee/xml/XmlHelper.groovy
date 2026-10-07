@@ -14,20 +14,81 @@ import groovy.xml.XmlNodePrinter
 import groovy.xml.XmlSlurper
 import groovy.xml.slurpersupport.GPathResult
 import groovy.xml.slurpersupport.NodeChild
-import groovy.xml.DOMBuilder
 import groovy.xml.StreamingMarkupBuilder
 import groovy.xml.XmlUtil
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.xml.sax.EntityResolver
 import org.xml.sax.InputSource
+import org.xml.sax.SAXException
+
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilder
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.parsers.ParserConfigurationException
 
 final class XmlHelper {
 
     private static final String S_NEWLINE = '\n'
 
+    private static final DocumentBuilderFactory SECURE_FACTORY = secureFactory()
+
     private XmlHelper() {
         throw new AssertionError();
+    }
+
+    /**
+     * A parser that does not read a DTD or an external entity.
+     * A {@code DOCTYPE} is rejected.
+     */
+    static Document parseDocument(final String xml) throws SAXException, IOException {
+        parseDocument(new StringReader(xml))
+    }
+
+    static Document parseDocument(final Reader reader) throws SAXException, IOException {
+        parse(new InputSource(reader))
+    }
+
+    static Document parseDocument(final InputStream input) throws SAXException, IOException {
+        parse(new InputSource(input))
+    }
+
+    static Document newDocument() {
+        try {
+            return SECURE_FACTORY.newDocumentBuilder().newDocument()
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException('Cannot build an XML document', e)
+        }
+    }
+
+    private static Document parse(final InputSource source) throws SAXException, IOException {
+        try {
+            final DocumentBuilder builder = SECURE_FACTORY.newDocumentBuilder()
+            return builder.parse(source)
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException('Cannot build an XML parser', e)
+        }
+    }
+
+    private static DocumentBuilderFactory secureFactory() {
+        final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance()
+        factory.setNamespaceAware(true)
+        factory.setXIncludeAware(false)
+        factory.setExpandEntityReferences(false)
+        setFeature(factory, XMLConstants.FEATURE_SECURE_PROCESSING, true)
+        setFeature(factory, 'http://apache.org/xml/features/disallow-doctype-decl', true)
+        setFeature(factory, 'http://xml.org/sax/features/external-general-entities', false)
+        setFeature(factory, 'http://xml.org/sax/features/external-parameter-entities', false)
+        setFeature(factory, 'http://apache.org/xml/features/nonvalidating/load-external-dtd', false)
+        factory
+    }
+
+    private static void setFeature(final DocumentBuilderFactory factory, final String name, final boolean value) {
+        try {
+            factory.setFeature(name, value)
+        } catch (ParserConfigurationException ignored) {
+            // A parser that does not know one feature still has the others.
+        }
     }
 
     /**
@@ -55,8 +116,7 @@ final class XmlHelper {
      * @return org.w3c.dom.Element The document element.
      */
     static Element asElement(final String xml) {
-        final Document document = DOMBuilder.parse(new StringReader(xml))
-        document.documentElement
+        parseDocument(xml).documentElement
     }
 
     /**
@@ -69,7 +129,7 @@ final class XmlHelper {
             final String xmlString = new StreamingMarkupBuilder().bind {
                 mkp.yieldUnescaped arg
             }.toString()
-            DOMBuilder.parse(new StringReader(xmlString)).documentElement
+            parseDocument(xmlString).documentElement
         } else {
             null
         }
@@ -93,7 +153,7 @@ final class XmlHelper {
         final String xmlString = new StreamingMarkupBuilder().bind {
             mkp.yield arg
         }.toString()
-        DOMBuilder.parse(new StringReader(xmlString)).documentElement
+        parseDocument(xmlString).documentElement
     }
 
     /**
