@@ -1,5 +1,6 @@
 package org.odisee.document
 
+import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException
 
 import java.net.InetSocketAddress

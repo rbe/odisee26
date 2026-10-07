@@ -1,5 +1,7 @@
 package org.odisee.io
 
+import groovy.test.GroovyTestCase
+
 class CompressionTest extends GroovyTestCase {
 
     void testGzipRoundTrip() {

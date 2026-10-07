@@ -59,7 +59,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | ID | Severity | Status | Bug |
 |---|---|---|---|
 | B26 | major | open | Two office stacks are compiled: `OfficeConnection` / `OfficeConnectionFactory` (used) and `OOoConnection` / `OOoConnectionManager` / `OOoProcess` (not used by the request path). |
-| B27 | major | open | The service depends on `com.sun.org.apache.xerces.internal.dom.DeferredNode` (`RequestService`). That package is encapsulated on current JDKs. |
+| B27 | major | fixed with the toolchain update | `RequestService` no longer uses `com.sun.org.apache.xerces.internal.dom.DeferredNode`. XML is written through `GPathResult` and `org.w3c.dom.Node`, which JDK 21 allows. |
 | B28 | minor | open | `OdiseePath` calls `Path.of(System.getProperty("ODISEE_HOME"))` when the environment variable is unset. A missing property throws `NullPointerException` instead of `OdiseeException`. |
 | B29 | minor | open | `SPREADSHEET` is the only Calc hint, and the instruction set is Writer-only. Calc/Impress are listed in `OdiseeFileFormat` and then stop. |
 | B30 | major | partial | Wave 1 covers the helpers. Tests 1–3 open a real template in LibreOffice (`GenerationBasisTest`, Docker). Tests 4–5 cover HTTP status and the pool. The Java client still has no assertion against a local server. |

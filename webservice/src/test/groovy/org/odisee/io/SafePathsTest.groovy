@@ -1,5 +1,6 @@
 package org.odisee.io
 
+import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException
 
 import java.nio.file.Files

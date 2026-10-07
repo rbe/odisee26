@@ -7,7 +7,10 @@ ls -lR
 
 ODISEE_HOME=/home/odisee
 . ${ODISEE_HOME}/etc/odienv
-odictl -q start
+# LibreOffice only. The JVM stays in the foreground below so the container
+# lifecycle follows the service. `odictl -q start` is the bare-metal command
+# and would launch application.jar a second time.
+odictl -q start-inst
 sleep 5
 echo
 echo "Running Office instances:"

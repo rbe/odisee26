@@ -1,7 +1,8 @@
 package org.odisee.document
 
+import groovy.test.GroovyTestCase
 import groovy.xml.DOMBuilder
-import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
@@ -129,7 +130,7 @@ class GenerationBasisTest extends GroovyTestCase {
     }
 
     private static String pdfText(byte[] bytes) {
-        PDDocument document = PDDocument.load(bytes)
+        def document = Loader.loadPDF(bytes)
         try {
             new PDFTextStripper().getText(document)
         } finally {

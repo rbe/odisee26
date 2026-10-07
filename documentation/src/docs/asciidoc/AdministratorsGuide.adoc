@@ -64,25 +64,15 @@ sudo su - odisee
 . Download distribution as ZIP archive for your platform
 [source,bash,lineno]
 ----
-wget https://ci.art-of-coding.eu/guestAuth/odisee2_build/latest.lastSuccessful/distrib/odisee-PLATFORM.zip
+wget https://github.com/rbe/odisee26/releases/latest/download/odisee-2.6-linux-x86_64.zip
 ----
 
-Where PLATFORM is one of the following:
+GitHub Actions also attaches the same zip to each successful build. Publishing a release happens when a `v*` tag is pushed.
 
 .Supported Platforms
 [source,bash,lineno]
 ----
 linux-x86_64
-----
-
-or
-
-.Unsupported Platforms
-[source,bash,lineno]
-----
-freebsd-amd64
-Darwin-x86_64
-Windows x64
 ----
 
 .Unpack distribution in `$ODISEE_HOME`

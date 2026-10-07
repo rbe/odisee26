@@ -1,5 +1,7 @@
 package org.odisee.document
 
+import groovy.test.GroovyTestCase
+
 class OfficeDocumentTypeTest extends GroovyTestCase {
 
     void testSpreadsheetDocumentExtension() {

@@ -10,7 +10,7 @@
  */
 package org.odisee.document
 
-import com.sun.org.apache.xerces.internal.dom.DeferredNode
+import groovy.xml.slurpersupport.GPathResult
 import org.odisee.io.FileHelper
 import org.odisee.xml.XmlHelper
 import org.odisee.shared.OdiseeConstant
@@ -57,8 +57,7 @@ class RequestService implements InitializingBean {
             final String filename = String.format('%s_%d.xml', arg.uniqueRequestId, requestNumber)
             final Path documentDir = (Path) arg.documentDir
             requestXMLFile = documentDir.resolve(filename)
-            final DeferredNode deferredNode = (DeferredNode) arg.xml.request[requestNumber]
-            xmlString = XmlHelper.asString(deferredNode)
+            xmlString = XmlHelper.asString((GPathResult) arg.xml.request[requestNumber])
         }
         Files.createDirectories(requestXMLFile.parent)
         FileHelper.writeUTF8(requestXMLFile, xmlString)

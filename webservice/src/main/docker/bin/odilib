@@ -799,6 +799,57 @@ update_all_oxt() {
 }
 
 #
+# Start the Odisee service (Spring Boot jar).
+#
+start_appsrv() {
+    local jar="${ODISEE_HOME}/application.jar"
+    local pidfile="${ODISEE_VAR}/odisee.pid"
+    local logfile="${ODISEE_LOG}/odisee.log"
+    if [ ! -f "${jar}" ]
+    then
+        echo "Odisee: application.jar not found in ${ODISEE_HOME}"
+        return 1
+    fi
+    if [ -z "${JAVA_HOME}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]
+    then
+        echo "Odisee: JAVA_HOME is not set to a JDK or JRE"
+        return 1
+    fi
+    mkdir -p "${ODISEE_LOG}"
+    if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" 2>/dev/null
+    then
+        echo "Odisee: application already started (pid $(cat "${pidfile}"))."
+        return 0
+    fi
+    echo "Starting Odisee Service"
+    nohup "${JAVA_HOME}/bin/java" \
+        -Xms1g -Xmx1g \
+        -Djava.security.egd=file:/dev/./urandom \
+        -jar "${jar}" >>"${logfile}" 2>&1 &
+    echo $! > "${pidfile}"
+}
+
+#
+# Stop the Odisee service.
+#
+stop_appsrv() {
+    local pidfile="${ODISEE_VAR}/odisee.pid"
+    if [ ! -f "${pidfile}" ]
+    then
+        echo "Odisee: application is not running."
+        return 0
+    fi
+    local pid
+    pid=$(cat "${pidfile}")
+    if kill -0 "${pid}" 2>/dev/null
+    then
+        echo "Stopping Odisee Service"
+        kill "${pid}"
+    fi
+    rm -f "${pidfile}"
+}
+
+#
 # Show copyright.
 #
 show_copyr() {

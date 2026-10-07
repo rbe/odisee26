@@ -1,5 +1,6 @@
 package org.odisee.document
 
+import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import org.odisee.ooo.connection.OdiseeServerException

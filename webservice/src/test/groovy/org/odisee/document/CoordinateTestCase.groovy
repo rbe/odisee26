@@ -10,6 +10,8 @@
  */
 package org.odisee.document
 
+import groovy.test.GroovyTestCase
+
 class CoordinateTestCase extends GroovyTestCase {
 
     void testSimpleCoordinate() {

@@ -10,7 +10,7 @@
  */
 package org.odisee.document
 
-import javax.servlet.http.HttpServletResponse
+import jakarta.servlet.http.HttpServletResponse
 import java.security.SecureRandom
 
 final class DocumentStreamer {

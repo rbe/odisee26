@@ -1,9 +1,10 @@
-FROM debian:bookworm-slim
+FROM ubuntu:26.04
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libreoffice-writer \
         fonts-liberation \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /entrypoint.sh

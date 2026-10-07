@@ -1,5 +1,8 @@
 package org.odisee.document
 
+import groovy.test.GroovyTestCase
+import groovy.xml.XmlSlurper
+
 class OutputFormatsTest extends GroovyTestCase {
 
     void testV2Attribute() {

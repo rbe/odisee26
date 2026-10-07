@@ -13,6 +13,7 @@ package org.odisee.document
 
 import com.sun.star.lang.XComponent
 import groovy.util.logging.Log
+import groovy.xml.XmlSlurper
 import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
 import org.odisee.io.SafePaths
@@ -22,7 +23,6 @@ import org.odisee.ooo.connection.OfficeConnectionFactory
 import org.odisee.shared.OdiseeConstant
 import org.odisee.writer.*
 
-import javax.xml.bind.DatatypeConverter
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -227,7 +227,7 @@ class OdiseeXmlCategory {
     }
 
     private static String saveImageToFile(Map arg, String imageType, String imageContent) {
-        byte[] imageData = DatatypeConverter.parseBase64Binary(imageContent)
+        byte[] imageData = Base64.decoder.decode(imageContent.toString().trim())
         Path outputPath = Paths.get(arg.outputPath)
         FileAttribute<Set<PosixFilePermission>> fileAttribute = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))
         String extension

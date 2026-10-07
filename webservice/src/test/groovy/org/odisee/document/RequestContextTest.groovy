@@ -1,5 +1,7 @@
 package org.odisee.document
 
+import groovy.test.GroovyTestCase
+
 class RequestContextTest extends GroovyTestCase {
 
     void testEachCallHasItsOwnDocumentList() {

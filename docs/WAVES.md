@@ -22,10 +22,14 @@ Scope:
 
 Out of scope on purpose: authentication enforcement, schema validation, UNO deadlines, deleting the unused office stack, a real LibreOffice test.
 
-Build, so this wave can be compiled here:
+Build:
 
-- UNO classes come from Maven Central (`org.libreoffice:juh`, `jurt`, `ridl`, `unoil`, `unoloader` at 6.3.3). `compileJava` no longer downloads a LibreOffice `.deb`. The unpack task is still there for an offline deb.
-- The extension project skips its Ant import when `oxt/antlib` has no jars, so a missing ant-contrib does not stop the webservice from configuring. Building the extension still asks for those jars.
+- JDK 21, Gradle 8.14.5, Grails 7.2.4.
+- UNO classes come from Maven Central (`org.libreoffice:libreoffice` and `org.libreoffice:unoloader` at 26.2.2, the newest 26.2 still jars published there). The older `juh`, `jurt`, `ridl`, and `unoil` coordinates are empty stubs at that version. `compileJava` does not download a LibreOffice `.deb`.
+- `./gradlew build` compiles, runs the unit tests, and writes `build/distributions/odisee-2.6-linux-x86_64.zip`. GitHub Actions does the same on JDK 21 and publishes the zip on a `v*` tag.
+- `./gradlew :webservice:test` does not start Docker. `./gradlew :webservice:libreOfficeTest` builds `webservice/src/test/docker/libreoffice` (Ubuntu 26.04, distro LibreOffice) and runs tests 1–3.
+- The service image is `./gradlew :webservice:buildOdiseeImage` (Ubuntu 26.04, OpenJDK 21, distro LibreOffice). It is not part of `build`.
+- `oxt/buildExtension` downloads ant-contrib and xmltask, then runs the Ant `world-production` target. Configuration of the webservice does not import that Ant build. Gradle is started with `--add-exports` for `java.xml/com.sun.org.apache.xpath.internal` and `java.xml/com.sun.org.apache.xpath.internal.objects` because xmltask 1.16 calls those JDK-internal XPath classes.
 
 ## Wave 2 — One request contract
 
@@ -39,7 +43,7 @@ Build, so this wave can be compiled here:
 - Deadline on UNO `open`, instruction, and `save`. On deadline, close the document, drop the slot, and let `odiwatchdog` restart `soffice` (B14).
 - `/ready` and pool gauges (F2).
 - Delete or quarantine `OOoConnection`, `OOoConnectionManager`, and `OOoProcess` so the next edit cannot land in the unused stack (B26).
-- Stop using `com.sun.org.apache.xerces.internal.dom.DeferredNode` (B27).
+- `DeferredNode` is already gone (B27, toolchain update).
 
 ## Wave 4 — Tenancy
 
