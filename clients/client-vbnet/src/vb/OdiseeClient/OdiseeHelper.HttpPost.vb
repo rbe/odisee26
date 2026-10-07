@@ -58,12 +58,19 @@ Namespace Helper
         ''' <returns></returns>
         ''' <remarks></remarks>
         Public Shared Function doBasicAuthPost(ByRef xmlDocument As XmlDocument, ByRef serviceURL As Uri, Optional ByVal username As String = Nothing, Optional ByVal password As String = Nothing, Optional ByVal timeout As Integer = 30000) As HttpWebResponse
+            Return doBasicAuthPost(xmlDocument.OuterXml, "text/xml; charset=UTF-8", serviceURL, username, password, timeout)
+        End Function
+
+        ''' <summary>
+        ''' Post a request body (XML or JSON) to an Odisee server using HTTP basic authentication.
+        ''' </summary>
+        Public Shared Function doBasicAuthPost(ByVal body As String, ByVal contentType As String, ByRef serviceURL As Uri, Optional ByVal username As String = Nothing, Optional ByVal password As String = Nothing, Optional ByVal timeout As Integer = 30000) As HttpWebResponse
             Dim trycount As Integer = 0
             Dim httpWebResponse As HttpWebResponse = Nothing
             ' Create instance of WebRequest
             Dim httpWebRequest As HttpWebRequest = makeHttpWebRequest(serviceURL, username, password)
             httpWebRequest.Method = "POST"
-            httpWebRequest.ContentType = "text/xml"
+            httpWebRequest.ContentType = contentType
             ' Authentication?
             If Not IsNothing(username) And Not IsNothing(password) Then
                 ' BASIC
@@ -71,8 +78,8 @@ Namespace Helper
                 authInfo = Convert.ToBase64String(Encoding.Default.GetBytes(authInfo))
                 httpWebRequest.Headers.Set("Authorization", "Basic " & authInfo)
             End If
-            ' Create byte buffer from XML string
-            Dim byteBuffer() As Byte = Encoding.UTF8.GetBytes(xmlDocument.OuterXml)
+            ' Create byte buffer from the request body
+            Dim byteBuffer() As Byte = Encoding.UTF8.GetBytes(body)
             httpWebRequest.ContentLength = byteBuffer.Length()
             ' Send request
             Try
@@ -142,6 +149,13 @@ Namespace Helper
         ''' <returns></returns>
         ''' <remarks></remarks>
         Public Shared Function doDigestAuthPost(ByRef xmlDocument As XmlDocument, ByRef serviceURL As Uri, Optional ByVal username As String = Nothing, Optional ByVal password As String = Nothing, Optional ByVal timeout As Integer = 30000) As HttpWebResponse
+            Return doDigestAuthPost(xmlDocument.OuterXml, "text/xml; charset=UTF-8", serviceURL, username, password, timeout)
+        End Function
+
+        ''' <summary>
+        ''' Post a request body (XML or JSON) to an Odisee server using HTTP digest authentication.
+        ''' </summary>
+        Public Shared Function doDigestAuthPost(ByVal body As String, ByVal contentType As String, ByRef serviceURL As Uri, Optional ByVal username As String = Nothing, Optional ByVal password As String = Nothing, Optional ByVal timeout As Integer = 30000) As HttpWebResponse
             ' Init for HTTP DIGEST
             Dim httpWebRequest As HttpWebRequest = initHttpDigestAuth(serviceURL, username, password)
             Dim trycount As Integer = 0
@@ -150,9 +164,9 @@ Namespace Helper
                 ' Create new instance of WebRequest
                 httpWebRequest = makeHttpWebRequest(serviceURL, username, password)
                 httpWebRequest.Method = "POST"
-                httpWebRequest.ContentType = "text/xml"
-                ' Create byte buffer from XML string
-                Dim byteBuffer() As Byte = Encoding.UTF8.GetBytes(xmlDocument.OuterXml)
+                httpWebRequest.ContentType = contentType
+                ' Create byte buffer from the request body
+                Dim byteBuffer() As Byte = Encoding.UTF8.GetBytes(body)
                 ' Send request
                 Try
                     ' Set content length

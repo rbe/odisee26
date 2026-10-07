@@ -50,11 +50,12 @@ final class OdiseeHttpHelper {
         this.password = password;
     }
 
-    public byte[] post(final URL url, final String body) {
+    public byte[] post(final URL url, final String body, final String contentType) {
         final HttpURLConnection connection = getHttpURLConnection(url);
         Objects.requireNonNull(connection);
-        connection.setRequestProperty("Content-Length", String.valueOf(body.length()));
-        connection.setRequestProperty("Content-Type", "text/xml");
+        final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        connection.setRequestProperty("Content-Length", String.valueOf(bytes.length));
+        connection.setRequestProperty("Content-Type", contentType);
         try (final OutputStreamWriter streamWriter = new OutputStreamWriter(connection.getOutputStream(),
                 StandardCharsets.UTF_8);
              final InputStream is = connection.getInputStream();
@@ -70,10 +71,10 @@ final class OdiseeHttpHelper {
         }
     }
 
-    public byte[] postCompressed(URL url, String body) {
+    public byte[] postCompressed(URL url, String body, final String contentType) {
         final HttpURLConnection connection = getHttpURLConnection(url);
         Objects.requireNonNull(connection);
-        connection.setRequestProperty("Content-Type", "application/x-gzip");
+        connection.setRequestProperty("Content-Type", contentType);
         connection.setRequestProperty("Content-Encoding", "gzip");
         try (final GZIPOutputStream gzipOutputStream = new GZIPOutputStream(connection.getOutputStream());
              final OutputStreamWriter streamWriter = new OutputStreamWriter(gzipOutputStream,

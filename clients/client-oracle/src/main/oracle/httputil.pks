@@ -29,6 +29,16 @@ AS
         , charset IN VARCHAR2 DEFAULT 'UTF-8'
         , result OUT BLOB
     );
+    /*
+     * Post a request with an explicit Content-Type (text/xml or application/json).
+     */
+    PROCEDURE post_document(
+        url IN VARCHAR2
+        , data IN VARCHAR2
+        , content_type IN VARCHAR2
+        , charset IN VARCHAR2 DEFAULT 'UTF-8'
+        , result OUT BLOB
+    );
     PROCEDURE process_response(
         url IN VARCHAR2
         , resp IN OUT UTL_HTTP.resp

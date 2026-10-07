@@ -5,7 +5,10 @@ Make Your Documents Smile.
 
 === Documentation
 
-See file://src/main/asciidoc/Odisee.adoc[Odisee.adoc]
+See documentation/src/docs/asciidoc/Odisee.adoc[Odisee.adoc].
+
+`POST /document/generate` accepts XML (`text/xml`, the default) and JSON (`application/json`).
+The JSON shape is `webservice/src/main/resources/json/request.schema.json`.
 
 === Building
 

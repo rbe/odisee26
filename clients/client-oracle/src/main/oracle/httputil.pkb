@@ -82,6 +82,28 @@ AS
         process_response(url, httpresp, result);
     END;
     /*
+     * Post a request with an explicit Content-Type and receive binary data.
+     */
+    PROCEDURE post_document(
+        url IN VARCHAR2
+        , data IN VARCHAR2
+        , content_type IN VARCHAR2
+        , charset IN VARCHAR2 DEFAULT 'UTF-8'
+        , result OUT BLOB
+    )
+    AS
+        httpreq UTL_HTTP.req;
+        httpresp UTL_HTTP.resp;
+    BEGIN
+        httpreq := UTL_HTTP.BEGIN_REQUEST(url, 'POST', 'HTTP/1.1');
+        UTL_HTTP.SET_BODY_CHARSET(httpreq, charset);
+        UTL_HTTP.SET_HEADER(httpreq, 'Content-Type', content_type);
+        UTL_HTTP.SET_HEADER(httpreq, 'Content-Length', LENGTH(data));
+        UTL_HTTP.write_text(httpreq, data);
+        httpresp := UTL_HTTP.GET_RESPONSE(httpreq);
+        process_response(url, httpresp, result);
+    END;
+    /*
      *
      */
     PROCEDURE process_response(
