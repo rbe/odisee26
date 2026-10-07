@@ -1,6 +1,6 @@
 # Odisee feature ideas
 
-These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. None of them are implemented yet.
+These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F11 landed with wave 2. The rest are not implemented yet.
 
 ## Generation API
 
@@ -66,9 +66,7 @@ Depends on: wave 1 parser (done), wave 3 deadlines.
 
 ### F11. One request schema, published for the clients
 
-Pick v2 (`template/@outputFormat`) or v3 (`output/format`) and generate the Java client from that file. Delete the schemas the server does not implement. PHP, VB.NET, and the Oracle package should share the same examples under `webservice/src/main/docker/var/request`.
-
-Depends on: wave 2.
+Done in wave 2. The server and the Java client use v2 (`template/@outputFormat`). The schema is `webservice/src/main/resources/xml/v2/request.xsd`, copied to `clients/client-java/src/main/schema/request.xsd`. The v3 and v2.6 request schemas are deleted. PHP, VB.NET, and the Oracle package still build that same shape; their examples under `webservice/src/main/docker/var/request` are unchanged.
 
 ### F12. Integration suite with a headless LibreOffice
 

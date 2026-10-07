@@ -11,12 +11,13 @@
 
 package org.odisee.document
 
+import org.grails.web.servlet.mvc.GrailsWebRequest
 import org.odisee.api.OdiseeException
 import org.odisee.debug.WallTime
 import org.odisee.io.Compression
 import org.odisee.io.OdiseePath
 import org.odisee.json.JsonRequest
-import org.odisee.xml.XmlHelper
+import org.springframework.web.context.request.RequestContextHolder
 import org.w3c.dom.Element
 
 import java.security.Principal
@@ -37,36 +38,52 @@ class DocumentController {
         if (OdiseePath.ODISEE_PROFILE) {
             wallTime.start()
         }
-        boolean jsonRequest = false
+        boolean errorResponse = false
         try {
-            final InputStream decompressedInputStream = Compression.decompress(request.inputStream)
-            final byte[] body = decompressedInputStream.bytes
-            jsonRequest = isJsonRequest(request.getContentType(), body)
+            final byte[] body = Compression.readLimited(request.inputStream)
+            final boolean jsonRequest = isJsonRequest(request.getContentType(), body)
             final Element xml = jsonRequest
                     ? JsonRequest.toElement(new String(body, 'UTF-8'))
-                    : XmlHelper.convertToXmlElement(new ByteArrayInputStream(body))
-            if (null != xml) {
-                final Principal caller = request.userPrincipal ?: principal
-                final Document document = processXmlRequest(caller, xml)
-                if (null == document) {
-                    throw new OdiseeException('Cannot send stream, no document')
-                } else {
-                    DocumentStreamer.stream(response, document)
-                }
-            } else {
+                    : RequestSchema.parse(body)
+            if (jsonRequest) {
+                RequestSchema.validate(xml)
+            }
+            if (null == xml) {
                 throw new OdiseeException(jsonRequest
                         ? 'Invalid or missing JSON request'
                         : 'Invalid or missing XML request')
             }
+            final Principal caller = request.userPrincipal ?: principal
+            final Document document = processXmlRequest(caller, xml)
+            if (null == document) {
+                throw new OdiseeException('Cannot send stream, no document')
+            }
+            DocumentStreamer.stream(response, document)
         } catch (e) {
+            errorResponse = true
             processThrowable(e)
         } finally {
-            // Prevent Grails from rendering generate.gsp (it does not exist)
-            response.outputStream.close()
+            // The error path already wrote the body through HttpStatuses.
+            // Closing that stream again drops the message. Close only the
+            // success path, which is what stops Grails rendering generate.gsp.
+            skipView()
+            if (!errorResponse) {
+                try {
+                    response.outputStream.close()
+                } catch (IOException ignored) {
+                }
+            }
             if (OdiseePath.ODISEE_PROFILE) {
                 wallTime.stop()
                 log.info "Document generation took ${wallTime.diff()} ms (wall clock)"
             }
+        }
+    }
+
+    private static void skipView() {
+        def attributes = RequestContextHolder.getRequestAttributes()
+        if (attributes instanceof GrailsWebRequest) {
+            attributes.renderView = false
         }
     }
 

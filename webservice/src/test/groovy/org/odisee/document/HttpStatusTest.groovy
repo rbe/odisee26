@@ -4,6 +4,7 @@ import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import org.odisee.ooo.connection.OdiseeServerException
+import org.xml.sax.SAXException
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -42,6 +43,16 @@ class HttpStatusTest extends GroovyTestCase {
     void testOfficePoolFailureIsUnavailable() {
         OdiseeServerException error = new OdiseeServerException('Could not fetch connection from pool, sorry.')
         assertBody(error, 503)
+    }
+
+    void testParseFailureIsBadRequest() {
+        SAXException error = new SAXException('DOCTYPE is disallowed')
+        assertBody(error, OdiseeException.BAD_REQUEST)
+    }
+
+    void testInstructionFailureIsUnprocessable() {
+        OdiseeException error = new OdiseeException('Document instructions failed: userfield Hallo: missing', OdiseeException.UNPROCESSABLE)
+        assertBody(error, OdiseeException.UNPROCESSABLE)
     }
 
     private static void assertBody(Throwable error, int status) {

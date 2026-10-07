@@ -22,6 +22,7 @@ import de.odisee.xml.server.request.Odisee;
 import de.odisee.xml.server.request.Parameter;
 import de.odisee.xml.server.request.PostProcess;
 import de.odisee.xml.server.request.Request;
+import de.odisee.xml.server.request.ResultPlaceholder;
 import de.odisee.xml.server.request.Template;
 import de.odisee.xml.server.request.Userfield;
 
@@ -110,19 +111,22 @@ public final class OdiseeClient {
     }
 
     private List<Object> getInstructionsObject(final Request request) {
-        return getInstructions(request).getAutotextAndBookmarkAndMacro();
+        return getInstructions(request).getInstruction();
     }
 
     public OdiseeClient mergeDocumentAtEnd(final Path path) {
-        final PostProcess postProcess = factory.createPostProcess();
+        PostProcess postProcess = odisee.getPostProcess();
+        if (postProcess == null) {
+            postProcess = factory.createPostProcess();
+            odisee.setPostProcess(postProcess);
+        }
         final Action action = factory.createAction();
         action.setType("merge-with");
-        action.setResultPlaceholder("");
+        action.getResultPlaceholder().add(new ResultPlaceholder());
         final Input input = factory.createInput();
         input.setFilename(path.toString());
-        action.setInput(input);
+        action.getInput().add(input);
         postProcess.getAction().add(action);
-        odisee.getPostProcess().add(postProcess);
         return this;
     }
 

@@ -12,11 +12,11 @@ class OutputFormatsTest extends GroovyTestCase {
         assertEquals(['odt', 'pdf'], OutputFormats.fromRequest(request))
     }
 
-    void testV3FormatElement() {
+    void testV3FormatElementIsNotRead() {
         def request = new XmlSlurper().parseText(
                 '<request><template name="A"/><output><format type="pdfa"/></output></request>')
 
-        assertEquals(['pdfa'], OutputFormats.fromRequest(request))
+        assertEquals([], OutputFormats.fromRequest(request))
     }
 
     void testAttributeWinsWhenBothArePresent() {

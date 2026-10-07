@@ -63,9 +63,29 @@ the API.
                              setUserfield("Subject", "This is a letter").
                              process();
 
+=== Request contract
+
+`POST /document/generate` validates XML against the v2 request schema (`template/@outputFormat`).
+A document with no namespace is that same shape.
+The v3 namespace, the v2.6 namespace, and `output/format` are HTTP 400.
+The body is plain text: the schema message.
+
+A `DOCTYPE` is rejected.
+External entities are not read.
+The raw body, including gzip, is limited to 8 MiB.
+The body after gzip is limited to 32 MiB.
+Either limit is HTTP 400.
+
+`HttpStatuses` chooses the status.
+400 is a request the schema refused.
+422 is an instruction the schema allowed and the office process could not run.
+404 is a missing template.
+503 is an office pool that could not take the call.
+
 === JSON requests
 
 XML is still the default, and it is still what the generator executes.
+JSON is converted to that v2 document and validated with the same schema.
 The same `POST /document/generate` endpoint also accepts JSON.
 Send `Content-Type: application/json`.
 A body that starts with `{` is treated as JSON when the content type is omitted.
