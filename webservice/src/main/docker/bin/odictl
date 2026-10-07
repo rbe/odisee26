@@ -110,8 +110,10 @@ exec_cmdopt() {
                     do
                         start_instance $i
                     done
+                    start_appsrv
                 ;;
                 stop) # Stop OOo instance(s) and application server
+                    stop_appsrv
                     for i in $(_splitcmdopt i)
                     do
                         stop_instance $i

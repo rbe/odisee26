@@ -9,15 +9,27 @@ See file://src/main/asciidoc/Odisee.adoc[Odisee.adoc]
 
 === Building
 
-Steps to setup environment
+Java 11 is required. Gradle 6.0.1 and Grails 4.0.1 do not run on Java 17 or newer.
+
+.Steps
 
 1. Optional: Configure HTTP proxy (see below)
-2. Execute following build tasks:
+2. Point `JAVA_HOME` at a JDK 11
+3. Execute following build tasks:
 +
 [source,text]
 ----
+export JAVA_HOME=/path/to/jdk-11
 ./gradlew build
 ----
+
+`build` compiles every module, runs the unit tests, and writes `build/distributions/odisee-2.6-linux-x86_64.zip`.
+
+The zip contains `application.jar`, `bin/odictl`, `etc/`, the Java client, the LibreOffice extension, and the HTML documentation.
+
+Docker image tasks (`:docker:buildAllDockerImages`, `:webservice:buildOdiseeImage`) are not part of `build`. They need a local Docker daemon. The LibreOffice base images still use archived 2019 distribution snapshots.
+
+GitHub Actions runs the same `./gradlew build` and uploads the zip. A git tag `v*` also publishes that zip as a GitHub Release.
 
 ==== Proxy
 

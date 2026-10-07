@@ -77,8 +77,7 @@ task buildOpenSuseLibreOfficeImage(type: DockerBuildImage, dependsOn: prepareOpe
 
 task buildAllDockerImages() {
     group = 'Odisee'
+    description = 'Build LibreOffice base images. Requires a Docker daemon; not part of the default build.'
     dependsOn buildArchLinuxLibreOfficeImage
     dependsOn buildOpenSuseLibreOfficeImage
 }
-
-assemble.dependsOn('buildArchLinuxLibreOfficeImage')

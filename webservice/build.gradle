@@ -49,7 +49,8 @@ configurations {
 
 // LibreOffice Version
 // See ext.downloadMap in section LibreOffice
-def libreOfficeVersion = '6.3.3'
+// 6.3.3 disappeared from the stable mirrors. 6.3.3.2 is the same line and is still on the Document Foundation archive.
+def libreOfficeVersion = '6.3.3.2'
 // Change variant in odisee/Dockerfile also (variable not usable in Docker FROM)
 def libreOfficeVariant = 'still'
 
@@ -91,6 +92,7 @@ dependencies {
     //testImplementation 'org.grails:grails-gorm-testing-support'
     testImplementation 'org.mockito:mockito-core'
     testImplementation 'org.grails:grails-web-testing-support'
+    testImplementation 'org.codehaus.groovy:groovy-test:2.5.8'
     //testImplementation 'org.grails.plugins:geb'
 }
 
@@ -269,9 +271,7 @@ task createDockerfile(type: Dockerfile, dependsOn: prepareOdiseeDocker) {
 */
 task buildOdiseeImage(type: DockerBuildImage, dependsOn: prepareOdiseeDocker) {
     group = 'Odisee'
-    description = 'Create Docker image to run the Grails application'
+    description = 'Create Docker image to run the Grails application. Requires a Docker daemon; not part of the default build.'
     inputDir = file(dockerBuildDir)
     images.add(dockerTag)
 }
-
-assemble.dependsOn('buildOdiseeImage')

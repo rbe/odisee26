@@ -609,10 +609,6 @@
                 </copy>
             </then>
         </if>
-        <!-- Set build date in build.properties -->
-        <propertyfile file="build.properties">
-            <entry key="ext.release.date" type="date" value="now" pattern="yyyyMMdd-HHmmss"/>
-        </propertyfile>
     </target>
     <!--
 

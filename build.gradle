@@ -43,3 +43,64 @@ task osInfo {
         }
     }
 }
+
+task packageDistribution(type: Zip) {
+    group = 'Odisee'
+    description = 'Zip the Linux x86_64 runtime: service, Java client, extension, and docs'
+    baseName = 'odisee'
+    classifier = 'linux-x86_64'
+    destinationDir = file("${buildDir}/distributions")
+    dependsOn ':webservice:bootJar',
+            ':clients:client-java:jar',
+            ':oxt:buildExtension',
+            ':documentation:asciidoctor'
+
+    def layout = file("${buildDir}/package-layout")
+    def varDirs = [
+            'var/deploy/fonts',
+            'var/document',
+            'var/image',
+            'var/log',
+            'var/merge',
+            'var/profile',
+            'var/request',
+            'var/template',
+            'var/tmp',
+    ]
+    doFirst {
+        varDirs.each { String rel ->
+            def dir = new File(layout, rel)
+            dir.mkdirs()
+            new File(dir, '.keep').text = ''
+        }
+    }
+
+    into('bin') {
+        from('webservice/src/main/docker/bin')
+        fileMode = 0755
+    }
+    into('etc') {
+        from('webservice/src/main/docker/etc')
+    }
+    from('webservice/src/main/docker/shell_profile') {
+        rename { '.bash_profile' }
+    }
+    from("${layout}")
+    from("webservice/build/libs/webservice-${version}.jar") {
+        rename { 'application.jar' }
+    }
+    into('client') {
+        from("clients/client-java/build/libs/client-java-${version}.jar")
+    }
+    into('extension') {
+        from('oxt/Odisee/dist/Odisee.oxt')
+    }
+    into('docs') {
+        from('documentation/build/docs')
+    }
+    from('LICENSE')
+    from('LICENSE-Apache2.0')
+    from('README.md')
+}
+
+build.dependsOn packageDistribution
