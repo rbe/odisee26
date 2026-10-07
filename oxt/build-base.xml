@@ -379,6 +379,7 @@
     </target>
     <!-- -->
     <target name="make-serverupdatexml">
+        <mkdir dir="${dist.dir}"/>
         <antcall target="-create-empty-serverxml"/>
         <antcall target="-add-identifier-to-serverxml"/>
         <antcall target="-add-version-to-serverxml"/>

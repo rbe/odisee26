@@ -165,50 +165,62 @@ task downloadAndUnpackLibreOffice {
         }
         // Unpack
         File unpackLibreOfficeDir = file("${unpackDir}/libreoffice-${libreOfficeVersion}")
-        List unpack_debs = []
-        if (!unpackLibreOfficeDir.exists()) {
+        def debTree = {
+            fileTree(unpackLibreOfficeDir) {
+                include '**/*ure*.deb'
+                include '**/*core*.deb'
+            }
+        }
+        if (debTree().empty) {
             println "Unpacking ${dl}"
+            unpackLibreOfficeDir.mkdirs()
             copy {
                 from(tarTree(archive)) {
                     include '*/DEBS/*ure*.deb'
                     include '*/DEBS/*core*.deb'
                     eachFile { f ->
                         f.relativePath = new RelativePath(true, f.relativePath.segments.drop(2))
-                        unpack_debs << f.relativePath
                     }
                 }
                 into unpackLibreOfficeDir
             }
         }
-        for (deb in unpack_debs) {
-            // deb
-            File absdeb = file("${unpackLibreOfficeDir}/${deb}")
+        if (debTree().empty) {
+            throw new GradleException("No LibreOffice .deb packages found in ${archive}")
+        }
+        debTree().each { File absdeb ->
+            // .deb is an ar archive. tar cannot read it.
             String debdirname = absdeb.name.replaceAll('[.]', '_')
             File debdir = file("${unpackLibreOfficeDir}/${debdirname}")
-            if (!debdir.exists()) {
-                debdir.mkdirs()
-                println "Unpacking ${deb}"
-                Process proc1 = "tar -C ${debdir} -xf ${absdeb}".execute()
+            debdir.mkdirs()
+            File dataXz = new File(debdir, 'data.tar.xz')
+            File dataGz = new File(debdir, 'data.tar.gz')
+            File dataTar = new File(debdir, 'data.tar')
+            if (!dataXz.exists() && !dataGz.exists() && !dataTar.exists()) {
+                println "Unpacking ${absdeb.name}"
+                Process proc1 = ["ar", "x", absdeb.absolutePath].execute(null, debdir)
                 proc1.waitFor()
-                if (proc1.exitValue() > 0) println new String(proc1.err.readAllBytes())
-            } else {
-                println "${debdirname} already exists"
+                if (proc1.exitValue() != 0) {
+                    throw new GradleException("ar failed for ${absdeb.name}: ${proc1.err.text}")
+                }
             }
             // data.tar.??
             def datadest = file("${debdir}/data")
             if (!datadest.exists() || datadest.list()?.length == 0) {
-                File dataar = file("${debdir}/data.tar.xz")
-                if (!dataar.exists()) dataar = file("${debdir}/data.tar.gz")
-                println "Unpacking ${debdirname}/${dataar.name}"
-                if (dataar.name.endsWith('.xz')) {
+                println "Unpacking ${debdirname} data archive"
+                if (dataXz.exists() && !dataTar.exists()) {
                     ant.sequential {
-                        unxz(src: dataar)
+                        unxz(src: dataXz)
                     }
+                } else if (dataGz.exists() && !dataTar.exists()) {
+                    ant.gunzip(src: dataGz)
                 }
-                File datatar = file("${debdir}/data.tar")
+                if (!dataTar.exists()) {
+                    throw new GradleException("No data.tar in ${debdir}")
+                }
                 datadest.mkdirs()
                 copy {
-                    from(tarTree(datatar))
+                    from(tarTree(dataTar))
                     into datadest
                 }
             } else {
