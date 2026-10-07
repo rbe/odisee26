@@ -37,6 +37,10 @@ unzip odisee-2.6-linux-x86_64.zip -d "$ODISEE_HOME"
 
 See [documentation/src/docs/asciidoc/Odisee.adoc](documentation/src/docs/asciidoc/Odisee.adoc). The HTML book is generated into the distribution under `docs/`.
 
+`POST /document/generate` accepts XML (`text/xml`, the default) and JSON (`application/json`).
+The JSON shape is `webservice/src/main/resources/json/request.schema.json`.
+Java, PHP, VB.NET, and Oracle clients can send JSON via `useJson()` / `use_json`.
+
 ## License
 
 See [LICENSE](LICENSE).

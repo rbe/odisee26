@@ -15,6 +15,7 @@ import org.odisee.api.OdiseeException
 import org.odisee.debug.WallTime
 import org.odisee.io.Compression
 import org.odisee.io.OdiseePath
+import org.odisee.json.JsonRequest
 import org.odisee.xml.XmlHelper
 import org.w3c.dom.Element
 
@@ -36,9 +37,14 @@ class DocumentController {
         if (OdiseePath.ODISEE_PROFILE) {
             wallTime.start()
         }
+        boolean jsonRequest = false
         try {
             final InputStream decompressedInputStream = Compression.decompress(request.inputStream)
-            final Element xml = XmlHelper.convertToXmlElement(decompressedInputStream)
+            final byte[] body = decompressedInputStream.bytes
+            jsonRequest = isJsonRequest(request.getContentType(), body)
+            final Element xml = jsonRequest
+                    ? JsonRequest.toElement(new String(body, 'UTF-8'))
+                    : XmlHelper.convertToXmlElement(new ByteArrayInputStream(body))
             if (null != xml) {
                 final Principal caller = request.userPrincipal ?: principal
                 final Document document = processXmlRequest(caller, xml)
@@ -48,7 +54,9 @@ class DocumentController {
                     DocumentStreamer.stream(response, document)
                 }
             } else {
-                throw new OdiseeException('Invalid or missing XML request')
+                throw new OdiseeException(jsonRequest
+                        ? 'Invalid or missing JSON request'
+                        : 'Invalid or missing XML request')
             }
         } catch (e) {
             processThrowable(e)
@@ -60,6 +68,21 @@ class DocumentController {
                 log.info "Document generation took ${wallTime.diff()} ms (wall clock)"
             }
         }
+    }
+
+    /**
+     * JSON when Content-Type says so. XML content types stay XML.
+     * A missing content type is JSON only when the body starts with '{'.
+     */
+    private static boolean isJsonRequest(final String contentType, final byte[] body) {
+        final String ct = contentType?.toLowerCase() ?: ''
+        if (ct.contains('json')) {
+            return true
+        }
+        if (ct.contains('xml')) {
+            return false
+        }
+        JsonRequest.looksLikeJson(body)
     }
 
     private Document processXmlRequest(final Principal principal, final Element xml) throws OdiseeException {

@@ -63,6 +63,121 @@ the API.
                              setUserfield("Subject", "This is a letter").
                              process();
 
+=== JSON requests
+
+XML is still the default, and it is still what the generator executes.
+The same `POST /document/generate` endpoint also accepts JSON.
+Send `Content-Type: application/json`.
+A body that starts with `{` is treated as JSON when the content type is omitted.
+Gzip works for both formats: the service looks at the gzip magic bytes before it reads the document.
+
+JSON field names are camelCase.
+They map onto the existing XML attributes (`preSaveMacro` becomes `pre-save-macro`, `postMacro` becomes `post-macro`, and so on).
+`instructions` is an array, and the array order is the order the instructions run.
+`table` is accepted as an alias of `texttable`.
+On an `input` step, `file` from older XML is sent as `filename`.
+
+.One template, two user fields
+[source,json]
+----
+{
+  "request": {
+    "name": "HalloOdisee",
+    "template": { "name": "HalloOdisee", "outputFormat": "pdf" },
+    "instructions": [
+      { "instruction": "userfield", "name": "Hallo", "value": "Odisee" },
+      { "instruction": "userfield", "name": "Tabelle1!A4", "value": "support@odisee.de" }
+    ]
+  }
+}
+----
+
+[source,bash]
+----
+curl -u odisee:odisee \
+  -H 'Content-Type: application/json' \
+  --data-binary @HalloOdisee.json \
+  -o HalloOdisee.pdf \
+  http://127.0.0.1:8080/document/generate
+----
+
+A failed JSON request uses the same error response as XML: the status comes from the exception, and the body is the plain-text message.
+
+The shape is described by `webservice/src/main/resources/json/request.schema.json`.
+A request object needs `template.name`.
+Each instruction needs `instruction` set to one of `userfield`, `texttable`, `image`, `autotext`, `bookmark`, or `macro`.
+Macro arguments are a `parameter` array of strings or `{"value":"..."}` objects.
+Post-processing looks like this:
+
+[source,json]
+----
+"postProcess": {
+  "action": [{
+    "type": "merge-with",
+    "content": [
+      { "element": "result-placeholder" },
+      { "element": "input", "filename": "pdf/AGB.pdf" }
+    ]
+  }]
+}
+----
+
+`response.base64` is accepted and stored on the request.
+The HTTP response is still the generated document itself.
+
+==== Clients
+
+Call `useJson()` before `process()`.
+The client libraries keep building the request the way they always have, then convert that XML to JSON for the POST.
+Leave the call out and they keep sending XML.
+
+.Java
+[source,java]
+----
+OdiseeClient odisee = new OdiseeClient("http://127.0.0.1:8080/document/generate", "odisee", "odisee");
+odisee.useJson();
+odisee.createRequest("HalloOdisee", OutputFormat.PDF);
+odisee.setUserfield("Hallo", "Odisee");
+byte[] document = odisee.process(false);
+----
+
+.PHP
+[source,php]
+----
+$odisee = Odisee::createClient('http://127.0.0.1:8080', 'odisee', 'odisee');
+$odisee->useJson();
+$request = $odisee->createRequest('HalloOdisee');
+$odisee->setUserfield($request, 'Hallo', 'Odisee');
+$document = $odisee->process();
+----
+
+.Visual Basic .NET
+[source,vbnet]
+----
+Dim odiseeClient As OdiseeClient = OdiseeClient.createClient(serviceUrl, "odisee", "odisee")
+odiseeClient.useJson()
+odiseeClient.createRequest("HalloOdisee")
+odiseeClient.setUserfield("Hallo", "Welt")
+Dim webResponse As HttpWebResponse = odiseeClient.process()
+----
+
+.Oracle
+Call `odisee.use_json` before `odisee.header`.
+`odisee.generate` then posts `application/json`.
+`odisee.use_xml` switches back.
+The JSON path emits the current request shape (`template`, `instructions`, `userfield`).
+The XML path is unchanged, including its older element names.
+
+=== Suggestions
+
+A few follow-ups are worth doing while this interface is still young:
+
+. Validate JSON against `request.schema.json` at the edge and return the failing field in `{"error":"..."}`. The converter already rejects unknown instructions and a missing template name; a schema check would cover the rest without another hand-written branch.
+. Publish an OpenAPI description of `POST /document/generate` with both `application/json` and `text/xml` request bodies. The client libraries would then be able to grow from one description instead of each one owning a copy of the XML-to-JSON mapping.
+. Honor `response.base64`. The field is accepted today and the document is still returned as raw bytes. Callers that want a JSON conversation end to end need a base64 document (and, later, page count and template revision) selected with `Accept`.
+. Keep XML as the execution format until a single in-memory request model replaces both the DOM walk and the JSON converter. Two encodings of one model drift; one model with two parsers does not.
+. Point the Oracle package at `/document/generate`. It still posts to `/oooDocument/generate`, which is the previous route.
+
 === Testing
 
 There are several Odisee clients available, for several programming languages.

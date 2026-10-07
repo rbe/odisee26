@@ -53,14 +53,14 @@ class OdiseeHttpHelper
      * @return mixed HTTP response.
      * @throws OdiseeException When fsockopen() or fputs() cannot be called.
      */
-    private static function f_post($host, $username, $password, $path, $referer, $data_to_send)
+    private static function f_post($host, $username, $password, $path, $referer, $data_to_send, $contentType = 'text/xml')
     {
         if (is_callable('fsockopen') && is_callable('fputs')) {
             $fp = fsockopen($host, 80);
             fputs($fp, "POST $path HTTP/1.1\r\n");
             fputs($fp, "Host: $host\r\n");
             fputs($fp, "Referer: $referer\r\n");
-            fputs($fp, "Content-type: text/xml\r\n");
+            fputs($fp, "Content-type: $contentType\r\n");
             fputs($fp, "Content-length: " . strlen($data_to_send) . "\r\n");
             fputs($fp, "Connection: close\r\n");
             fputs($fp, "\r\n");
@@ -87,13 +87,13 @@ class OdiseeHttpHelper
      * @return mixed HTTP response.
      * @throws OdiseeException When curl_xxx() functions cannot be called.
      */
-    private static function &curl_post($host, $username, $password, $path, $referer, $data_to_send)
+    private static function &curl_post($host, $username, $password, $path, $referer, $data_to_send, $contentType = 'text/xml')
     {
         if (is_callable('curl_init')) { // extension_loaded
             // Initialize curl
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_HEADER, FALSE);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: text/xml' /*, $additionalHeaders*/));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: ' . $contentType));
             curl_setopt($ch, CURLOPT_URL, $host . $path);
             curl_setopt($ch, CURLOPT_REFERER, $referer);
             curl_setopt($ch, CURLOPT_USERPWD, $username . ":" . $password);
@@ -131,9 +131,9 @@ class OdiseeHttpHelper
      * @return mixed HTTP response.
      * @throws OdiseeException When fsockopen() or fputs() cannot be called.
      */
-    public static function &post($host, $username, $password, $referer, $data_to_send)
+    public static function &post($host, $username, $password, $referer, $data_to_send, $contentType = 'text/xml')
     {
-        return self::curl_post($host, $username, $password, self::$ODISEE_URI, $referer, $data_to_send);
+        return self::curl_post($host, $username, $password, self::$ODISEE_URI, $referer, $data_to_send, $contentType);
     }
 
 }

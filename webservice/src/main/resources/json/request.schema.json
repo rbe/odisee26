@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://xmlns.odisee.org/request.schema.json",
+  "title": "Odisee document request",
+  "description": "JSON form of an Odisee document generation request. POST it to /document/generate with Content-Type application/json. The service converts it to the same XML the generator already executes. Instruction array order is the execution order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request"],
+  "properties": {
+    "request": {
+      "oneOf": [
+        { "$ref": "#/definitions/request" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/request" }
+        }
+      ]
+    },
+    "postProcess": { "$ref": "#/definitions/postProcess" },
+    "response": { "$ref": "#/definitions/response" }
+  },
+  "definitions": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template"],
+      "properties": {
+        "name": { "type": "string" },
+        "id": { "type": "string" },
+        "localDebug": { "type": "boolean" },
+        "group": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "name": { "type": "string" } }
+            }
+          ]
+        },
+        "template": { "$ref": "#/definitions/template" },
+        "archive": { "$ref": "#/definitions/archive" },
+        "instructions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/instruction" }
+        },
+        "postProcess": { "$ref": "#/definitions/postProcess" }
+      }
+    },
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "outputFormat": { "type": "string", "description": "Comma-separated extensions such as odt, pdf, doc, pdfa." },
+        "revision": { "type": "string" },
+        "path": { "type": "string" },
+        "outputPath": { "type": "string" },
+        "preSaveMacro": { "type": "string" },
+        "postSaveMacro": { "type": "string" }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": { "type": "boolean" },
+        "database": { "type": "boolean" }
+      }
+    },
+    "instruction": {
+      "type": "object",
+      "required": ["instruction"],
+      "properties": {
+        "instruction": {
+          "type": "string",
+          "enum": ["userfield", "texttable", "table", "image", "autotext", "bookmark", "macro"]
+        },
+        "name": { "type": "string" },
+        "value": { "type": ["string", "number", "boolean"] },
+        "postMacro": { "type": "string" },
+        "coordinate": { "type": "string" },
+        "cellAlign": { "type": "string" },
+        "cellWidth": { "type": "string" },
+        "type": { "type": "string", "description": "MIME type when instruction is image." },
+        "bookmark": { "type": "string" },
+        "url": { "type": "string" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "group": { "type": "string" },
+        "atend": { "type": "boolean" },
+        "language": { "type": "string" },
+        "location": { "type": "string" },
+        "parameter": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["value"],
+                "properties": { "value": { "type": "string" } }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "postProcess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/action" }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "examples": ["merge-with", "merge-results"] },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/actionStep" }
+        }
+      }
+    },
+    "actionStep": {
+      "type": "object",
+      "required": ["element"],
+      "properties": {
+        "element": { "type": "string", "enum": ["result-placeholder", "input"] },
+        "filename": { "type": "string" }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base64": { "type": "boolean" }
+      }
+    }
+  }
+}

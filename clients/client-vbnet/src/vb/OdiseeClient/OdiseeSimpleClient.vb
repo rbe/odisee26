@@ -37,6 +37,11 @@ Public Class OdiseeSimpleClient
     Private password As String
 
     ''' <summary>
+    ''' xml (default) or json.
+    ''' </summary>
+    Private requestFormat As String = "xml"
+
+    ''' <summary>
     ''' The auth key (e.g. used for non-public templates).
     ''' </summary>
     ''' <remarks></remarks>
@@ -133,6 +138,22 @@ Public Class OdiseeSimpleClient
     ''' <param name="filepath"></param>
     ''' <returns></returns>
     ''' <remarks></remarks>
+    ''' <summary>
+    ''' Post the request as JSON. The service converts it back to the XML generator input.
+    ''' </summary>
+    Public Function useJson() As OdiseeSimpleClient
+        requestFormat = "json"
+        Return Me
+    End Function
+
+    ''' <summary>
+    ''' Post the request as XML. This is the default.
+    ''' </summary>
+    Public Function useXml() As OdiseeSimpleClient
+        requestFormat = "xml"
+        Return Me
+    End Function
+
     Public Function mergeDocumentAtEnd(ByVal filepath As String) As OdiseeSimpleClient
         Dim xmlElement As XmlElement = __xmlDoc.CreateElement("action")
         xmlElement.SetAttribute("type", "merge-with")
@@ -304,12 +325,18 @@ Public Class OdiseeSimpleClient
         If Not IsNothing(username) And IsNothing(password) Then
             Throw New Exception(OdiseeConstant.ERR_NO_AUTH_INFO)
         End If
-        ' Send Odisee request XML document through HTTP POST
+        ' Send Odisee request through HTTP POST
         Dim webResponse As WebResponse
+        Dim body As String = __xmlDoc.OuterXml
+        Dim contentType As String = "text/xml; charset=UTF-8"
+        If requestFormat = "json" Then
+            body = Helper.Json.FromXml(__xmlDoc)
+            contentType = "application/json; charset=UTF-8"
+        End If
         If Not IsNothing(username) And Not IsNothing(password) Then
-            webResponse = Helper.HttpPost.doDigestAuthPost(__xmlDoc, New Uri(serviceURL), username, password)
+            webResponse = Helper.HttpPost.doDigestAuthPost(body, contentType, New Uri(serviceURL), username, password)
         Else
-            webResponse = Helper.HttpPost.doDigestAuthPost(__xmlDoc, New Uri(serviceURL))
+            webResponse = Helper.HttpPost.doDigestAuthPost(body, contentType, New Uri(serviceURL))
         End If
         ' Return response from Odisee HTTP server
         Return webResponse
