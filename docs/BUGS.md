@@ -63,6 +63,8 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B28 | minor | fixed in wave 4 | A missing or blank `ODISEE_HOME` is an `OdiseeException`. The environment value wins and is absolute. |
 | B29 | minor | open | `SPREADSHEET` is the only Calc hint, and the instruction set is Writer-only. Calc/Impress are listed in `OdiseeFileFormat` and then stop. |
 | B30 | major | fixed in wave 5 | Wave 1 covers the helpers. Tests 1–3 open a real template in LibreOffice (`GenerationBasisTest`, Docker). Tests 4–5 cover HTTP status and the pool. The Java client asserts the Hallo value in the PDF against a local server (`OdiseeClientLocalTest`). |
+| B31 | major | fixed in wave 5 | A successful HTTP Basic login still left `request.userPrincipal` null. Grails captured the request before Spring Security wrapped it, so `POST /document/generate` returned 401. The caller is read from the security context. |
+| B32 | major | fixed in wave 5 | `RequestService` cast the active DOM request to `GPathResult`. A DOM body failed before LibreOffice opened the template. A DOM node is serialized as XML. |
 
 ## Tests added in wave 1
 

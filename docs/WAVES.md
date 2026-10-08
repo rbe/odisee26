@@ -95,6 +95,8 @@ The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:jav
 - The same request with no credentials is HTTP 401, and that user's output directory does not gain a file.
 - The client sends HTTP Basic on that request. It does not call `Authenticator.setDefault`.
 
+The proof found two failures and fixed them. A logged-in call had a null `request.userPrincipal`, so generate returned 401 (B31). Saving the active DOM request cast it to `GPathResult` and failed before LibreOffice (B32).
+
 Calc and Impress stay out of this wave. The remote tests in `OdiseeClientTest` stay `@Ignore`. They still point at `service3.odisee.de`.
 
 ## Wave 6 — Features

@@ -11,6 +11,7 @@
 package org.odisee.document
 
 import groovy.xml.slurpersupport.GPathResult
+import org.odisee.api.OdiseeException
 import org.odisee.io.FileHelper
 import org.odisee.xml.XmlHelper
 import org.odisee.shared.OdiseeConstant
@@ -61,7 +62,14 @@ class RequestService implements InitializingBean {
             final String filename = String.format('%s_%d.xml', arg.uniqueRequestId, requestNumber)
             final Path documentDir = (Path) arg.documentDir
             requestXMLFile = documentDir.resolve(filename)
-            xmlString = XmlHelper.asString((GPathResult) arg.xml.request[requestNumber])
+            def active = arg.xml.request[requestNumber]
+            if (active instanceof GPathResult) {
+                xmlString = XmlHelper.asString((GPathResult) active)
+            } else if (active instanceof org.w3c.dom.Node) {
+                xmlString = XmlHelper.asString((org.w3c.dom.Node) active)
+            } else {
+                throw new OdiseeException('Cannot read request XML', OdiseeException.BAD_REQUEST)
+            }
         }
         Files.createDirectories(requestXMLFile.parent)
         FileHelper.writeUTF8(requestXMLFile, xmlString)

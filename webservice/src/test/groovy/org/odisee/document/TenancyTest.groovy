@@ -5,6 +5,10 @@ import groovy.xml.DOMBuilder
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import org.odisee.io.TenantPaths
+import org.springframework.security.authentication.AnonymousAuthenticationToken
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.context.SecurityContextHolder
 import org.w3c.dom.Element
 
 import java.nio.file.Files
@@ -36,6 +40,30 @@ class TenancyTest extends GroovyTestCase {
         }
         assertFalse(Files.exists(OdiseePath.ODISEE_VAR.resolve('evil')))
         assertFalse(Files.exists(OdiseePath.ODISEE_VAR.parent.resolve('evil')))
+    }
+
+    void testSecurityContextIsTheCallerWhenTheRequestHasNone() {
+        SecurityContextHolder.context.authentication =
+                new UsernamePasswordAuthenticationToken('ada', 'secret', [])
+        try {
+            java.security.Principal caller = DocumentController.requireCaller(DocumentController.callerFromContext(null))
+            assertEquals('ada', caller.name)
+        } finally {
+            SecurityContextHolder.clearContext()
+        }
+    }
+
+    void testAnonymousSecurityContextIs401() {
+        SecurityContextHolder.context.authentication = new AnonymousAuthenticationToken(
+                'key', 'anonymousUser', [new SimpleGrantedAuthority('ROLE_ANONYMOUS')])
+        try {
+            DocumentController.requireCaller(DocumentController.callerFromContext(null))
+            fail('anonymous')
+        } catch (OdiseeException e) {
+            assertEquals(OdiseeException.UNAUTHORIZED, e.httpStatus)
+        } finally {
+            SecurityContextHolder.clearContext()
+        }
     }
 
     void testCallerNameWithSeparatorIs400() {
