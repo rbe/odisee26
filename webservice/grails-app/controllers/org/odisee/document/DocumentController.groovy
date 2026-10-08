@@ -17,6 +17,7 @@ import org.odisee.debug.WallTime
 import org.odisee.io.Compression
 import org.odisee.io.OdiseePath
 import org.odisee.json.JsonRequest
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.context.request.RequestContextHolder
 import org.w3c.dom.Element
 
@@ -29,9 +30,23 @@ class DocumentController {
     OdiseeService odiseeService
 
     /**
+     * Grails stores the request before Spring Security wraps it, so
+     * {@code request.userPrincipal} stays null after a successful Basic login.
+     * The security context is the caller. The request principal is the fallback.
      * No login is HTTP 401. A name that is not a single path segment is HTTP 400.
      * There is no hardcoded user.
      */
+    static Principal callerFromContext(Principal requestPrincipal) {
+        def authentication = SecurityContextHolder.context?.authentication
+        if (authentication != null && authentication.authenticated) {
+            String name = authentication.name?.toString()
+            if (name != null && !name.trim().isEmpty() && name != 'anonymousUser') {
+                return (Principal) authentication
+            }
+        }
+        requestPrincipal
+    }
+
     static Principal requireCaller(Principal caller) {
         if (caller == null || caller.name == null || caller.name.trim().isEmpty() || caller.name == 'anonymousUser') {
             throw new OdiseeException('Authentication required', OdiseeException.UNAUTHORIZED)
@@ -55,7 +70,7 @@ class DocumentController {
         }
         boolean errorResponse = false
         try {
-            final Principal caller = requireCaller(request.userPrincipal)
+            final Principal caller = requireCaller(callerFromContext(request.userPrincipal))
             final byte[] body = Compression.readLimited(request.inputStream)
             final boolean jsonRequest = isJsonRequest(request.getContentType(), body)
             final Element xml = jsonRequest

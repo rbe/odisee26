@@ -84,7 +84,20 @@ Tests 1–3 use a Writer template with the user field `Hallo` and read the text 
 
 That builds `webservice/src/test/docker/libreoffice`, starts the container, and runs tests 1–3. `./gradlew :webservice:test` runs tests 4 and 5 with the other unit tests and does not start Docker.
 
-Still open: the same request through the Java client, and Calc/Impress.
+Status: **landed in this change**.
+
+The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`.
+
+- The task starts the same LibreOffice container as tests 1–3, on port 2002, with `ODISEE_HOME` mounted at the same path.
+- It starts the webservice against that home. `etc/users` has the caller. `Letter.ott` (user field `Hallo`) is in `var/user/odisee/template`.
+- `OdiseeClient` posts to `http://127.0.0.1:<port>/odisee/document/generate` with the username and password constructor. The request is template `Letter`, output format PDF, and user field `Hallo`.
+- The PDF text contains the value written.
+- The same request with no credentials is HTTP 401, and that user's output directory does not gain a file.
+- The client sends HTTP Basic on that request. It does not call `Authenticator.setDefault`.
+
+The proof found two failures and fixed them. A logged-in call had a null `request.userPrincipal`, so generate returned 401 (B31). Saving the active DOM request cast it to `GPathResult` and failed before LibreOffice (B32).
+
+Calc and Impress stay out of this wave. The remote tests in `OdiseeClientTest` stay `@Ignore`. They still point at `service3.odisee.de`.
 
 ## Wave 6 — Features
 
@@ -156,6 +169,8 @@ template.'@outputFormat'?.toString()?.split(',')?.each { format ->
 ```
 
 After, `OutputFormats.fromRequest` returns the attribute when it is non-blank, otherwise each v3 `output/format/@type`.
+
+Wave 2 stopped reading v3 `output/format`. `OutputFormats.fromRequest` reads only `template/@outputFormat`.
 
 ### Dispatch
 

@@ -1,6 +1,6 @@
 # Odisee feature ideas
 
-These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F11 landed with wave 2. The rest are not implemented yet.
+These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F9 shipped with wave 4. F11 landed with wave 2. The rest are not implemented yet.
 
 ## Generation API
 
@@ -71,3 +71,5 @@ Done in wave 2. The server and the Java client use v2 (`template/@outputFormat`)
 ### F12. Integration suite with a headless LibreOffice
 
 One fixture `.ott`, one XML request, one assertion on the PDF text (PDFBox is already a dependency). Run it in CI against the Docker image. Wave 1 tests the helpers without starting office; they do not prove a document was filled in.
+
+Wave 5 proves that request through the Java client against a local server (`:clients:client-java:javaClientOfficeTest`). CI still does not run that task.

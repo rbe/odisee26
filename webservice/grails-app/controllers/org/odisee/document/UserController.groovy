@@ -26,7 +26,7 @@ class UserController {
         boolean errorResponse = false
         try {
             boolean admin = SecurityContextHolder.context?.authentication?.authorities?.any { it.authority == 'ROLE_ADMIN' } as boolean
-            DocumentController.requireAdmin(request.userPrincipal, admin)
+            DocumentController.requireAdmin(DocumentController.callerFromContext(request.userPrincipal), admin)
             UserCredentials credentials = readCredentials()
             String name = userAccountService.create(credentials.name, credentials.password)
             response.status = 201
