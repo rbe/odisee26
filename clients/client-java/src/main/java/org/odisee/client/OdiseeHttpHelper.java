@@ -18,15 +18,15 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.net.Authenticator;
 import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.HttpURLConnection;
-import java.net.PasswordAuthentication;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.zip.GZIPOutputStream;
 
@@ -56,19 +56,7 @@ final class OdiseeHttpHelper {
         final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         connection.setRequestProperty("Content-Length", String.valueOf(bytes.length));
         connection.setRequestProperty("Content-Type", contentType);
-        try (final OutputStreamWriter streamWriter = new OutputStreamWriter(connection.getOutputStream(),
-                StandardCharsets.UTF_8);
-             final InputStream is = connection.getInputStream();
-             final ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            streamWriter.write(body);
-            streamWriter.flush();
-            is.transferTo(baos);
-            connection.disconnect();
-            return baos.toByteArray();
-        } catch (IOException e) {
-            LOGGER.warn("", e);
-            return EMPY_BYTES;
-        }
+        return send(connection, body, false);
     }
 
     public byte[] postCompressed(URL url, String body, final String contentType) {
@@ -76,19 +64,69 @@ final class OdiseeHttpHelper {
         Objects.requireNonNull(connection);
         connection.setRequestProperty("Content-Type", contentType);
         connection.setRequestProperty("Content-Encoding", "gzip");
-        try (final GZIPOutputStream gzipOutputStream = new GZIPOutputStream(connection.getOutputStream());
-             final OutputStreamWriter streamWriter = new OutputStreamWriter(gzipOutputStream,
-                     StandardCharsets.UTF_8);
-             final InputStream is = connection.getInputStream();
-             final ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            streamWriter.write(body);
-            streamWriter.flush();
-            is.transferTo(baos);
-            connection.disconnect();
-            return baos.toByteArray();
+        return send(connection, body, true);
+    }
+
+    /**
+     * Basic credentials travel on this request. {@link java.net.Authenticator#setDefault}
+     * is JVM-wide and would attach the same user to a later call that has none.
+     */
+    private void applyAuthorization(final HttpURLConnection connection) {
+        if (username == null || username.isEmpty()) {
+            return;
+        }
+        final String token = username + ":" + (password == null ? "" : password);
+        final String encoded = Base64.getEncoder().encodeToString(token.getBytes(StandardCharsets.UTF_8));
+        connection.setRequestProperty("Authorization", "Basic " + encoded);
+    }
+
+    private byte[] send(final HttpURLConnection connection, final String body, final boolean gzip) {
+        applyAuthorization(connection);
+        try {
+            writeBody(connection, body, gzip);
+            final int status = connection.getResponseCode();
+            if (status >= 400) {
+                throw new OdiseeClientException("HTTP " + status, status);
+            }
+            try (InputStream in = connection.getInputStream();
+                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                in.transferTo(out);
+                return out.toByteArray();
+            }
+        } catch (OdiseeClientException e) {
+            throw e;
         } catch (IOException e) {
+            final int status = responseCode(connection);
+            if (status >= 400) {
+                throw new OdiseeClientException("HTTP " + status, status);
+            }
             LOGGER.warn("", e);
-            return EMPY_BYTES;
+            throw new OdiseeClientException(e);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static void writeBody(final HttpURLConnection connection, final String body, final boolean gzip)
+            throws IOException {
+        if (gzip) {
+            try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(connection.getOutputStream());
+                 OutputStreamWriter writer = new OutputStreamWriter(gzipOutputStream, StandardCharsets.UTF_8)) {
+                writer.write(body);
+            }
+            return;
+        }
+        try (OutputStream raw = connection.getOutputStream();
+             OutputStreamWriter writer = new OutputStreamWriter(raw, StandardCharsets.UTF_8)) {
+            writer.write(body);
+        }
+    }
+
+    private static int responseCode(final HttpURLConnection connection) {
+        try {
+            return connection.getResponseCode();
+        } catch (IOException e) {
+            return -1;
         }
     }
 
@@ -103,30 +141,11 @@ final class OdiseeHttpHelper {
             connection.setRequestProperty("User-Agent", "Odisee/Java Client");
             CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL));
             System.setProperty("http.maxRedirects", "3");
-            Authenticator.setDefault(new UserPassAuthenticator(username, password));
             return connection;
         } catch (IOException e) {
             LOGGER.warn("", e);
         }
         throw new IllegalStateException("No HTTP connection");
-    }
-
-    private static class UserPassAuthenticator extends Authenticator {
-
-        private final String user;
-
-        private final String pass;
-
-        private UserPassAuthenticator(final String user, final String pass) {
-            this.user = user;
-            this.pass = pass;
-        }
-
-        @Override
-        protected PasswordAuthentication getPasswordAuthentication() {
-            return new PasswordAuthentication(user, pass.toCharArray());
-        }
-
     }
 
 }

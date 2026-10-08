@@ -14,24 +14,45 @@ package org.odisee.client;
 
 public final class OdiseeClientException extends RuntimeException {
 
+    private final int httpStatus;
+
     public OdiseeClientException() {
-        super();
+        this.httpStatus = 0;
     }
 
     public OdiseeClientException(String message) {
         super(message);
+        this.httpStatus = 0;
     }
 
     public OdiseeClientException(String message, Throwable cause) {
         super(message, cause);
+        this.httpStatus = 0;
     }
 
     public OdiseeClientException(Throwable cause) {
         super(cause);
+        this.httpStatus = 0;
+    }
+
+    /**
+     * @param httpStatus the HTTP status from the service, or {@code 0} when the call did not get one
+     */
+    public OdiseeClientException(String message, int httpStatus) {
+        super(message);
+        this.httpStatus = httpStatus;
     }
 
     protected OdiseeClientException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
         super(message, cause, enableSuppression, writableStackTrace);
+        this.httpStatus = 0;
+    }
+
+    /**
+     * HTTP status from the service. {@code 0} when the failure was not an HTTP response.
+     */
+    public int getHttpStatus() {
+        return httpStatus;
     }
 
 }

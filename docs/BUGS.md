@@ -31,7 +31,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B11 | major | fixed in wave 1 | `OdiseeInstance.readOdiinst` replaced `oooGroup['group0']` on every host, so only the last host remained. Blank lines were parsed as rows. |
 | B12 | major | fixed in wave 1 | `OfficeConnectionFactory.fetchConnection` returned null after a connect failure. `toDocument` then failed even when another instance in the pool was healthy. |
 | B13 | major | fixed in wave 1 | If every bootstrap failed, the factory still started with an empty queue. The SLF4J message used `%{}` instead of `{}`. |
-| B14 | major | fixed in wave 3 | UNO calls have no deadline. A live but wedged `soffice` holds a pool slot until the JVM exits. `odiwatchdog` only helps after the process has exited. |
+| B14 | major | fixed in wave 3 | UNO calls had no deadline. A live but wedged `soffice` held a pool slot until the JVM exits. `odiwatchdog` only helps after the process has exited. Wave 3 bounds the call and drops the slot. |
 | B15 | major | fixed in wave 1 | `processTemplate` called `xComponent.close()` only on the success path. A failure in `open` or `saveAs` left the document open inside LibreOffice. |
 | B16 | minor | fixed in wave 1 | `OOoConnection.connect` referenced `diff` in a branch that Groovy compiles but cannot run (`MissingPropertyException`). `isUsable()` already throws before that branch. |
 
@@ -62,13 +62,13 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B27 | major | fixed with the toolchain update | `RequestService` no longer uses `com.sun.org.apache.xerces.internal.dom.DeferredNode`. XML is written through `GPathResult` and `org.w3c.dom.Node`, which JDK 21 allows. |
 | B28 | minor | fixed in wave 4 | A missing or blank `ODISEE_HOME` is an `OdiseeException`. The environment value wins and is absolute. |
 | B29 | minor | open | `SPREADSHEET` is the only Calc hint, and the instruction set is Writer-only. Calc/Impress are listed in `OdiseeFileFormat` and then stop. |
-| B30 | major | partial | Wave 1 covers the helpers. Tests 1–3 open a real template in LibreOffice (`GenerationBasisTest`, Docker). Tests 4–5 cover HTTP status and the pool. The Java client still has no assertion against a local server. |
+| B30 | major | fixed in wave 5 | Wave 1 covers the helpers. Tests 1–3 open a real template in LibreOffice (`GenerationBasisTest`, Docker). Tests 4–5 cover HTTP status and the pool. The Java client asserts the Hallo value in the PDF against a local server (`OdiseeClientLocalTest`). |
 
 ## Tests added in wave 1
 
 - `TemplateLocatorTest` — `LATEST` is numeric, revision 1 falls back to `Name.ott`, path escape is rejected.
 - `OdiinstParserTest` — host and port come from the file, comments and blank lines are skipped.
-- `OutputFormatsTest` — v2 attribute and v3 `output/format` both resolve.
+- `OutputFormatsTest` — `template/@outputFormat` is the extension list. The v3 `output/format` element is not read.
 - `SafePathsTest` — relative merge paths stay under the root; absolute paths and `..` do not.
 - `RequestContextTest` — each call gets its own document list; resetting for the next request keeps documents already produced.
 - `CompressionTest` — gzip round-trip and a one-byte body.
