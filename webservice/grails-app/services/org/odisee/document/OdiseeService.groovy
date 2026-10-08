@@ -11,14 +11,13 @@
 package org.odisee.document
 
 import groovy.xml.dom.DOMCategory
+import org.odisee.api.OdiseeException
+import org.odisee.io.TenantPaths
 import org.odisee.shared.OdiseeConstant
 import org.w3c.dom.Element
 
 import java.nio.file.Files
-import java.nio.file.Paths
 import java.security.Principal
-
-import static org.odisee.io.OdiseePath.ODISEE_USER
 
 class OdiseeService {
 
@@ -38,10 +37,13 @@ class OdiseeService {
      * @return List with generated OooDocument instance(s).
      */
     List<Document> generateDocument(final Principal principal, final Element xml) {
+        if (principal == null || principal.name == null || principal.name.trim().isEmpty()) {
+            throw new OdiseeException('Authentication required', OdiseeException.UNAUTHORIZED)
+        }
+        String user = TenantPaths.requireUserName(principal.name)
         Map<String, Object> arg = RequestContext.create()
-        final GString userDocumentDir = "${ODISEE_USER}/${OdiseeConstant.S_DOCUMENT}"
         arg.uniqueRequestId = UUID.randomUUID()
-        arg.requestDir = Paths.get(userDocumentDir, arg.uniqueRequestId.toString())
+        arg.requestDir = TenantPaths.outputDir(user).resolve(arg.uniqueRequestId.toString())
         Files.createDirectories(arg.requestDir)
         arg.principal = principal
         arg.xml = xml

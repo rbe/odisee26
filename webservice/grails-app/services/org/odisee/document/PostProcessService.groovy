@@ -15,12 +15,11 @@ import groovy.xml.dom.DOMCategory
 import org.odisee.api.OdiseeException
 import org.odisee.io.FileHelper
 import org.odisee.io.SafePaths
+import org.odisee.io.TenantPaths
 import org.w3c.dom.Element
 
 import java.nio.file.Path
 import java.nio.file.Paths
-
-import static org.odisee.io.OdiseePath.ODISEE_VAR
 
 @Log
 class PostProcessService {
@@ -56,7 +55,7 @@ class PostProcessService {
                         pdfFiles << Paths.get(generatedFile)
                     } else {
                         String filename = it.'@filename'.toString()
-                        pdfFiles << SafePaths.resolveInside(ODISEE_VAR, filename)
+                        pdfFiles << mergeInput(arg, filename)
                     }
                 }
             }
@@ -117,6 +116,11 @@ class PostProcessService {
                 dispatchAction(arg, action)
             }
         }
+    }
+
+    Path mergeInput(Map arg, String filename) {
+        String user = TenantPaths.requireUserName(arg.principal?.name?.toString())
+        SafePaths.resolveInside(TenantPaths.workDir(user), filename)
     }
 
     private void dispatchAction(Map arg, action) {

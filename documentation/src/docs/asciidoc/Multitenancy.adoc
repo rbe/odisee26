@@ -2,63 +2,52 @@
 Multitenancy
 ~~~~~~~~~~~~
 
-Odisee is multitenant, so users should be able to access their templates
-and generated documents. To achieve that, I favor use of SSH, a user can
-provide a SSH public key and get access.
-
-Add this to your `/etc/ssh/sshd_config` to allow users in group `odisee`
-to access their data:
-
-[source]
-----
-Subsystem sftp internal-sftp
-
-Match User !odisee Group odisee
-    ChrootDirectory %h
-    ForceCommand internal-sftp
-----
+A logged-in user has a private directory under `$ODISEE_HOME/var/user/{name}/`.
+Templates are in `template`.
+Merge inputs are in `work`.
+Generated files are in `output`.
+There is no shared `var/template` fallback.
 
 [[adding-odisee-users]]
 Adding Odisee Users
 ^^^^^^^^^^^^^^^^^^^
 
-To add an Odisee user use `odictl -c -u <username>`:
+The server reads `$ODISEE_HOME/etc/users`.
+`java -jar` does not read `odisee-users.xml`.
 
-[source,bash,linenums]
-----
-[odisee@linux ~]$ odictl -c -u odiuser
-User 'odiuser' created.
-----
+A line is `username bcrypt-hash` or `username bcrypt-hash admin`.
+A line that starts with `#` is a comment.
+The hash is bcrypt.
+The file does not store the password.
 
-Do not forget to put user’s SSH public key into
-`$ODISEE_HOME/var/user/odiuser/.ssh/authorized_keys`.
+If `etc/users` is missing, the server creates the first admin only when both `ODISEE_BOOTSTRAP_USER` and `ODISEE_BOOTSTRAP_PASSWORD` are set.
+Otherwise it creates no users.
+There is no default password.
+
+An admin creates the next user with `POST /odisee/user`.
+Send HTTP Basic as that admin.
+The JSON body is `{"name":"...","password":"..."}`.
+The call appends a line to `etc/users` and creates `template`, `work`, and `output` under `var/user/{name}/`.
+The new user is not an admin.
+No login is HTTP 401.
+A logged-in user without role `admin` is HTTP 403.
+A bad name is HTTP 400.
+An existing user is HTTP 409.
 
 [[permissions]]
 Permissions
 ~~~~~~~~~~~
 
-Directory permissions must be set appropriately for proper operation and
-to support multi tenancy through SCP/SFTP. For sshd configuration
-directive `ChrootDirectory` all directories on the path to the user
-directory must be owned by root and not writable by `group` or `other`.
-The command `odictl -q set-perm` does this job for you.
+`etc/users` is readable and writable by the server user only.
+This server does not create users with `odictl` and does not configure SFTP.
 
 [[access-to-http-service]]
 Access to HTTP Service
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The user must have access to Odisee’s HTTP service which is secured by
-HTTP Basic Authentication. Edit
-`$ODISEE_HOME/libexec/tomcat/conf/odisee-users.xml` and add an entry for
-`odiuser`.
-
-The distribution comes preconfigured with a user `odisee` so you can
-start testing.
-
-[source,xml,linenums]
-----
-<?xml version='1.0' encoding='utf-8'?>
-<tomcat-users>
-    <user username="odisee" password="odisee" roles="odisee"/>
-</tomcat-users>
-----
+`POST /odisee/document/generate` requires HTTP Basic.
+No login is HTTP 401 and does not generate a document.
+Any authenticated user may run macros.
+The macro name, library, and language must be plain names.
+A bad name is HTTP 400.
+`GET /odisee/ready` stays anonymous.

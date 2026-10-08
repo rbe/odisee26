@@ -53,9 +53,16 @@ Status: **landed in this change**.
 
 ## Wave 4 — Tenancy
 
-- Require a principal. Resolve templates only under that user's directory (B21, B22, F9).
-- Macro execution is off unless the principal has that role (B25).
-- Fix `OdiseePath` so a missing `ODISEE_HOME` is an `OdiseeException` (B28).
+Status: **landed in this change**.
+
+- `POST /document/generate` requires a logged-in user. No login is HTTP 401. The hardcoded `odisee` principal is gone (B21, B22).
+- Spring Security reads bcrypt hashes from `$ODISEE_HOME/etc/users`. Embedded Tomcat stays. `java -jar` does not read `odisee-users.xml`.
+- The first admin is created only when that file is missing and both `ODISEE_BOOTSTRAP_USER` and `ODISEE_BOOTSTRAP_PASSWORD` are set. Otherwise there are no users.
+- `POST /user` creates a password-file line and `var/user/{name}/template`, `var/user/{name}/work`, and `var/user/{name}/output`. Only role `admin` may call it. No login is 401. A logged-in user without that role is 403. A bad name is 400. An existing user is 409. There is no default password.
+- Templates, merge inputs, and output resolve only under that user. There is no shared `var/template` fallback (F9).
+- Any authenticated user may run macros. Macro name, library, and language must be plain names. A bad name is HTTP 400 and does not drop an office slot (B25).
+- A missing or blank `ODISEE_HOME` is an `OdiseeException` (B28).
+- `GET /ready` stays anonymous.
 
 ## Wave 5 — Prove a document
 

@@ -8,6 +8,7 @@ class UrlMappings {
         '404'(view: '/notFound')
         // Odisee
         '/ready'(controller: 'ready', action: 'index')
+        '/user'(controller: 'user', action: 'create', method: 'POST')
         '/document/generate'(controller: 'document', action: 'generate')
         "/document/generate/$id?"(controller: 'document', action: 'generate')
     }

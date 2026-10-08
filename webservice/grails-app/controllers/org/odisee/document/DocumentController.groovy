@@ -20,17 +20,32 @@ import org.odisee.json.JsonRequest
 import org.springframework.web.context.request.RequestContextHolder
 import org.w3c.dom.Element
 
+import org.odisee.io.SafePaths
+
 import java.security.Principal
 
 class DocumentController {
 
     OdiseeService odiseeService
 
-    public static final Principal principal = new Principal() {
-        @Override
-        String getName() {
-            return "odisee";
+    /**
+     * No login is HTTP 401. A name that is not a single path segment is HTTP 400.
+     * There is no hardcoded user.
+     */
+    static Principal requireCaller(Principal caller) {
+        if (caller == null || caller.name == null || caller.name.trim().isEmpty() || caller.name == 'anonymousUser') {
+            throw new OdiseeException('Authentication required', OdiseeException.UNAUTHORIZED)
         }
+        SafePaths.requireSimpleName(caller.name, 'user')
+        caller
+    }
+
+    static Principal requireAdmin(Principal caller, boolean admin) {
+        Principal required = requireCaller(caller)
+        if (!admin) {
+            throw new OdiseeException('Admin role required', OdiseeException.FORBIDDEN)
+        }
+        required
     }
 
     def generate() {
@@ -40,6 +55,7 @@ class DocumentController {
         }
         boolean errorResponse = false
         try {
+            final Principal caller = requireCaller(request.userPrincipal)
             final byte[] body = Compression.readLimited(request.inputStream)
             final boolean jsonRequest = isJsonRequest(request.getContentType(), body)
             final Element xml = jsonRequest
@@ -53,7 +69,6 @@ class DocumentController {
                         ? 'Invalid or missing JSON request'
                         : 'Invalid or missing XML request')
             }
-            final Principal caller = request.userPrincipal ?: principal
             final Document document = processXmlRequest(caller, xml)
             if (null == document) {
                 throw new OdiseeException('Cannot send stream, no document')

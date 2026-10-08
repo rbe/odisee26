@@ -11,12 +11,11 @@
 package org.odisee.document
 
 import org.odisee.api.OdiseeException
-import org.odisee.io.OdiseePath
+import org.odisee.io.TenantPaths
 import org.odisee.shared.OdiseeConstant
 import groovy.xml.dom.DOMCategory
 
 import java.nio.file.Path
-import java.nio.file.Paths
 
 class TemplateService {
 
@@ -53,7 +52,8 @@ class TemplateService {
 
     void copyTemplateToRequest(Map<String, Object> arg) {
         arg.documentDir = arg.requestDir
-        arg.templateDir = Paths.get("${OdiseePath.ODISEE_VAR}", OdiseeConstant.S_TEMPLATE)
+        String user = TenantPaths.requireUserName(arg.principal?.name?.toString())
+        arg.templateDir = TenantPaths.templateDir(user)
         try {
             Path localTemplate = TemplateLocator.locate(arg.templateDir, arg.template?.toString(), arg.revision?.toString())
             arg.templateFile = localTemplate

@@ -382,7 +382,7 @@ class OOoDocumentCategory {
                     xScript.invoke(params/* as Object[]*/, outParamIndex, outParam)
                 }
             } catch (e) {
-                log.debug "Cannot execute macro: ${name}", e
+                log.log(java.util.logging.Level.FINE, "Cannot execute macro: ${name}", e)
             }
         }
     }
