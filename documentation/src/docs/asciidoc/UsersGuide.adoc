@@ -65,10 +65,17 @@ the API.
 
 === Request contract
 
-`POST /document/generate` validates XML against the v2 request schema (`template/@outputFormat`).
+`POST /document/generate` is synchronous.
+The response body is the file.
+It validates XML against the v2 request schema (`http://xmlns.odisee.de/v2/request`).
 A document with no namespace is that same shape.
-The v3 namespace, the v2.6 namespace, and `output/format` are HTTP 400.
-The body is plain text: the schema message.
+The v3 namespace and the v2.6 namespace are HTTP 400.
+`output/format` is part of v2.
+`format/@type` is the file extension when it is present.
+`template/@outputFormat` applies when `output` is absent.
+`format/options/option` carries name/value pairs such as `pdf-version`, `tagged`, and `watermark`.
+The `.pdfa` suffix remains the PDF/A fallback when the request did not set a PDF version.
+The body of a failed request is plain text: the schema message.
 
 A `DOCTYPE` is rejected.
 External entities are not read.
@@ -81,6 +88,29 @@ Either limit is HTTP 400.
 422 is an instruction the schema allowed and the office process could not run.
 404 is a missing template.
 503 is an office pool that could not take the call.
+
+=== Jobs
+
+`POST /document/jobs` returns HTTP 202 and a job id.
+`GET /document/jobs/{id}` returns `status`, `failedInstruction`, and `file`.
+Jobs are private to the caller.
+The list is `var/user/{name}/jobs.json`.
+A callback is a query parameter on `POST /document/jobs`.
+`POST /document/generate` does not read a callback.
+Odisee POSTs the status only when that host is listed in `$ODISEE_HOME/etc/callback-hosts`.
+An admin adds a host with `POST /callback-host`.
+A URL whose host is off the list does not get a POST.
+
+=== Instructions
+
+Writer, Calc, and Impress have separate instruction sets.
+Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`.
+Calc uses `cell`.
+`cell` requires `sheet` and `coordinate`.
+Impress uses `shape`.
+`shape` requires `name`.
+A tag from another application's set is HTTP 422.
+There is no shared `named` tag.
 
 === JSON requests
 
@@ -125,7 +155,11 @@ A failed JSON request uses the same error response as XML: the status comes from
 
 The shape is described by `webservice/src/main/resources/json/request.schema.json`.
 A request object needs `template.name`.
-Each instruction needs `instruction` set to one of `userfield`, `texttable`, `image`, `autotext`, `bookmark`, or `macro`.
+Each instruction needs `instruction` set to one of `userfield`, `texttable`, `image`, `autotext`, `bookmark`, `macro`, `cell`, or `shape`.
+`cell` is Calc.
+`shape` is Impress.
+`output.format.type` is the extension when it is present.
+`output.format.options` is a list of `{ "name", "value" }` pairs.
 Macro arguments are a `parameter` array of strings or `{"value":"..."}` objects.
 Post-processing looks like this:
 

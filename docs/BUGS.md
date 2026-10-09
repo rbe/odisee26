@@ -2,7 +2,7 @@
 
 Findings from a code review of the document-generation path. Status is against `master` plus the wave that closed the item.
 
-Wave 6 does not close a row in this table. B25's stricter allow-list and B29 (Calc and Impress instructions) stay open.
+Wave 6 closes B29. B25's stricter allow-list stays open.
 
 Severity: **blocker** (wrong document, leak, or the service cannot do what it claims), **major** (failures are silent or one bad instance takes the pool down), **minor** (wrong metadata, dead code, misleading errors).
 
@@ -20,7 +20,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 |---|---|---|---|
 | B4 | blocker | fixed in wave 1 | `TemplateService` rewrote a missing or `LATEST` revision to `1`, then assigned `arg.revision = 1` again. `Contract_rev3.ott` was reported as missing. `LATEST` did not pick the highest revision. |
 | B5 | major | fixed in wave 1 | `OdiseeXmlCategory.findLatestRevision` called `Path.listFiles()`, which does not exist, then indexed `[0]` on an empty directory. Revision strings were compared lexicographically (`rev9` > `rev10`). `findTemplate` also dereferenced a null path when revision was `LATEST`. |
-| B6 | major | fixed in wave 1 | The runtime only read `template/@outputFormat` (v2). A v3 request that uses `output/format/@type` produced no file and failed with "Got zero bytes from office process". |
+| B6 | major | fixed in wave 1 | The runtime only read `template/@outputFormat` (v2). A v3 request that uses `output/format/@type` produced no file and failed with "Got zero bytes from office process". The current request reads v2 `output/format`. A v3 namespace is HTTP 400. `template/@outputFormat` applies when `output` is absent. |
 | B7 | minor | fixed in wave 1 | `OfficeDocumentType.SPREADSHEET` sets the document extension to `ots` (the template extension). It is `ods`. |
 | B8 | major | fixed in wave 2 | XML is validated against the v2 request schema before generation. v3 and v2.6 are HTTP 400. Those request schemas are no longer shipped. |
 | B9 | major | fixed in wave 2 | The request parser rejects a `DOCTYPE` and does not resolve external entities. |

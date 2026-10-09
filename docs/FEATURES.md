@@ -18,7 +18,7 @@ Depends on: wave 2 status codes, wave 3 pool deadlines.
 
 Status: **landed in wave 3**.
 
-`GET /ready` (context path `/odisee`) is HTTP 200 only when at least one office port accepts a UNO connection, otherwise 503. The JSON body exports pool size, in-use count, the last generation time, instruction failures, and `soffice` restarts. The watchdog becomes something an operator can see.
+`GET /ready` (context path `/odisee`) is anonymous. It is HTTP 200 only when at least one office port accepts a UNO connection, otherwise 503. The JSON body exports pool size, in-use count, the last generation time, instruction failures, and `soffice` restarts. The watchdog becomes something an operator can see.
 
 ### F3. Template catalog and dry run
 
@@ -66,7 +66,9 @@ The callback belongs on the job, not on `POST /document/generate`. `POST /docume
 
 ### F9. Authenticated multi-tenancy
 
-Wave 4 requires HTTP Basic. Passwords are bcrypt hashes in `$ODISEE_HOME/etc/users`. Each user has `var/user/{name}/template`, `var/user/{name}/work`, and `var/user/{name}/output`. Any authenticated user may run macros. SFTP homes are not implemented. OpenID Connect is not implemented.
+Status: **landed in wave 4**.
+
+Wave 4 requires HTTP Basic. Passwords are bcrypt hashes in `$ODISEE_HOME/etc/users`. `java -jar` does not read `odisee-users.xml`. Each user has `var/user/{name}/template`, `var/user/{name}/work`, and `var/user/{name}/output`. Any authenticated user may run macros. `GET /ready` is anonymous. SFTP homes are not implemented. OpenID Connect is not implemented.
 
 Depends on: wave 4 (authentication and per-user directories are done).
 

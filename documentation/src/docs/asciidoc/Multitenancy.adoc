@@ -6,6 +6,7 @@ A logged-in user has a private directory under `$ODISEE_HOME/var/user/{name}/`.
 Templates are in `template`.
 Merge inputs are in `work`.
 Generated files are in `output`.
+The job list is `jobs.json` in that same directory.
 There is no shared `var/template` fallback.
 
 [[adding-odisee-users]]
@@ -51,3 +52,14 @@ Any authenticated user may run macros.
 The macro name, library, and language must be plain names.
 A bad name is HTTP 400.
 `GET /odisee/ready` stays anonymous.
+
+[[callback-hosts]]
+Callback hosts
+^^^^^^^^^^^^^^
+
+`POST /odisee/document/jobs?callback=https://host/path` stores that URL on the job.
+Odisee POSTs only when that host is listed in `$ODISEE_HOME/etc/callback-hosts`.
+An admin adds a host with `POST /odisee/callback-host`.
+Send HTTP Basic as that admin.
+A URL whose host is off the list does not get a POST.
+`POST /odisee/document/generate` does not read a callback.
