@@ -44,10 +44,6 @@ import java.util.concurrent.TimeUnit
 @Log
 class OdiseeXmlCategory {
 
-    private static final Set<String> INSTRUCTION_METHODS = [
-            'Userfield', 'Texttable', 'Image', 'Autotext', 'Bookmark', 'Macro'
-    ] as Set
-
     /**
      * Highest {@code *_revN.ott} in a directory. Numeric order, so revision 10 outranks 9.
      */
@@ -280,6 +276,111 @@ class OdiseeXmlCategory {
     }
 
     /**
+     * Set a Calc cell. {@code sheet} is the sheet name and {@code coordinate} is the cell, for example A1.
+     */
+    static void processCell(XComponent template, Map arg, cell) {
+        String sheetName = cell.'@sheet'?.toString()?.trim()
+        String coordinate = cell.'@coordinate'?.toString()?.trim()
+        if (!sheetName || !coordinate) {
+            throw new OdiseeException('cell requires sheet and coordinate', OdiseeException.BAD_REQUEST)
+        }
+        String value = cell.text()?.toString() ?: ''
+        Map parsed = Coordinate.parseCoordinate(coordinate)
+        int column = parsed.columnIndex as int
+        int row = parsed.rowIndex as int
+        OdiseeXmlCategory.processInstruction template, { t ->
+            use(org.odisee.uno.UnoCategory) {
+                def spreadsheetDocument = t.uno(com.sun.star.sheet.XSpreadsheetDocument)
+                if (spreadsheetDocument == null) {
+                    throw new OdiseeException('cell applies to a Calc document', OdiseeException.UNPROCESSABLE)
+                }
+                def sheetObject = spreadsheetDocument.getSheets().getByName(sheetName)
+                def sheet = sheetObject.uno(com.sun.star.sheet.XSpreadsheet)
+                def xcell = sheet.getCellByPosition(column, row)
+                def text = xcell.uno(com.sun.star.text.XText)
+                if (text != null) {
+                    text.setString(value)
+                } else {
+                    xcell.setFormula(value)
+                }
+            }
+        }
+    }
+
+    /**
+     * Set the text of a named Impress shape.
+     */
+    static void processShape(XComponent template, Map arg, shape) {
+        String shapeName = shape.'@name'?.toString()?.trim()
+        if (!shapeName) {
+            throw new OdiseeException('shape requires a name', OdiseeException.BAD_REQUEST)
+        }
+        String value = shape.text()?.toString() ?: ''
+        OdiseeXmlCategory.processInstruction template, { t ->
+            use(org.odisee.uno.UnoCategory) {
+                def supplier = t.uno(com.sun.star.drawing.XDrawPagesSupplier)
+                if (supplier == null) {
+                    throw new OdiseeException('shape applies to an Impress document', OdiseeException.UNPROCESSABLE)
+                }
+                def pages = supplier.getDrawPages()
+                boolean found = false
+                for (int pageIndex = 0; pageIndex < pages.getCount(); pageIndex++) {
+                    def page = pages.getByIndex(pageIndex)
+                    def shapes = page.uno(com.sun.star.drawing.XShapes)
+                    if (shapes == null) {
+                        continue
+                    }
+                    for (int shapeIndex = 0; shapeIndex < shapes.getCount(); shapeIndex++) {
+                        def candidate = shapes.getByIndex(shapeIndex)
+                        def named = candidate.uno(com.sun.star.container.XNamed)
+                        if (named != null && shapeName == named.getName()) {
+                            def text = candidate.uno(com.sun.star.text.XText)
+                            if (text == null) {
+                                throw new OdiseeException("shape '${shapeName}' has no text", OdiseeException.UNPROCESSABLE)
+                            }
+                            text.setString(value)
+                            found = true
+                        }
+                    }
+                }
+                if (!found) {
+                    throw new OdiseeException("shape '${shapeName}' was not found", OdiseeException.UNPROCESSABLE)
+                }
+            }
+        }
+    }
+
+    /**
+     * The open document selects the instruction set. The template extension is the fallback.
+     */
+    static OfficeDocumentType applicationOf(XComponent component, Path template) {
+        if (component != null) {
+            use(org.odisee.uno.UnoCategory) {
+                if (component.uno(com.sun.star.sheet.XSpreadsheetDocument)) {
+                    return OfficeDocumentType.SPREADSHEET
+                }
+                if (component.uno(com.sun.star.presentation.XPresentationSupplier)) {
+                    return OfficeDocumentType.PRESENTATION
+                }
+                if (component.uno(com.sun.star.text.XTextDocument)) {
+                    return OfficeDocumentType.TEXT
+                }
+            }
+        }
+        OfficeDocumentType.fromFileName(template?.fileName?.toString())
+    }
+
+    static String instructionLabel(instr) {
+        String name = instr?.'@name'?.toString()?.trim()
+        if (name) {
+            return name
+        }
+        String sheet = instr?.'@sheet'?.toString()?.trim()
+        String coordinate = instr?.'@coordinate'?.toString()?.trim()
+        [sheet, coordinate].findAll { it }.join(' ')
+    }
+
+    /**
      * Read request and return map.
      */
     static Map readRequest(Path file, int requestNumber) {
@@ -318,14 +419,17 @@ class OdiseeXmlCategory {
             final String join = strings.join('.')
             documentBasename = "${join}-id${arg.id}"
         }
-        List<String> formats = OutputFormats.fromRequest(request)
+        List<OutputFormats.Choice> formats = OutputFormats.fromRequest(request)
         if (!formats) {
             throw new OdiseeException('No output format specified', OdiseeException.UNPROCESSABLE)
         }
         final Path outputDir = Paths.get(outputPath)
-        formats.each { String format ->
-            String extension = SafePaths.requireSimpleName(format, 'output format')
-            output << outputDir.resolve("${documentBasename}.${extension}")
+        Map<Path, List<Map<String, String>>> optionsByFile = new LinkedHashMap<>()
+        formats.each { OutputFormats.Choice format ->
+            String extension = SafePaths.requireSimpleName(format.extension, 'output format')
+            Path file = outputDir.resolve("${documentBasename}.${extension}")
+            output << file
+            optionsByFile[file] = format.options
         }
         use(OOoDocumentCategory) {
             // Should we hide OpenOffice?
@@ -344,13 +448,14 @@ class OdiseeXmlCategory {
                         arg.template.open(oooConnection, [Hidden: hidden])
                     }
                 }
+                OfficeDocumentType application = applicationOf(xComponent, arg.template as Path)
                 List<String> failures = []
                 request.instructions.'*'.each { instr ->
                     String tagName = instr.name()?.toString() ?: ''
-                    String instruction = instr.'@name'?.toString() ?: ''
+                    String instruction = instructionLabel(instr)
                     String methodName = tagName ? tagName[0].toUpperCase() + (tagName.length() > 1 ? tagName[1..-1] : '') : ''
                     Profile.time "OdiseeXmlCategory.toDocument(${request.'@name'}, instruction ${instruction})", {
-                        if (!INSTRUCTION_METHODS.contains(methodName)) {
+                        if (!InstructionSets.accepts(application, methodName)) {
                             failures << "Unsupported instruction '${tagName}'"
                             officeConnectionFactory?.recordInstructionFailure()
                             return
@@ -368,11 +473,13 @@ class OdiseeXmlCategory {
                 if (failures) {
                     throw new OdiseeException("Document instructions failed: ${failures.join('; ')}", OdiseeException.UNPROCESSABLE)
                 }
-                withinOffice('instruction', UnoCall.deadlineMillis()) {
-                    use(OOoFieldCategory) {
-                        xComponent.refreshTextFields()
+                if (application == OfficeDocumentType.TEXT) {
+                    withinOffice('instruction', UnoCall.deadlineMillis()) {
+                        use(OOoFieldCategory) {
+                            xComponent.refreshTextFields()
+                        }
+                        null
                     }
-                    null
                 }
                 if (writesFile(arg)) {
                     final String preSaveMacro = template.'@pre-save-macro'.toString()?.trim()
@@ -385,20 +492,22 @@ class OdiseeXmlCategory {
                             null
                         }
                     }
-                    output.each { Path file ->
-                        Files.createDirectories(file.parent)
-                        boolean isPDFA = file.toString().endsWith('.pdfa')
-                        withinOffice('save', UnoCall.deadlineMillis()) {
-                            use(OOoDocumentCategory) {
-                                if (isPDFA) {
-                                    xComponent.saveAsPDF_A(file)
-                                } else {
-                                    xComponent.saveAs(file)
-                                }
+                output.each { Path file ->
+                    Files.createDirectories(file.parent)
+                    Map<String, Object> filterData = FormatOptions.filterData(optionsByFile[file])
+                    withinOffice('save', UnoCall.deadlineMillis()) {
+                        use(OOoDocumentCategory) {
+                            if (filterData && FormatOptions.pdfFamily(file.fileName.toString())) {
+                                xComponent.saveAsPdf(file, application.pdfExportFilter, filterData)
+                            } else if (FormatOptions.pdfaFallback(file.fileName.toString(), filterData)) {
+                                xComponent.saveAsPDF_A(file)
+                            } else {
+                                xComponent.saveAs(file)
                             }
-                            null
                         }
+                        null
                     }
+                }
                     final String postSaveMacro = template.'@post-save-macro'.toString()?.trim()
                     if (postSaveMacro) {
                         MacroNames.requireReference(postSaveMacro)

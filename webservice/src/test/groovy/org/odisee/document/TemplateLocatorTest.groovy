@@ -107,6 +107,28 @@ class TemplateLocatorTest extends GroovyTestCase {
         assertEquals('12', TemplateLocator.revisionOf(latest))
     }
 
+    void testCalcAndImpressTemplatesResolveWhenNoWriterFileExists() {
+        Files.createFile(dir.resolve('Budget.ots'))
+        Files.createFile(dir.resolve('Deck_rev2.otp'))
+
+        Path calc = TemplateLocator.locate(dir, 'Budget', 'LATEST')
+        Path impress = TemplateLocator.locate(dir, 'Deck', '2')
+
+        assertEquals('Budget.ots', calc.fileName.toString())
+        assertEquals('1', TemplateLocator.revisionOf(calc))
+        assertEquals('Deck_rev2.otp', impress.fileName.toString())
+        assertEquals('2', TemplateLocator.revisionOf(impress))
+    }
+
+    void testWriterTemplateStillWinsWhenAnOtsIsAlsoPresent() {
+        Files.createFile(dir.resolve('Letter.ott'))
+        Files.createFile(dir.resolve('Letter.ots'))
+
+        Path found = TemplateLocator.locate(dir, 'Letter', '1')
+
+        assertEquals('Letter.ott', found.fileName.toString())
+    }
+
     void testTemplateNameCannotEscapeTheDirectory() {
         try {
             TemplateLocator.locate(dir, '../secret', 'LATEST')

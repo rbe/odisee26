@@ -54,6 +54,7 @@
                         </xs:sequence>
                     </xs:complexType>
                 </xs:element>
+                <xs:element name="output" type="odisee:outputType" minOccurs="0" maxOccurs="1"/>
             </xs:sequence>
             <xs:attribute name="name" use="optional" type="odisee:name">
                 <xs:annotation>
@@ -144,6 +145,8 @@
                 <xs:element ref="odisee:macro"/>
                 <xs:element ref="odisee:userfield"/>
                 <xs:element ref="odisee:texttable"/>
+                <xs:element ref="odisee:cell"/>
+                <xs:element ref="odisee:shape"/>
             </xs:choice>
         </xs:complexType>
     </xs:element>
@@ -313,6 +316,35 @@
             </xs:attribute>
         </xs:complexType>
     </xs:element>
+    <xs:element name="cell">
+        <xs:annotation>
+            <xs:documentation>Set a Calc cell. The sheet name and the coordinate are required.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType mixed="true">
+            <xs:attribute name="sheet" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Name of the sheet.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="coordinate" use="required" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>Cell coordinate, for example A1 or B2.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="shape">
+        <xs:annotation>
+            <xs:documentation>Set the text of a named Impress shape.</xs:documentation>
+        </xs:annotation>
+        <xs:complexType mixed="true">
+            <xs:attribute name="name" use="required" type="odisee:name">
+                <xs:annotation>
+                    <xs:documentation>Name of the shape.</xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
     <xs:element name="parameter">
         <xs:annotation>
             <xs:documentation>List of parameters, ordered by arity.</xs:documentation>
@@ -363,6 +395,37 @@
             </xs:sequence>
         </xs:complexType>
     </xs:element>
+    <xs:complexType name="outputType">
+        <xs:annotation>
+            <xs:documentation>Specify output. Absent output leaves template/@outputFormat in charge.</xs:documentation>
+        </xs:annotation>
+        <xs:sequence minOccurs="0" maxOccurs="1">
+            <xs:element name="format" type="odisee:formatType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="formatType">
+        <xs:sequence>
+            <xs:element name="options" type="odisee:formatOptionsType" minOccurs="0" maxOccurs="1"/>
+        </xs:sequence>
+        <xs:attribute name="type" use="optional" type="xs:string">
+            <xs:annotation>
+                <xs:documentation>File extension, for example pdf, pdfa, odt, or ods. This is the format when it is present.</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+    </xs:complexType>
+    <xs:complexType name="formatOptionsType">
+        <xs:annotation>
+            <xs:documentation>Name/value pairs for the format, such as PDF version, tagged PDF, and a watermark.</xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="option" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:attribute name="name" use="required" type="xs:string"/>
+                    <xs:attribute name="value" use="required" type="xs:string"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
     <!--
 
         Complex Types.

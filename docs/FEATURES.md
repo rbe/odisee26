@@ -1,12 +1,16 @@
 # Odisee feature ideas
 
-These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F3, F4, and F10 shipped with wave 6. F9 shipped with wave 4. F11 landed with wave 2. F1, F5, F6, F7, and F8 are not implemented yet.
+These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F1, F3, F4, F5, F6, F8, and F10 shipped with wave 6. F9 shipped with wave 4. F11 landed with wave 2. F7 is not implemented yet.
 
 ## Generation API
 
 ### F1. Job API
 
-`POST /document/generate` holds the HTTP connection for as long as LibreOffice takes. Return `202` with a job id. `GET /document/jobs/{id}` returns status, the instruction that failed, and the file when it is ready. Callers can retry a `503` without guessing whether the first attempt is still running.
+Status: **landed in wave 6**.
+
+`POST /document/generate` stays synchronous. The response body stays the file bytes. `POST /document/jobs` returns HTTP 202 and a JSON job id. `GET /document/jobs/{id}` returns JSON: `status`, `failedInstruction`, and `file` (base64, or null until the job has a file). The caller is `callerFromContext`, the same source as generate. No login is HTTP 401. A job id that is not in that user's list is HTTP 404.
+
+The list is `var/user/{name}/jobs.json`. One file per user. It is not process memory and not a shared table. The generated file stays under that user's `output` directory. Object storage is F7 and is not this change.
 
 Depends on: wave 2 status codes, wave 3 pool deadlines.
 
@@ -34,23 +38,29 @@ Revisions live at `var/user/{name}/template/{templateName}/rev/{n}.ott`. `LATEST
 
 ### F5. Output options that are not a filename suffix
 
-PDF/A is detected by a `.pdfa` suffix. Expose PDF version, tagged PDF, and a watermark as `format/options`, which the v3 schema already allows and the runtime ignores.
+Status: **landed in wave 6**.
+
+The v2 request (`http://xmlns.odisee.de/v2/request`) includes `output/format`. `format/@type` is the file extension. `format/options/option` is name/value pairs: `pdf-version` (`SelectPdfVersion`), `tagged` (`UseTaggedPDF`), and `watermark` (`Watermark`). A v3 namespace is still HTTP 400. `template/@outputFormat` selects the format when `output` is absent. When `output/format/@type` is present, that type is the format. A file whose name ends in `.pdfa` still uses the PDF/A save path when the request did not set a PDF version. The Java client schema is that same v2 file.
 
 Depends on: wave 2 schema choice.
 
 ### F6. Calc and Impress on the same request path
 
-`OdiseeFileFormat` already lists spreadsheet filters. `OfficeDocumentType.SPREADSHEET` is the only Calc entry, and wave 1 only corrects its document extension to `ods`. Instructions are Writer-specific (user fields, text tables, bookmarks). A second instruction set, or a shared "named range / named shape" set, would cover Calc and Impress without a second server.
+Status: **landed in wave 6**.
+
+Each application has its own instruction set, and a set can grow without adding the tag to the others. Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`. Calc starts with `cell` (`sheet` and `coordinate`). Impress starts with `shape` (`name`). There is no shared `named` tag. A tag from another application's set is HTTP 422. A Calc save with no instructions is not this feature. `Budget.ots` and `Deck.otp` resolve when no Writer file of that name is present. `Name.ott` still wins when both a Writer file and a Calc file exist.
 
 ### F7. Delivery that is not the HTTP body
 
-The response is the file bytes, held in a `byte[]` on the `Document` object. Large batches need "write this PDF to object storage and POST this URL". The web tier then does not keep the document on the heap.
+Not implemented. The response is still the file bytes, held in a `byte[]` on the `Document` object. Large batches need "write this PDF to object storage and POST this URL". Object storage stays later.
 
 Depends on: B1 (done — the heap leak made this worse).
 
 ### F8. Callback when a job finishes
 
-Pair with F1. The request names a URL. Odisee POSTs the status and a download handle when the office process returns. Oracle and PHP callers that already build the XML can stay synchronous; new callers do not have to.
+Status: **landed in wave 6**.
+
+The callback belongs on the job, not on `POST /document/generate`. `POST /document/jobs?callback=https://host/path` stores that URL on the job. When the job finishes, Odisee POSTs JSON (`id`, `status`, `failedInstruction`, and `file` set to `/odisee/document/jobs/{id}`) only if the URL's host is on the server allow-list. An admin adds a host with `POST /callback-host`. The list is `$ODISEE_HOME/etc/callback-hosts`. A URL whose host is off the list does not get a POST. The synchronous generate route does not read a callback.
 
 ## Operations
 
@@ -72,7 +82,7 @@ A failed health check drops a remote host from the pool and does not signal a lo
 
 ### F11. One request schema, published for the clients
 
-Done in wave 2. The server and the Java client use v2 (`template/@outputFormat`). The schema is `webservice/src/main/resources/xml/v2/request.xsd`, copied to `clients/client-java/src/main/schema/request.xsd`. The v3 and v2.6 request schemas are deleted. PHP, VB.NET, and the Oracle package still build that same shape; their examples under `webservice/src/main/docker/var/request` are unchanged.
+Done in wave 2. The server and the Java client use v2. Wave 6 adds `output/format` to that same namespace. The schema is `webservice/src/main/resources/xml/v2/request.xsd`, copied to `clients/client-java/src/main/schema/request.xsd`. The v3 and v2.6 request schemas stay deleted. A v3 namespace is still HTTP 400. PHP, VB.NET, and the Oracle package still build the v2 shape; their examples under `webservice/src/main/docker/var/request` are unchanged.
 
 ### F12. Integration suite with a headless LibreOffice
 

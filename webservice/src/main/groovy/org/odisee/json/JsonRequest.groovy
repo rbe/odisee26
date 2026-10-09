@@ -31,7 +31,7 @@ final class JsonRequest {
     ]
 
     private static final Set<String> INSTRUCTION_NAMES = [
-            'userfield', 'texttable', 'image', 'autotext', 'bookmark', 'macro'
+            'userfield', 'texttable', 'image', 'autotext', 'bookmark', 'macro', 'cell', 'shape'
     ] as Set<String>
 
     private static final Set<String> ACTION_STEPS = ['result-placeholder', 'input'] as Set<String>
@@ -140,7 +140,49 @@ final class JsonRequest {
             if (request.postProcess != null) {
                 appendPostProcess(xml, request.postProcess)
             }
+            if (request.output != null) {
+                appendOutput(xml, request.output)
+            }
         }
+    }
+
+    private static void appendOutput(MarkupBuilder xml, Object output) {
+        if (!(output instanceof Map)) {
+            throw new OdiseeException('output must be an object')
+        }
+        final Map map = (Map) output
+        final Object format = map.format
+        if (!(format instanceof Map)) {
+            throw new OdiseeException('output.format must be an object')
+        }
+        final Map formatMap = (Map) format
+        final Map<String, String> attrs = new LinkedHashMap<>()
+        if (formatMap.type != null) {
+            attrs.put('type', stringify(formatMap.type))
+        }
+        xml.output {
+            xml.format(attrs) {
+                final List options = asList(formatMap.options ?: formatMap.option)
+                if (options) {
+                    xml.options {
+                        options.each { Object option ->
+                            appendOption(xml, option)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void appendOption(MarkupBuilder xml, Object option) {
+        if (!(option instanceof Map)) {
+            throw new OdiseeException('Each format option must be an object')
+        }
+        final Map map = (Map) option
+        if (!map.name) {
+            throw new OdiseeException('A format option needs a name')
+        }
+        xml.option(name: stringify(map.name), value: stringify(map.value))
     }
 
     private static void appendGroup(MarkupBuilder xml, Object group) {

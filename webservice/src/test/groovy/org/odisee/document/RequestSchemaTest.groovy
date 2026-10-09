@@ -98,15 +98,45 @@ class RequestSchemaTest extends GroovyTestCase {
         assertTrue(error.message.contains('v3'))
     }
 
-    void testV3OutputElementIsRejected() {
-        OdiseeException error = reject('''<odisee>
+    void testV2OutputFormatIsAccepted() {
+        def root = RequestSchema.parse('''<odisee>
   <request name="Edh">
-    <template name="T"/>
+    <template name="T" outputFormat="odt"/>
     <instructions><userfield name="Hallo">x</userfield></instructions>
-    <output><format type="pdf"/></output>
+    <output>
+      <format type="pdf">
+        <options>
+          <option name="pdf-version" value="1.4"/>
+          <option name="tagged" value="true"/>
+          <option name="watermark" value="DRAFT"/>
+        </options>
+      </format>
+    </output>
+  </request>
+</odisee>'''.getBytes('UTF-8'))
+        use(DOMCategory) {
+            assertEquals('pdf', root.request[0].output.format[0].'@type')
+            assertEquals('watermark', root.request[0].output.format.options.option[2].'@name')
+        }
+    }
+
+    void testCellAndShapeAreAcceptedAndNamedIsNot() {
+        RequestSchema.parse('''<odisee>
+  <request name="Sheet">
+    <template name="Budget"/>
+    <instructions>
+      <cell sheet="Sheet1" coordinate="B2">42</cell>
+      <shape name="Title">Hello</shape>
+    </instructions>
+  </request>
+</odisee>'''.getBytes('UTF-8'))
+        OdiseeException error = reject('''<odisee>
+  <request name="Bad">
+    <template name="Letter" outputFormat="pdf"/>
+    <instructions><named name="A">nope</named></instructions>
   </request>
 </odisee>''')
-        assertTrue(error.message.contains('output/format'))
+        assertTrue(error.message.startsWith('Invalid request:'))
     }
 
     void testV26NamespaceIsRejected() {

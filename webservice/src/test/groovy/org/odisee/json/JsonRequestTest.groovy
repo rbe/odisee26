@@ -12,6 +12,7 @@ import groovy.xml.XmlUtil
 import groovy.xml.dom.DOMCategory
 import org.junit.Test
 import org.odisee.api.OdiseeException
+import org.odisee.document.RequestSchema
 import org.w3c.dom.Element
 
 import static org.junit.Assert.assertEquals
@@ -109,6 +110,44 @@ class JsonRequestTest {
             assertEquals('pdf/AGB.pdf', xml.request[0].'post-process'.action[0].input[0].'@filename')
             assertEquals('false', xml.response.base64.text())
         }
+    }
+
+    @Test
+    void outputFormatAndApplicationInstructionsBecomeXml() {
+        final String json = '''
+        {
+          "request": {
+            "name": "Budget",
+            "template": { "name": "Budget", "outputFormat": "ods" },
+            "instructions": [
+              { "instruction": "cell", "sheet": "Sheet1", "coordinate": "B2", "value": "42" },
+              { "instruction": "shape", "name": "Title", "value": "Hello" }
+            ],
+            "output": {
+              "format": {
+                "type": "pdf",
+                "options": [
+                  { "name": "pdf-version", "value": "1.4" },
+                  { "name": "tagged", "value": "true" },
+                  { "name": "watermark", "value": "DRAFT" }
+                ]
+              }
+            }
+          }
+        }
+        '''
+        final Element xml = JsonRequest.toElement(json)
+        use(DOMCategory) {
+            assertEquals('Sheet1', xml.request[0].instructions.cell[0].'@sheet')
+            assertEquals('B2', xml.request[0].instructions.cell[0].'@coordinate')
+            assertEquals('42', xml.request[0].instructions.cell[0].text())
+            assertEquals('Title', xml.request[0].instructions.shape[0].'@name')
+            assertEquals('Hello', xml.request[0].instructions.shape[0].text())
+            assertEquals('pdf', xml.request[0].output.format[0].'@type')
+            assertEquals('watermark', xml.request[0].output.format.options.option[2].'@name')
+            assertEquals('DRAFT', xml.request[0].output.format.options.option[2].'@value')
+        }
+        RequestSchema.validate(xml)
     }
 
     @Test

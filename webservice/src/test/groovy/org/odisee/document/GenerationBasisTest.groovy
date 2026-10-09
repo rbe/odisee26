@@ -10,6 +10,7 @@ import org.w3c.dom.Element
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.ZipInputStream
 
 /**
  * Tests 1-3 against LibreOffice listening on 127.0.0.1:2002.
@@ -156,6 +157,57 @@ class GenerationBasisTest extends GroovyTestCase {
         assertTrue(pdfText(recovered[0].bytes).contains('still-open'))
     }
 
+    void testOutputFormatTypeSelectsTheFile() {
+        String xml = '''<odisee>
+  <request name="Typed">
+    <template name="Letter" outputFormat="odt"/>
+    <instructions><userfield name="Hallo">typed-pdf</userfield></instructions>
+    <output><format type="pdf">
+      <options>
+        <option name="pdf-version" value="1.4"/>
+        <option name="tagged" value="true"/>
+        <option name="watermark" value="DRAFT"/>
+      </options>
+    </format></output>
+  </request>
+</odisee>'''
+        List documents = service.generateDocument(caller, parse(xml))
+
+        assertEquals(1, documents.size())
+        assertEquals('Typed.pdf', documents[0].filename)
+        assertTrue(pdfText(documents[0].bytes).contains('typed-pdf'))
+    }
+
+    void testCalcCellInstructionIsWritten() {
+        Path templates = OdiseePath.ODISEE_VAR.resolve('user').resolve('odisee').resolve('template')
+        MinimalSpreadsheet.write(templates.resolve('Budget.ots'))
+        String xml = '''<odisee>
+  <request name="BudgetOut">
+    <template name="Budget" outputFormat="ods"/>
+    <instructions><cell sheet="Sheet1" coordinate="A1">cell-value</cell></instructions>
+  </request>
+</odisee>'''
+        List documents = service.generateDocument(caller, parse(xml))
+
+        assertEquals('BudgetOut.ods', documents[0].filename)
+        assertTrue(zipText(documents[0].bytes, 'content.xml').contains('cell-value'))
+    }
+
+    void testImpressShapeInstructionIsWritten() {
+        Path templates = OdiseePath.ODISEE_VAR.resolve('user').resolve('odisee').resolve('template')
+        MinimalPresentation.write(templates.resolve('Deck.otp'))
+        String xml = '''<odisee>
+  <request name="DeckOut">
+    <template name="Deck" outputFormat="odp"/>
+    <instructions><shape name="Title">shape-value</shape></instructions>
+  </request>
+</odisee>'''
+        List documents = service.generateDocument(caller, parse(xml))
+
+        assertEquals('DeckOut.odp', documents[0].filename)
+        assertTrue(zipText(documents[0].bytes, 'content.xml').contains('shape-value'))
+    }
+
     private static Element request(String name, String value) {
         parse("""<odisee>
   <request name="${name}">
@@ -178,6 +230,21 @@ class GenerationBasisTest extends GroovyTestCase {
             stream.each { found << dir.relativize(it).toString() }
         }
         found
+    }
+
+    private static String zipText(byte[] bytes, String entryName) {
+        ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(bytes))
+        try {
+            def entry
+            while ((entry = zip.nextEntry) != null) {
+                if (entry.name == entryName) {
+                    return new String(zip.readAllBytes(), 'UTF-8')
+                }
+            }
+        } finally {
+            zip.close()
+        }
+        ''
     }
 
     private static String pdfText(byte[] bytes) {
