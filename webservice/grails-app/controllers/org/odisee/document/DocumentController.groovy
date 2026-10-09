@@ -29,6 +29,8 @@ class DocumentController {
 
     OdiseeService odiseeService
 
+    JobService jobService
+
     /**
      * Grails stores the request before Spring Security wraps it, so
      * {@code request.userPrincipal} stays null after a successful Basic login.
@@ -72,19 +74,7 @@ class DocumentController {
         try {
             final Principal caller = requireCaller(callerFromContext(request.userPrincipal))
             final boolean dryRun = dryRunRequested(request.getParameter('dryRun'))
-            final byte[] body = Compression.readLimited(request.inputStream)
-            final boolean jsonRequest = isJsonRequest(request.getContentType(), body)
-            final Element xml = jsonRequest
-                    ? JsonRequest.toElement(new String(body, 'UTF-8'))
-                    : RequestSchema.parse(body)
-            if (jsonRequest) {
-                RequestSchema.validate(xml)
-            }
-            if (null == xml) {
-                throw new OdiseeException(jsonRequest
-                        ? 'Invalid or missing JSON request'
-                        : 'Invalid or missing XML request')
-            }
+            final Element xml = readRequestElement()
             if (dryRun) {
                 odiseeService.generateDocument(caller, xml, true)
                 response.status = 200
@@ -130,6 +120,128 @@ class DocumentController {
      */
     static boolean dryRunRequested(String value) {
         value != null && value.equalsIgnoreCase('true')
+    }
+
+    /**
+     * {@code POST /document/jobs} returns 202 and a job id. The file is not this response.
+     * A callback URL on this request is stored on the job. {@code POST /document/generate} does not read one.
+     */
+    def submitJob() {
+        boolean errorResponse = false
+        try {
+            final Principal caller = requireCaller(callerFromContext(request.userPrincipal))
+            final Element xml = readRequestElement()
+            final String callback = callbackForJob(request.getParameter('callback'))
+            final String id = jobService.submit(caller, xml, callback)
+            response.status = JobResponses.ACCEPTED
+            response.contentType = 'application/json; charset=UTF-8'
+            response.outputStream << JobResponses.accepted(id)
+            response.outputStream.flush()
+        } catch (e) {
+            errorResponse = true
+            processThrowable(e)
+        } finally {
+            skipView()
+            if (!errorResponse) {
+                try {
+                    response.outputStream.close()
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    /**
+     * {@code GET /document/jobs/{id}} returns status, the failed instruction, and the file.
+     * The job is read from the caller's own list.
+     */
+    def showJob() {
+        boolean errorResponse = false
+        try {
+            final Principal caller = requireCaller(callerFromContext(request.userPrincipal))
+            final String id = SafePaths.requireSimpleName(params.id?.toString(), 'job')
+            final String user = org.odisee.io.TenantPaths.requireUserName(caller.name)
+            final Map job = JobStore.require(user, id)
+            final byte[] file = JobStore.fileBytes(user, job)
+            response.status = 200
+            response.contentType = 'application/json; charset=UTF-8'
+            response.outputStream << JobResponses.statusBody(job, file)
+            response.outputStream.flush()
+        } catch (e) {
+            errorResponse = true
+            processThrowable(e)
+        } finally {
+            skipView()
+            if (!errorResponse) {
+                try {
+                    response.outputStream.close()
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    /**
+     * {@code POST /callback-host} adds one host to the server allow-list. Only an admin may call it.
+     */
+    def addCallbackHost() {
+        boolean errorResponse = false
+        try {
+            boolean admin = org.springframework.security.core.context.SecurityContextHolder.context?.authentication?.authorities?.any {
+                it.authority == 'ROLE_ADMIN'
+            } as boolean
+            requireAdmin(callerFromContext(request.userPrincipal), admin)
+            String host = request.getParameter('host')
+            if (!host?.trim()) {
+                byte[] body = Compression.readLimited(request.inputStream)
+                host = new String(body, 'UTF-8').trim()
+            }
+            boolean added = CallbackAllowList.add(host)
+            response.status = added ? 201 : 200
+            response.outputStream << String.format("Callback host '%s' listed.%n", CallbackAllowList.requireHost(host))
+            response.outputStream.flush()
+        } catch (e) {
+            errorResponse = true
+            processThrowable(e)
+        } finally {
+            skipView()
+            if (!errorResponse) {
+                try {
+                    response.outputStream.close()
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    /**
+     * The synchronous generate route does not keep a callback.
+     * The job route does.
+     */
+    static String callbackForGenerate(String callback) {
+        null
+    }
+
+    static String callbackForJob(String callback) {
+        String value = callback?.trim()
+        value ? value : null
+    }
+
+    private Element readRequestElement() {
+        final byte[] body = Compression.readLimited(request.inputStream)
+        final boolean jsonRequest = isJsonRequest(request.getContentType(), body)
+        final Element xml = jsonRequest
+                ? JsonRequest.toElement(new String(body, 'UTF-8'))
+                : RequestSchema.parse(body)
+        if (jsonRequest) {
+            RequestSchema.validate(xml)
+        }
+        if (null == xml) {
+            throw new OdiseeException(jsonRequest
+                    ? 'Invalid or missing JSON request'
+                    : 'Invalid or missing XML request')
+        }
+        xml
     }
 
     /**

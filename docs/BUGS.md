@@ -63,7 +63,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B26 | major | fixed in wave 3 | Two office stacks are compiled: `OfficeConnection` / `OfficeConnectionFactory` (used) and `OOoConnection` / `OOoConnectionManager` / `OOoProcess` (not used by the request path). The unused stack is deleted. |
 | B27 | major | fixed with the toolchain update | `RequestService` no longer uses `com.sun.org.apache.xerces.internal.dom.DeferredNode`. XML is written through `GPathResult` and `org.w3c.dom.Node`, which JDK 21 allows. |
 | B28 | minor | fixed in wave 4 | A missing or blank `ODISEE_HOME` is an `OdiseeException`. The environment value wins and is absolute. |
-| B29 | minor | open | `SPREADSHEET` is the only Calc hint, and the instruction set is Writer-only. Calc/Impress are listed in `OdiseeFileFormat` and then stop. |
+| B29 | minor | fixed in wave 6 | `SPREADSHEET` was the only Calc hint, and the instruction set was Writer-only. Calc now starts with `cell`. Impress starts with `shape`. Writer keeps its own tags. |
 | B30 | major | fixed in wave 5 | Wave 1 covers the helpers. Tests 1–3 open a real template in LibreOffice (`GenerationBasisTest`, Docker). Tests 4–5 cover HTTP status and the pool. The Java client asserts the Hallo value in the PDF against a local server (`OdiseeClientLocalTest`). |
 | B31 | major | fixed in wave 5 | A successful HTTP Basic login still left `request.userPrincipal` null. Grails captured the request before Spring Security wrapped it, so `POST /document/generate` returned 401. The caller is read from the security context. |
 | B32 | major | fixed in wave 5 | `RequestService` cast the active DOM request to `GPathResult`. A DOM body failed before LibreOffice opened the template. A DOM node is serialized as XML. |
@@ -72,7 +72,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 
 - `TemplateLocatorTest` — `LATEST` is numeric, revision 1 falls back to `Name.ott`, path escape is rejected.
 - `OdiinstParserTest` — host and port come from the file, comments and blank lines are skipped.
-- `OutputFormatsTest` — `template/@outputFormat` is the extension list. The v3 `output/format` element is not read.
+- `OutputFormatsTest` — `template/@outputFormat` is the extension list when `output` is absent. `output/format/@type` is the extension when it is present. A v3 namespace is still rejected.
 - `SafePathsTest` — relative merge paths stay under the root; absolute paths and `..` do not.
 - `RequestContextTest` — each call gets its own document list; resetting for the next request keeps documents already produced.
 - `CompressionTest` — gzip round-trip and a one-byte body.

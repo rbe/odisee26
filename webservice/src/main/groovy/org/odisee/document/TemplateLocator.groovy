@@ -17,18 +17,22 @@ import java.nio.file.Path
 import java.util.regex.Matcher
 
 /**
- * Find a Writer template under one user's template directory.
- * {@code Name.ott} is revision 1 when no numbered file exists.
+ * Find a template under one user's template directory.
+ * Writer files are {@code .ott}. Calc files are {@code .ots}. Impress files are {@code .otp}.
+ * {@code Name.ott} is revision 1 when no numbered file exists. {@code .ots} and {@code .otp}
+ * are revision 1 when no {@code .ott} is present.
  * {@code Name_revN.ott} is revision N in that flat directory.
  * {@code Name/rev/N.ott} is the same revision in the per-template directory.
- * {@code LATEST} is the highest N across both layouts, or {@code Name.ott}
+ * {@code LATEST} is the highest N across both layouts, or the plain file
  * when neither layout has a numbered file.
  */
 final class TemplateLocator {
 
-    private static final String NUMBERED = /_rev(\d+)\.ott$/
+    private static final List<String> EXTENSIONS = ['ott', 'ots', 'otp']
 
-    private static final String REV_FILE = /^(\d+)\.ott$/
+    private static final String NUMBERED = /_rev(\d+)\.(ott|ots|otp)$/
+
+    private static final String REV_FILE = /^(\d+)\.(ott|ots|otp)$/
 
     private TemplateLocator() {
     }
@@ -53,12 +57,12 @@ final class TemplateLocator {
         if (!requested.isInteger()) {
             throw new OdiseeException("Revision '${requested}' is not a number or LATEST", OdiseeException.BAD_REQUEST)
         }
-        Path inDirectory = revisionFile(templateDir, templateName, requested)
-        if (Files.exists(inDirectory)) {
+        Path inDirectory = existingRevisionFile(templateDir, templateName, requested)
+        if (inDirectory != null) {
             return inDirectory
         }
-        Path numbered = templateDir.resolve("${templateName}_rev${requested}.ott")
-        if (Files.exists(numbered)) {
+        Path numbered = existingFlatRevision(templateDir, templateName, requested)
+        if (numbered != null) {
             return numbered
         }
         if (requested == '1') {
@@ -109,11 +113,33 @@ final class TemplateLocator {
     }
 
     private static Path plainTemplate(Path templateDir, String templateName) {
+        for (String extension : EXTENSIONS) {
+            Path candidate = templateDir.resolve("${templateName}.${extension}")
+            if (Files.exists(candidate)) {
+                return candidate
+            }
+        }
         templateDir.resolve("${templateName}.ott")
     }
 
-    private static Path revisionFile(Path templateDir, String templateName, String revision) {
-        templateDir.resolve(templateName).resolve('rev').resolve("${revision}.ott")
+    private static Path existingRevisionFile(Path templateDir, String templateName, String revision) {
+        for (String extension : EXTENSIONS) {
+            Path candidate = templateDir.resolve(templateName).resolve('rev').resolve("${revision}.${extension}")
+            if (Files.exists(candidate)) {
+                return candidate
+            }
+        }
+        null
+    }
+
+    private static Path existingFlatRevision(Path templateDir, String templateName, String revision) {
+        for (String extension : EXTENSIONS) {
+            Path candidate = templateDir.resolve("${templateName}_rev${revision}.${extension}")
+            if (Files.exists(candidate)) {
+                return candidate
+            }
+        }
+        null
     }
 
     private static Path highestRevision(Path templateDir, String templateName) {
@@ -141,11 +167,13 @@ final class TemplateLocator {
         if (!Files.isDirectory(templateDir)) {
             return
         }
-        Files.newDirectoryStream(templateDir, "${templateName}_rev*.ott").withCloseable { stream ->
-            stream.each { Path candidate ->
-                Matcher matcher = (candidate.fileName.toString() =~ NUMBERED)
-                if (matcher.find()) {
-                    visitor.call(candidate, Integer.parseInt(matcher.group(1)))
+        EXTENSIONS.each { String extension ->
+            Files.newDirectoryStream(templateDir, "${templateName}_rev*.${extension}").withCloseable { stream ->
+                stream.each { Path candidate ->
+                    Matcher matcher = (candidate.fileName.toString() =~ NUMBERED)
+                    if (matcher.find()) {
+                        visitor.call(candidate, Integer.parseInt(matcher.group(1)))
+                    }
                 }
             }
         }
@@ -156,11 +184,13 @@ final class TemplateLocator {
         if (!Files.isDirectory(revDir)) {
             return
         }
-        Files.newDirectoryStream(revDir, '*.ott').withCloseable { stream ->
-            stream.each { Path candidate ->
-                Matcher matcher = (candidate.fileName.toString() =~ REV_FILE)
-                if (matcher.matches()) {
-                    visitor.call(candidate, Integer.parseInt(matcher.group(1)))
+        EXTENSIONS.each { String extension ->
+            Files.newDirectoryStream(revDir, "*.${extension}").withCloseable { stream ->
+                stream.each { Path candidate ->
+                    Matcher matcher = (candidate.fileName.toString() =~ REV_FILE)
+                    if (matcher.matches()) {
+                        visitor.call(candidate, Integer.parseInt(matcher.group(1)))
+                    }
                 }
             }
         }

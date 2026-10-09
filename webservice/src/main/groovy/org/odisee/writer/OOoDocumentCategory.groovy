@@ -276,6 +276,31 @@ class OOoDocumentCategory {
     }
 
     /**
+     * Save as PDF with the application's export filter and the request's filter data.
+     */
+    static saveAsPdf(XComponent component, Path file, String filterName, Map<String, Object> filterData) {
+        List<com.sun.star.beans.PropertyValue> pdfFilterData = new LinkedList<>()
+        filterData?.each { String key, Object value ->
+            pdfFilterData << makePropertyValue(key, value)
+        }
+        com.sun.star.beans.PropertyValue[] filterArray = pdfFilterData.toArray(new com.sun.star.beans.PropertyValue[pdfFilterData.size()])
+        List<com.sun.star.beans.PropertyValue> conversionProperties = new LinkedList<>()
+        conversionProperties << makePropertyValue('FilterName', filterName ?: 'writer_pdf_Export')
+        conversionProperties << makePropertyValue('Overwrite', Boolean.TRUE)
+        conversionProperties << makePropertyValue('FilterData', filterArray)
+        com.sun.star.beans.PropertyValue[] properties = conversionProperties.toArray(new com.sun.star.beans.PropertyValue[conversionProperties.size()])
+        use(UnoCategory) {
+            String fileURL = getFileURL(file)
+            try {
+                XStorable xStorable = (XStorable) component.uno(XStorable)
+                xStorable.storeToURL(fileURL, properties)
+            } catch (e) {
+                throw new OdiseeException("Could not save document at ${fileURL}", e)
+            }
+        }
+    }
+
+    /**
      * Close a document.
      * http://wiki.services.openoffice.org/wiki/Documentation/DevGuide/OfficeDev/Closing_Documents
      */

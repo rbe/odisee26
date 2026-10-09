@@ -14,7 +14,8 @@ package org.odisee.document;
 public enum OfficeDocumentType {
 
     TEXT("Text document", "swriter", "ott", "odt", "writer_pdf_Export"),
-    SPREADSHEET("Spreadsheet", "scalc", "ots", "ods", "calc_pdf_Export");
+    SPREADSHEET("Spreadsheet", "scalc", "ots", "ods", "calc_pdf_Export"),
+    PRESENTATION("Presentation", "simpress", "otp", "odp", "impress_pdf_Export");
 
     private final String description;
     private final String internalType;
@@ -66,6 +67,26 @@ public enum OfficeDocumentType {
             }
         }
         return r;
+    }
+
+    /**
+     * Template and document extensions select the application when the open document does not.
+     * Writer stays the default so an {@code .ott} file keeps the Writer instruction set.
+     */
+    public static OfficeDocumentType fromFileName(final String fileName) {
+        if (fileName == null) {
+            return TEXT;
+        }
+        String lower = fileName.toLowerCase(java.util.Locale.ROOT);
+        int dot = lower.lastIndexOf('.');
+        String ext = dot >= 0 ? lower.substring(dot + 1) : lower;
+        if ("ots".equals(ext) || "ods".equals(ext) || "xls".equals(ext) || "xlsx".equals(ext)) {
+            return SPREADSHEET;
+        }
+        if ("otp".equals(ext) || "odp".equals(ext) || "ppt".equals(ext) || "pptx".equals(ext)) {
+            return PRESENTATION;
+        }
+        return TEXT;
     }
 
 }

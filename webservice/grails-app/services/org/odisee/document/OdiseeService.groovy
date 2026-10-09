@@ -38,19 +38,26 @@ class OdiseeService {
      * @return List with generated OooDocument instance(s).
      */
     List<Document> generateDocument(final Principal principal, final Element xml) {
-        generateDocument(principal, xml, false)
+        generateDocument(principal, xml, false, null)
     }
 
     /**
      * A dry run resolves instructions and does not leave a file under the user's output directory.
      */
     List<Document> generateDocument(final Principal principal, final Element xml, final boolean dryRun) {
+        generateDocument(principal, xml, dryRun, null)
+    }
+
+    /**
+     * {@code requestId} is the directory under the user's output. A job uses its id so the file stays with that job.
+     */
+    List<Document> generateDocument(final Principal principal, final Element xml, final boolean dryRun, final String requestId) {
         if (principal == null || principal.name == null || principal.name.trim().isEmpty()) {
             throw new OdiseeException('Authentication required', OdiseeException.UNAUTHORIZED)
         }
         String user = TenantPaths.requireUserName(principal.name)
         Map<String, Object> arg = RequestContext.create()
-        arg.uniqueRequestId = UUID.randomUUID()
+        arg.uniqueRequestId = requestId ?: UUID.randomUUID().toString()
         arg.dryRun = dryRun
         arg.principal = principal
         arg.xml = xml

@@ -81,6 +81,22 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         mvc.perform(post('/user').with(httpBasic('root', 'root-secret'))).andExpect(status().isCreated())
     }
 
+    void testJobWithoutLoginIs401() {
+        mvc.perform(post('/document/jobs')).andExpect(status().isUnauthorized())
+        mvc.perform(get('/document/jobs/abc')).andExpect(status().isUnauthorized())
+    }
+
+    void testJobWithLoginIsAllowed() {
+        mvc.perform(post('/document/jobs').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isAccepted())
+        mvc.perform(get('/document/jobs/abc').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
+    }
+
+    void testCallbackHostRequiresAdmin() {
+        mvc.perform(post('/callback-host')).andExpect(status().isUnauthorized())
+        mvc.perform(post('/callback-host').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isForbidden())
+        mvc.perform(post('/callback-host').with(httpBasic('root', 'root-secret'))).andExpect(status().isCreated())
+    }
+
     @Configuration
     @EnableWebMvc
     @Import(OdiseeSecurityConfiguration)
@@ -112,6 +128,23 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         @ResponseStatus(HttpStatus.CREATED)
         String createUser() {
             'created'
+        }
+
+        @PostMapping('/document/jobs')
+        @ResponseStatus(HttpStatus.ACCEPTED)
+        String submitJob() {
+            'accepted'
+        }
+
+        @GetMapping('/document/jobs/{id}')
+        String showJob() {
+            'job'
+        }
+
+        @PostMapping('/callback-host')
+        @ResponseStatus(HttpStatus.CREATED)
+        String callbackHost() {
+            'listed'
         }
     }
 

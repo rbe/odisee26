@@ -23,8 +23,10 @@ import javax.xml.validation.SchemaFactory
 import javax.xml.validation.Validator
 
 /**
- * The request the server accepts is the v2 schema ({@code template/@outputFormat}).
- * v3 and v2.6 are rejected. A document with no namespace is the same v2 shape.
+ * The request the server accepts is the v2 schema.
+ * {@code template/@outputFormat} selects the format when {@code output} is absent.
+ * {@code output/format/@type} selects the format when it is present.
+ * v3 and v2.6 namespaces are rejected. A document with no namespace is the same v2 shape.
  */
 final class RequestSchema {
 
@@ -77,9 +79,6 @@ final class RequestSchema {
         if (namespace && V2 != namespace) {
             throw new OdiseeException("Request namespace '${namespace}' is not accepted. Use the v2 request schema.", OdiseeException.BAD_REQUEST)
         }
-        if (hasLocalName(root, 'output')) {
-            throw new OdiseeException('The v3 output/format element is not accepted. Set template/@outputFormat.', OdiseeException.BAD_REQUEST)
-        }
         try {
             final Validator validator = SCHEMA.newValidator()
             validator.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, '')
@@ -113,21 +112,6 @@ final class RequestSchema {
         } catch (SAXException e) {
             throw new IllegalStateException('v2 request schema cannot be loaded', e)
         }
-    }
-
-    private static boolean hasLocalName(Element element, String name) {
-        Node child = element.firstChild
-        while (child != null) {
-            if (child.nodeType == Node.ELEMENT_NODE) {
-                Element nested = (Element) child
-                String local = nested.localName ?: nested.nodeName
-                if (name == local || hasLocalName(nested, name)) {
-                    return true
-                }
-            }
-            child = child.nextSibling
-        }
-        false
     }
 
     private static Element copyWithoutNamespace(Element root) {
