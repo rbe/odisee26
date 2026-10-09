@@ -1,6 +1,6 @@
 # Odisee feature ideas
 
-These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F9 shipped with wave 4. F11 landed with wave 2. The rest are not implemented yet.
+These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F3, F4, and F10 shipped with wave 6. F9 shipped with wave 4. F11 landed with wave 2. F1, F5, F6, F7, and F8 are not implemented yet.
 
 ## Generation API
 
@@ -18,15 +18,17 @@ Status: **landed in wave 3**.
 
 ### F3. Template catalog and dry run
 
-`GET /template/{name}` returns the user fields, bookmarks, tables, and the revisions on disk. `POST /document/generate?dryRun=true` resolves instructions and does not save. People building templates in the `.oxt` extension can see a misspelled field before a batch run.
+Status: **landed in wave 6**.
 
-Depends on: wave 1 template locator (done), wave 4 per-user directories.
+`GET /template/{name}` (context path `/odisee`) requires a login. The body is JSON: `name`, `revision`, `userFields`, `bookmarks`, `tables`, and `revisions`. Those come from that user's `var/user/{name}/template` only. Another user's template is HTTP 404. No login is HTTP 401. The caller is the security context (`callerFromContext`), the same source as `POST /document/generate`.
+
+`POST /document/generate?dryRun=true` requires a login. It opens the template, applies the instructions, and does not save a file under `output`. A failed instruction is HTTP 422 and does not drop a pool slot. A UNO deadline still drops the slot. The synchronous `POST /document/generate` response stays the file bytes.
 
 ### F4. Working template revisions
 
-Store `var/template/{name}/rev/{n}.ott`, honor `LATEST`, and refuse a revision that is not on disk. Wave 1 locates `Name.ott` and `Name_revN.ott` in the flat directory the server already uses. A directory per template is the layout the class comment in `OdiseeXmlCategory` already describes.
+Status: **landed in wave 6**.
 
-Depends on: wave 1 locator (done).
+Revisions live at `var/user/{name}/template/{templateName}/rev/{n}.ott`. `LATEST` is the highest number across that directory and the flat files. A revision that is not on disk is HTTP 404. `Name.ott` and `Name_revN.ott` in the user's flat template directory still resolve. User A cannot see user B's revisions. There is no shared `var/template` directory.
 
 ## Documents
 
@@ -60,9 +62,13 @@ Depends on: wave 4 (authentication and per-user directories are done).
 
 ### F10. Office pool from configuration, including remote hosts
 
-Wave 1 reads host and port from `etc/odiinst`. A follow-on is hot reload, a per-group name (the v2 `<group name="..."/>` element is unused), and a health check that removes a remote host without a restart.
+Status: **landed in wave 6**.
 
-Depends on: wave 1 parser (done), wave 3 deadlines.
+`etc/odiinst` is read again when its text changes. The pool in this JVM picks up a new host. A restart of the JVM is not required.
+
+The optional 8th field is the pool group. A blank field is `group0`. The request's v2 `<group name="..."/>` selects that group. A missing `<group>` is `group0`. The legacy `<ooo group="..."/>` element stays unread.
+
+A failed health check drops a remote host from the pool and does not signal a local `soffice`. A healthy local slot stays in the pool. The probe still uses the wave 3 recover deadline. A deadline on a local slot still drops that slot and signals `soffice`.
 
 ### F11. One request schema, published for the clients
 

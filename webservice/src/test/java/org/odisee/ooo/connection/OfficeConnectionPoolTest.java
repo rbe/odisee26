@@ -4,6 +4,9 @@ import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.assertEquals;
@@ -159,6 +162,72 @@ public class OfficeConnectionPoolTest {
         assertEquals(0, factory.waiting());
         assertEquals(1, factory.droppedCount());
         assertEquals(1, factory.gauges().sofficeRestarts());
+    }
+
+    @Test
+    public void failedRemoteHealthCheckDropsTheHostAndLeavesLocalSoffice() throws OdiseeServerException {
+        ScriptedOfficeConnection remote = new ScriptedOfficeConnection(false, "10.0.0.8", 2002);
+        remote.setFailConnect(true);
+        ScriptedOfficeConnection local = new ScriptedOfficeConnection(false, "127.0.0.1", 2001);
+        OfficeConnectionFactory factory = OfficeConnectionFactory.forTest(Arrays.asList(remote, local));
+
+        assertTrue(factory.acceptsUnoConnection());
+
+        assertTrue(remote.wasDropped());
+        assertFalse(remote.retired());
+        assertFalse(local.wasDropped());
+        assertFalse(local.retired());
+        assertEquals(1, factory.droppedCount());
+        assertEquals(0, factory.gauges().sofficeRestarts());
+        OfficeConnection fetched = factory.fetchConnection(false);
+        assertSame(local, fetched);
+        factory.repositConnection(fetched);
+    }
+
+    @Test
+    public void wedgedRemoteProbeDropsTheHostWithoutKillingLocalSoffice() {
+        ScriptedOfficeConnection remote = new ScriptedOfficeConnection(false, "10.0.0.8", 2002);
+        remote.setHangProbe(true);
+        ScriptedOfficeConnection local = new ScriptedOfficeConnection(false, "127.0.0.1", 2001);
+        OfficeConnectionFactory factory = OfficeConnectionFactory.forTest(Arrays.asList(remote, local));
+        System.setProperty(UnoCall.RECOVER_DEADLINE_PROPERTY, "50");
+        try {
+            assertTrue(factory.acceptsUnoConnection());
+        } finally {
+            System.clearProperty(UnoCall.RECOVER_DEADLINE_PROPERTY);
+        }
+        assertTrue(remote.wasDropped());
+        assertFalse(remote.retired());
+        assertFalse(local.retired());
+        assertEquals(0, factory.gauges().sofficeRestarts());
+        assertEquals(1, factory.waiting());
+    }
+
+    @Test
+    public void reloadAddsAHostOnTheSameFactoryAndTheGroupSelectsIt() throws OdiseeServerException {
+        ScriptedOfficeConnection local = new ScriptedOfficeConnection(false, "127.0.0.1", 2001);
+        OfficeConnectionFactory factory = OfficeConnectionFactory.forTest(Collections.singletonList(local));
+        ScriptedOfficeConnection added = new ScriptedOfficeConnection(false, "10.1.0.5", 2010);
+        Map<String, List<OfficeConnection>> groups = new LinkedHashMap<>();
+        groups.put("group0", Collections.singletonList(local));
+        groups.put("writers", Collections.singletonList(added));
+
+        factory.reloadConnections(groups);
+
+        assertEquals(2, factory.poolSize());
+        assertEquals(2, factory.waiting());
+        OfficeConnection writers = factory.fetchConnection("writers", false);
+        assertSame(added, writers);
+        factory.repositConnection(writers);
+        OfficeConnection fallback = factory.fetchConnection("group0", false);
+        assertSame(local, fallback);
+        factory.repositConnection(fallback);
+        try {
+            factory.fetchConnection("missing", false);
+            fail("missing group");
+        } catch (OdiseeServerException e) {
+            assertTrue(e.getMessage().contains("missing"));
+        }
     }
 
     @Test

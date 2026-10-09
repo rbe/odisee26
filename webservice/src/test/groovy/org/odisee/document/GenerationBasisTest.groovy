@@ -116,6 +116,46 @@ class GenerationBasisTest extends GroovyTestCase {
         assertTrue(pdfText(recovered[0].bytes).contains('still-open'))
     }
 
+    void testDryRunResolvesInstructionsAndWritesNoFile() {
+        Path output = OdiseePath.ODISEE_VAR.resolve('user').resolve('odisee').resolve('output')
+        Set<String> before = names(output)
+        String xml = '''<odisee>
+  <request name="DryRunNoFile">
+    <group name="group0"/>
+    <template name="Letter" outputFormat="pdf"/>
+    <instructions><userfield name="Hallo">dry-hallo</userfield></instructions>
+  </request>
+</odisee>'''
+
+        List documents = service.generateDocument(caller, parse(xml), true)
+
+        assertTrue(documents == null || documents.isEmpty())
+        assertEquals(before, names(output))
+    }
+
+    void testDryRunBadInstructionIs422AndTheSlotStays() {
+        Path output = OdiseePath.ODISEE_VAR.resolve('user').resolve('odisee').resolve('output')
+        Set<String> before = names(output)
+        String xml = '''<odisee>
+  <request name="DryRunBad">
+    <group name="group0"/>
+    <template name="Letter" outputFormat="pdf"/>
+    <instructions><explode name="x">nope</explode></instructions>
+  </request>
+</odisee>'''
+        try {
+            service.generateDocument(caller, parse(xml), true)
+            fail('unsupported instruction')
+        } catch (OdiseeException e) {
+            assertEquals(OdiseeException.UNPROCESSABLE, e.httpStatus)
+        }
+        assertEquals(before, names(output))
+
+        List recovered = service.generateDocument(caller, request('AfterDry', 'still-open'))
+        assertEquals(1, recovered.size())
+        assertTrue(pdfText(recovered[0].bytes).contains('still-open'))
+    }
+
     private static Element request(String name, String value) {
         parse("""<odisee>
   <request name="${name}">
@@ -127,6 +167,17 @@ class GenerationBasisTest extends GroovyTestCase {
 
     private static Element parse(String xml) {
         DOMBuilder.parse(new StringReader(xml)).documentElement
+    }
+
+    private static Set<String> names(Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) {
+            return [] as Set
+        }
+        Set<String> found = [] as Set
+        Files.walk(dir).withCloseable { stream ->
+            stream.each { found << dir.relativize(it).toString() }
+        }
+        found
     }
 
     private static String pdfText(byte[] bytes) {

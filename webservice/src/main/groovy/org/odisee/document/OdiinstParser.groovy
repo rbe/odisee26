@@ -9,12 +9,15 @@
 package org.odisee.document
 
 import org.odisee.api.OdiseeException
+import org.odisee.io.SafePaths
+import org.odisee.shared.OdiseeConstant
 
 import java.net.InetSocketAddress
 
 /**
  * {@code etc/odiinst} lines are
- * {@code name|host|port|office home| |options|autostart}.
+ * {@code name|host|port|office home| |options|autostart|group}.
+ * The group field is optional. A blank group is {@code group0}.
  */
 final class OdiinstParser {
 
@@ -38,6 +41,45 @@ final class OdiinstParser {
             throw new OdiseeException('No office instances configured', OdiseeException.SERVER_ERROR)
         }
         rows
+    }
+
+    /**
+     * Pool group for one line. The 8th field wins. Anything else is {@code group0}.
+     */
+    static String groupOf(Object row) {
+        String group = null
+        if (row != null && row.size() >= 8) {
+            group = row[7]?.toString()?.trim()
+        }
+        if (!group) {
+            return OdiseeConstant.S_GROUP0
+        }
+        try {
+            return SafePaths.requireSimpleName(group, 'group')
+        } catch (OdiseeException e) {
+            throw new OdiseeException(e.message, OdiseeException.SERVER_ERROR)
+        }
+    }
+
+    /**
+     * Addresses keyed by pool group. Lines with no group stay in {@code group0}.
+     */
+    static Map<String, List<InetSocketAddress>> byGroup(List rows) {
+        if (rows == null || rows.isEmpty()) {
+            throw new OdiseeException('No office instances configured', OdiseeException.SERVER_ERROR)
+        }
+        Map<String, List<InetSocketAddress>> grouped = new LinkedHashMap<>()
+        rows.each { row ->
+            String group = groupOf(row)
+            InetSocketAddress address = addresses([row])[0]
+            List<InetSocketAddress> hosts = grouped[group]
+            if (hosts == null) {
+                hosts = []
+                grouped[group] = hosts
+            }
+            hosts << address
+        }
+        grouped
     }
 
     static List<InetSocketAddress> addresses(List rows) {

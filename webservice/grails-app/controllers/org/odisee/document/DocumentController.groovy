@@ -71,6 +71,7 @@ class DocumentController {
         boolean errorResponse = false
         try {
             final Principal caller = requireCaller(callerFromContext(request.userPrincipal))
+            final boolean dryRun = dryRunRequested(request.getParameter('dryRun'))
             final byte[] body = Compression.readLimited(request.inputStream)
             final boolean jsonRequest = isJsonRequest(request.getContentType(), body)
             final Element xml = jsonRequest
@@ -84,11 +85,18 @@ class DocumentController {
                         ? 'Invalid or missing JSON request'
                         : 'Invalid or missing XML request')
             }
-            final Document document = processXmlRequest(caller, xml)
-            if (null == document) {
-                throw new OdiseeException('Cannot send stream, no document')
+            if (dryRun) {
+                odiseeService.generateDocument(caller, xml, true)
+                response.status = 200
+                response.outputStream << String.format('Dry run completed.%n')
+                response.outputStream.flush()
+            } else {
+                final Document document = processXmlRequest(caller, xml)
+                if (null == document) {
+                    throw new OdiseeException('Cannot send stream, no document')
+                }
+                DocumentStreamer.stream(response, document)
             }
-            DocumentStreamer.stream(response, document)
         } catch (e) {
             errorResponse = true
             processThrowable(e)
@@ -115,6 +123,13 @@ class DocumentController {
         if (attributes instanceof GrailsWebRequest) {
             attributes.renderView = false
         }
+    }
+
+    /**
+     * {@code POST /document/generate?dryRun=true} resolves instructions and does not save.
+     */
+    static boolean dryRunRequested(String value) {
+        value != null && value.equalsIgnoreCase('true')
     }
 
     /**

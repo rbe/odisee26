@@ -358,6 +358,23 @@ public class OfficeConnection {
     }
 
     /**
+     * A loopback address is this machine's soffice. Anything else is a remote host.
+     */
+    public boolean isLocal() {
+        if (socketAddress == null) {
+            return false;
+        }
+        String host = socketAddress.getHostString();
+        if (host == null) {
+            return false;
+        }
+        return "127.0.0.1".equals(host)
+                || "localhost".equalsIgnoreCase(host)
+                || "::1".equals(host)
+                || "0:0:0:0:0:0:0:1".equals(host);
+    }
+
+    /**
      * Abandon the bridge without calling back into a wedged office, then stop the local soffice.
      * @return true when a local soffice was signaled so {@code odiwatchdog} can restart it
      */

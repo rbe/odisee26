@@ -2,6 +2,8 @@
 
 Findings from a code review of the document-generation path. Status is against `master` plus the wave that closed the item.
 
+Wave 6 does not close a row in this table. B25's stricter allow-list and B29 (Calc and Impress instructions) stay open.
+
 Severity: **blocker** (wrong document, leak, or the service cannot do what it claims), **major** (failures are silent or one bad instance takes the pool down), **minor** (wrong metadata, dead code, misleading errors).
 
 ## Request state
