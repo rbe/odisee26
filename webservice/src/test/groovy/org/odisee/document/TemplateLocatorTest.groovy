@@ -51,6 +51,62 @@ class TemplateLocatorTest extends GroovyTestCase {
         }
     }
 
+    void testRevisionDirectoryHonorsLatestAndANumber() {
+        Path rev = dir.resolve('Contract').resolve('rev')
+        Files.createDirectories(rev)
+        Files.createFile(rev.resolve('3.ott'))
+        Files.createFile(rev.resolve('10.ott'))
+
+        Path latest = TemplateLocator.locate(dir, 'Contract', 'LATEST')
+        Path numbered = TemplateLocator.locate(dir, 'Contract', '10')
+
+        assertEquals(rev.resolve('10.ott'), latest)
+        assertEquals(latest, numbered)
+        assertEquals('10', TemplateLocator.revisionOf(latest))
+        assertEquals(['3', '10'], TemplateLocator.revisions(dir, 'Contract'))
+    }
+
+    void testMissingRevisionDirectoryEntryIsNotFound() {
+        Path rev = dir.resolve('Contract').resolve('rev')
+        Files.createDirectories(rev)
+        Files.createFile(rev.resolve('3.ott'))
+        try {
+            TemplateLocator.locate(dir, 'Contract', '4')
+            fail('revision 4 is not on disk')
+        } catch (OdiseeException e) {
+            assertEquals(OdiseeException.NOT_FOUND, e.httpStatus)
+        }
+    }
+
+    void testFlatFilesStillResolveBesideTheRevisionDirectory() {
+        Files.createFile(dir.resolve('Contract_rev2.ott'))
+        Files.createFile(dir.resolve('Contract.ott'))
+        Path rev = dir.resolve('Contract').resolve('rev')
+        Files.createDirectories(rev)
+        Files.createFile(rev.resolve('2.ott'))
+
+        Path latest = TemplateLocator.locate(dir, 'Contract', 'LATEST')
+        Path flatOnly = TemplateLocator.locate(dir, 'Contract', '1')
+        Path fromDirectory = TemplateLocator.locate(dir, 'Contract', '2')
+
+        assertEquals(rev.resolve('2.ott'), latest)
+        assertEquals('Contract.ott', flatOnly.fileName.toString())
+        assertEquals(rev.resolve('2.ott'), fromDirectory)
+        assertEquals(['1', '2'], TemplateLocator.revisions(dir, 'Contract'))
+    }
+
+    void testHigherFlatRevisionBeatsTheDirectory() {
+        Files.createFile(dir.resolve('Contract_rev12.ott'))
+        Path rev = dir.resolve('Contract').resolve('rev')
+        Files.createDirectories(rev)
+        Files.createFile(rev.resolve('4.ott'))
+
+        Path latest = TemplateLocator.locate(dir, 'Contract', 'LATEST')
+
+        assertEquals('Contract_rev12.ott', latest.fileName.toString())
+        assertEquals('12', TemplateLocator.revisionOf(latest))
+    }
+
     void testTemplateNameCannotEscapeTheDirectory() {
         try {
             TemplateLocator.locate(dir, '../secret', 'LATEST')

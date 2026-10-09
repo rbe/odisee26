@@ -101,7 +101,15 @@ Calc and Impress stay out of this wave. The remote tests in `OdiseeClientTest` s
 
 ## Wave 6 — Features
 
-F1, F3, F4 (directory layout), F5, F6, F7, F8, F10. Each one ships behind the contract from wave 2 and the pool from wave 3.
+Status: **F4, F3, and F10 landed in this change**. F1, F5, F6, F7, and F8 are not in this change.
+
+F4. `TemplateLocator` reads `var/user/{name}/template/{templateName}/rev/{n}.ott`. `LATEST` is the highest number there or in the flat `Name.ott` / `Name_revN.ott` files. A missing revision is HTTP 404. One user cannot read another user's revisions.
+
+F3. `GET /template/{name}` requires a login and lists that user's fields, bookmarks, tables, and revisions. Another user's template is HTTP 404. `POST /document/generate?dryRun=true` requires a login, resolves instructions, and writes no file under `output`. An instruction failure is HTTP 422 and does not drop a pool slot unless a UNO deadline fires. `GET /ready` stays anonymous. `POST /document/generate` stays synchronous and still returns the file bytes.
+
+F10. A changed `etc/odiinst` reloads the pool in this JVM. The 8th field is the group; a blank group is `group0`. The v2 `<group name="..."/>` value selects that group. A failed health check drops a remote host and does not signal a healthy local `soffice`. The probe keeps the wave 3 deadline.
+
+D1 and D5 are decided and are not this change: generate stays synchronous, and Calc and Impress keep their own instruction sets for a later change. D2, D3, and D4 are still open, so F1, F7, F8, F5, and F6 stay out.
 
 ## Refactorings
 

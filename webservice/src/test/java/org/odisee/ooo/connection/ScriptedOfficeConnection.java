@@ -16,7 +16,11 @@ public final class ScriptedOfficeConnection extends OfficeConnection {
     private boolean hangProbe;
 
     public ScriptedOfficeConnection(final boolean failConnect) {
-        super(new InetSocketAddress("127.0.0.1", 9));
+        this(failConnect, "127.0.0.1", 9);
+    }
+
+    public ScriptedOfficeConnection(final boolean failConnect, final String host, final int port) {
+        super(new InetSocketAddress(host, port));
         this.failConnect = failConnect;
     }
 

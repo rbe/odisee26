@@ -17,6 +17,7 @@ import org.odisee.shared.OdiseeConstant
 import org.w3c.dom.Element
 
 import java.nio.file.Files
+import java.nio.file.Path
 import java.security.Principal
 
 class OdiseeService {
@@ -37,35 +38,60 @@ class OdiseeService {
      * @return List with generated OooDocument instance(s).
      */
     List<Document> generateDocument(final Principal principal, final Element xml) {
+        generateDocument(principal, xml, false)
+    }
+
+    /**
+     * A dry run resolves instructions and does not leave a file under the user's output directory.
+     */
+    List<Document> generateDocument(final Principal principal, final Element xml, final boolean dryRun) {
         if (principal == null || principal.name == null || principal.name.trim().isEmpty()) {
             throw new OdiseeException('Authentication required', OdiseeException.UNAUTHORIZED)
         }
         String user = TenantPaths.requireUserName(principal.name)
         Map<String, Object> arg = RequestContext.create()
         arg.uniqueRequestId = UUID.randomUUID()
-        arg.requestDir = TenantPaths.outputDir(user).resolve(arg.uniqueRequestId.toString())
-        Files.createDirectories(arg.requestDir)
+        arg.dryRun = dryRun
         arg.principal = principal
         arg.xml = xml
-        requestService.extractRequestAndSaveToDisk(arg, OdiseeConstant.MINUS_ONE)
-        use(DOMCategory) {
-            arg.xml.'request'.eachWithIndex { request, i ->
-                arg.activeIndex = i
-                if (i > 0) RequestContext.resetForNextRequest(arg)
-                templateService.extractTemplateFromRequest(arg)
-                templateService.copyTemplateToRequest(arg)
-                templateService.checkPaths(arg)
-                requestService.processSingleRequest(arg)
-                postProcessService.postProcessRequest(arg)
-                arg.result.output.each { file ->
-                    if (!arg.document) arg.document = []
-                    arg.document << storageService.createDocument(data: file)
+        Path scratch = null
+        try {
+            if (dryRun) {
+                scratch = Files.createTempDirectory('odisee-dry-run')
+                arg.requestDir = scratch
+            } else {
+                arg.requestDir = TenantPaths.outputDir(user).resolve(arg.uniqueRequestId.toString())
+                Files.createDirectories(arg.requestDir)
+            }
+            requestService.extractRequestAndSaveToDisk(arg, OdiseeConstant.MINUS_ONE)
+            use(DOMCategory) {
+                arg.xml.'request'.eachWithIndex { request, i ->
+                    arg.activeIndex = i
+                    if (i > 0) RequestContext.resetForNextRequest(arg)
+                    arg.dryRun = dryRun
+                    templateService.extractTemplateFromRequest(arg)
+                    templateService.copyTemplateToRequest(arg)
+                    templateService.checkPaths(arg)
+                    requestService.processSingleRequest(arg)
+                    if (!dryRun) {
+                        postProcessService.postProcessRequest(arg)
+                        arg.result.output.each { file ->
+                            if (!arg.document) arg.document = []
+                            arg.document << storageService.createDocument(data: file)
+                        }
+                    }
                 }
             }
+            if (!dryRun) {
+                postProcessService.postProcessOdisee(arg)
+            }
+            log.info "Generated ${arg.document?.size() ?: 0} document(s)"
+            dryRun ? [] : arg.document
+        } finally {
+            if (scratch != null) {
+                scratch.toFile().deleteDir()
+            }
         }
-        postProcessService.postProcessOdisee(arg)
-        log.info "Generated ${arg.document?.size() ?: 0} document(s)"
-        arg.document
     }
 
 }

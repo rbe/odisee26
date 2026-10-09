@@ -374,39 +374,43 @@ class OdiseeXmlCategory {
                     }
                     null
                 }
-                final String preSaveMacro = template.'@pre-save-macro'.toString()?.trim()
-                if (preSaveMacro) {
-                    MacroNames.requireReference(preSaveMacro)
-                    withinOffice('instruction', UnoCall.deadlineMillis()) {
-                        use(OOoDocumentCategory) {
-                            xComponent.executeMacro(preSaveMacro)
-                        }
-                        null
-                    }
-                }
-                output.each { Path file ->
-                    Files.createDirectories(file.parent)
-                    boolean isPDFA = file.toString().endsWith('.pdfa')
-                    withinOffice('save', UnoCall.deadlineMillis()) {
-                        use(OOoDocumentCategory) {
-                            if (isPDFA) {
-                                xComponent.saveAsPDF_A(file)
-                            } else {
-                                xComponent.saveAs(file)
+                if (writesFile(arg)) {
+                    final String preSaveMacro = template.'@pre-save-macro'.toString()?.trim()
+                    if (preSaveMacro) {
+                        MacroNames.requireReference(preSaveMacro)
+                        withinOffice('instruction', UnoCall.deadlineMillis()) {
+                            use(OOoDocumentCategory) {
+                                xComponent.executeMacro(preSaveMacro)
                             }
+                            null
                         }
-                        null
                     }
-                }
-                final String postSaveMacro = template.'@post-save-macro'.toString()?.trim()
-                if (postSaveMacro) {
-                    MacroNames.requireReference(postSaveMacro)
-                    withinOffice('instruction', UnoCall.deadlineMillis()) {
-                        use(OOoDocumentCategory) {
-                            xComponent.executeMacro(postSaveMacro)
+                    output.each { Path file ->
+                        Files.createDirectories(file.parent)
+                        boolean isPDFA = file.toString().endsWith('.pdfa')
+                        withinOffice('save', UnoCall.deadlineMillis()) {
+                            use(OOoDocumentCategory) {
+                                if (isPDFA) {
+                                    xComponent.saveAsPDF_A(file)
+                                } else {
+                                    xComponent.saveAs(file)
+                                }
+                            }
+                            null
                         }
-                        null
                     }
+                    final String postSaveMacro = template.'@post-save-macro'.toString()?.trim()
+                    if (postSaveMacro) {
+                        MacroNames.requireReference(postSaveMacro)
+                        withinOffice('instruction', UnoCall.deadlineMillis()) {
+                            use(OOoDocumentCategory) {
+                                xComponent.executeMacro(postSaveMacro)
+                            }
+                            null
+                        }
+                    }
+                } else {
+                    output.clear()
                 }
             } catch (Throwable error) {
                 if (dropsSlot(error)) {
@@ -462,9 +466,9 @@ class OdiseeXmlCategory {
         // Our return value is a map with timing and output information
         final Map result = [output: [], retries: 0, wallTime: -1]
         try {
-            // Get connection to OpenOffice
-            final String group = 'group0'
-            oooConnection = officeConnectionFactory.fetchConnection(false)
+            // Get connection to OpenOffice. The request's group name selects the pool.
+            final String group = groupOf(arg.xml.request[requestNumber])
+            oooConnection = officeConnectionFactory.fetchConnection(group, false)
             if (!oooConnection) {
                 throw new OdiseeException("Could not acquire connection from group '${group}'")
             } else {
@@ -475,13 +479,8 @@ class OdiseeXmlCategory {
                 }
                 // Wall clock time
                 result.wallTime += TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
-                // Check result
-                if (output?.size() == 0) {
-                    /* TODO Should this class decide this?
-                    if (oooConnection) {
-                        oooConnection.setFaulted(true)
-                    }
-                    */
+                // A dry run is done when instructions resolve. It has no saved file.
+                if (writesFile(arg) && output?.size() == 0) {
                     throw new OdiseeException('Got zero bytes from office process')
                 }
             }
@@ -500,7 +499,27 @@ class OdiseeXmlCategory {
     }
 
     /**
+     * The v2 {@code <group name="..."/>} element selects the pool.
+     * A missing element is {@code group0}. The legacy {@code ooo} element is not read.
+     */
+    static String groupOf(request) {
+        String named = request?.group?.'@name'?.toString()?.trim()
+        if (!named) {
+            return OdiseeConstant.S_GROUP0
+        }
+        SafePaths.requireSimpleName(named, 'group')
+    }
+
+    /**
+     * A dry run applies instructions and does not save the document.
+     */
+    static boolean writesFile(Map arg) {
+        arg?.dryRun != true
+    }
+
+    /**
      * A deadline drops the office slot. A bad macro name does not.
+     * A dry-run instruction failure is the same: 422, and the slot stays unless the deadline fired.
      */
     static boolean dropsSlot(Throwable error) {
         error instanceof UnoDeadlineExceeded

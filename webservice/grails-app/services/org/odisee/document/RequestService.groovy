@@ -13,13 +13,13 @@ package org.odisee.document
 import groovy.xml.slurpersupport.GPathResult
 import org.odisee.api.OdiseeException
 import org.odisee.io.FileHelper
+import org.odisee.io.OdiseePath
 import org.odisee.xml.XmlHelper
 import org.odisee.shared.OdiseeConstant
 import org.odisee.ooo.connection.OfficeConnectionFactory
 import groovy.xml.XmlUtil
 import org.springframework.beans.factory.InitializingBean
 
-import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -29,16 +29,35 @@ class RequestService implements InitializingBean {
 
     private OfficeConnectionFactory officeConnectionFactory
 
+    private final OdiinstReloader odiinstReloader = new OdiinstReloader()
+
     OfficeConnectionFactory getOfficeConnectionFactory() {
+        refreshPool()
         officeConnectionFactory
     }
 
+    /**
+     * Read {@code etc/odiinst} again. A changed file replaces the pool in this JVM.
+     */
     @Override
     void afterPropertiesSet() {
-        final List odiinst = OdiseeInstance.instance.readOdiinst()
+        refreshPool()
+    }
+
+    synchronized void refreshPool() {
+        final Path odiinstPath = OdiseePath.ODISEE_HOME.resolve(OdiseePath.S_ETC_ODIINST)
+        if (!Files.exists(odiinstPath)) {
+            throw new IllegalStateException('Cannot setup Office connection factory, please check instance configuration',
+                    new OdiseeException('No odiinst found', OdiseeException.SERVER_ERROR))
+        }
+        final String text = odiinstPath.toFile().getText(OdiseeConstant.S_UTF8)
+        final Map groups = odiinstReloader.update(text)
+        if (groups == null) {
+            return
+        }
         try {
-            final List<InetSocketAddress> addresses = OdiinstParser.addresses(odiinst)
-            officeConnectionFactory = OfficeConnectionFactory.getInstance(OdiseeConstant.S_GROUP0, addresses)
+            officeConnectionFactory = OfficeConnectionFactory.load(groups)
+            odiinstReloader.markApplied(text)
         } catch (e) {
             throw new IllegalStateException('Cannot setup Office connection factory, please check instance configuration', e)
         }
@@ -81,13 +100,13 @@ class RequestService implements InitializingBean {
      */
     void processSingleRequest(final Map arg) {
         final Path requestXMLFile = extractRequestAndSaveToDisk(arg, arg.activeIndex)
+        refreshPool()
         use(OdiseeXmlCategory) {
             // requestNumber = 0 as file contains only one request
-            arg.result = requestXMLFile.toDocument(officeConnectionFactory, 0)
-            if (!arg.result) {
-                final String group = 'group0'
+            arg.result = requestXMLFile.toDocument(officeConnectionFactory, 0, [dryRun: arg.dryRun == true])
+            if (!arg.dryRun && !arg.result) {
                 log.error "${requestXMLFile.fileName.toString()}/${arg.activeIndex}:" +
-                        " Got no result, maybe all instances in group '${group}' are unwilling to perform?"
+                        " Got no result, maybe all instances in the requested group are unwilling to perform?"
             }
         }
     }

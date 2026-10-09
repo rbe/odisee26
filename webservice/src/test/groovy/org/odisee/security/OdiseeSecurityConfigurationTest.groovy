@@ -53,6 +53,14 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         mvc.perform(get('/ready')).andExpect(status().isOk())
     }
 
+    void testTemplateWithoutLoginIs401() {
+        mvc.perform(get('/template/Letter')).andExpect(status().isUnauthorized())
+    }
+
+    void testTemplateWithLoginIsAllowed() {
+        mvc.perform(get('/template/Letter').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
+    }
+
     void testGenerateWithoutLoginIs401() {
         mvc.perform(post('/document/generate')).andExpect(status().isUnauthorized())
     }
@@ -88,6 +96,11 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         @GetMapping('/ready')
         String ready() {
             'ready'
+        }
+
+        @GetMapping('/template/{name}')
+        String template() {
+            'catalog'
         }
 
         @PostMapping('/document/generate')
