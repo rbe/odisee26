@@ -56,6 +56,18 @@ final class Delivery {
         }
     }
 
+    /**
+     * A stream over the existing array. The constructor keeps that array; it does not copy it.
+     */
+    static final class SharedBytes extends ByteArrayInputStream {
+        final byte[] bytes
+
+        SharedBytes(byte[] bytes) {
+            super(bytes)
+            this.bytes = bytes
+        }
+    }
+
     static String mode(Element xml) {
         String value = xml?.getAttribute('delivery')
         if (value == null || value.isEmpty()) {
@@ -165,7 +177,7 @@ final class Delivery {
         String key = objectKey(document.filename)
         String type = DocumentAnalyzer.guessContentType(document.filename ?: 'document.bin')
         byte[] bytes = document.bytes
-        storage.put(record, key, type, new ByteArrayInputStream(bytes), bytes.length)
+        storage.put(record, key, type, new SharedBytes(bytes), bytes.length)
         new StoredObject(record.bucket, key)
     }
 

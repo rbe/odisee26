@@ -44,6 +44,7 @@ public class OdiseeClientSchemaTest {
     public void deliveryIsOnTheV2Request() throws Exception {
         final OdiseeClient client = new OdiseeClient("http://127.0.0.1:8080/odisee/document/generate");
         client.createRequest("Letter", OutputFormat.PDF);
+        client.setUserfield("Hallo", "Odisee");
         client.delivery("store");
         final Path out = Files.createTempFile("odisee", ".xml");
         client.saveRequestTo(out);

@@ -9,7 +9,6 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.w3c.dom.Element
 
-import java.lang.reflect.Field
 import java.nio.file.Files
 import java.security.Principal
 import java.util.concurrent.Executor
@@ -75,7 +74,8 @@ class DeliveryTest extends GroovyTestCase {
         assertEquals('application/pdf', put.contentType)
         assertEquals(document.bytes.length, put.length)
         assertBytes(document.bytes, (byte[]) put.read)
-        assertTrue(((byte[]) put.shared).is(document.bytes))
+        assertTrue(put.stream instanceof Delivery.SharedBytes)
+        assertTrue(((Delivery.SharedBytes) put.stream).bytes.is(document.bytes))
         assertTrue(put.key ==~ /[0-9a-f-]{36}\/Letter\.pdf/)
         assertFalse(put.key.toString().contains('other-bucket'))
         assertEquals('application/json; charset=UTF-8', response.contentType)
@@ -100,7 +100,8 @@ class DeliveryTest extends GroovyTestCase {
         assertEquals('application/pdf', response.contentType)
         assertEquals(1, storage.puts.size())
         assertEquals('ada-docs', storage.puts[0].bucket)
-        assertTrue(((byte[]) storage.puts[0].shared).is(document.bytes))
+        assertTrue(((Delivery.SharedBytes) storage.puts[0].stream).bytes.is(document.bytes))
+        assertBytes(document.bytes, (byte[]) storage.puts[0].read)
         assertEquals('ada-docs/' + storage.puts[0].key, response.getHeader(Delivery.OBJECT_HEADER))
     }
 
@@ -158,11 +159,12 @@ class DeliveryTest extends GroovyTestCase {
 
     void testUploadStreamsTheExistingBytes() {
         byte[] payload = '%PDF-1.4'.getBytes('UTF-8')
-        ByteArrayInputStream input = new ByteArrayInputStream(payload)
+        Delivery.SharedBytes input = new Delivery.SharedBytes(payload)
         def body = S3ObjectStorage.streamBody(input, payload.length, 'application/pdf')
         InputStream stream = body.contentStreamProvider().newStream()
-        assertTrue(stream instanceof ByteArrayInputStream)
-        assertTrue(buffer(stream).is(payload))
+        assertTrue(stream.is(input))
+        assertTrue(input.bytes.is(payload))
+        assertBytes(payload, stream.readAllBytes())
     }
 
     void testJobRecordStoresTheObjectLocation() {
@@ -249,12 +251,6 @@ class DeliveryTest extends GroovyTestCase {
         null
     }
 
-    private static byte[] buffer(InputStream stream) {
-        Field field = ByteArrayInputStream.getDeclaredField('buf')
-        field.accessible = true
-        (byte[]) field.get(stream)
-    }
-
     private String user(String name) {
         users << name
         name
@@ -292,15 +288,8 @@ class DeliveryTest extends GroovyTestCase {
 
         @Override
         void put(BucketFile.Record bucket, String key, String contentType, InputStream body, long length) {
-            byte[] shared = body instanceof ByteArrayInputStream ? buffer(body) : null
             byte[] read = body.readAllBytes()
-            puts << [bucket: bucket.bucket, key: key, contentType: contentType, length: length, shared: shared, read: read]
-        }
-
-        private static byte[] buffer(InputStream stream) {
-            Field field = ByteArrayInputStream.getDeclaredField('buf')
-            field.accessible = true
-            (byte[]) field.get(stream)
+            puts << [bucket: bucket.bucket, key: key, contentType: contentType, length: length, stream: body, read: read]
         }
     }
 
