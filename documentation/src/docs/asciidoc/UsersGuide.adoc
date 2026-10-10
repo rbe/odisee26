@@ -104,7 +104,7 @@ The list is `var/user/{name}/jobs.json`.
 A callback is a query parameter on `POST /document/jobs`.
 `POST /document/generate` does not read a callback.
 Odisee POSTs the status only when that host is listed in `$ODISEE_HOME/etc/callback-hosts`.
-An admin adds a host with `POST /callback-host`.
+`odictl callback-host HOST` appends a host.
 A URL whose host is off the list does not get a POST.
 
 === Instructions

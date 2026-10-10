@@ -75,24 +75,6 @@ class TenancyTest extends GroovyTestCase {
         }
     }
 
-    void testNoLoginCannotCreateAUser() {
-        try {
-            DocumentController.requireAdmin(null, true)
-            fail('no login')
-        } catch (OdiseeException e) {
-            assertEquals(OdiseeException.UNAUTHORIZED, e.httpStatus)
-        }
-    }
-
-    void testLoggedInUserWithoutAdminIsForbidden() {
-        try {
-            DocumentController.requireAdmin(principal('ada'), false)
-            fail('not admin')
-        } catch (OdiseeException e) {
-            assertEquals(OdiseeException.FORBIDDEN, e.httpStatus)
-        }
-    }
-
     void testUserDoesNotSeeAnotherUsersTemplateOrTheSharedDirectory() {
         Path shared = OdiseePath.ODISEE_VAR.resolve('template')
         Files.createDirectories(shared)

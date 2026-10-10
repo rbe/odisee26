@@ -59,14 +59,6 @@ class DocumentController {
         caller
     }
 
-    static Principal requireAdmin(Principal caller, boolean admin) {
-        Principal required = requireCaller(caller)
-        if (!admin) {
-            throw new OdiseeException('Admin role required', OdiseeException.FORBIDDEN)
-        }
-        required
-    }
-
     def generate() {
         final WallTime wallTime = new WallTime()
         if (OdiseePath.ODISEE_PROFILE) {
@@ -183,84 +175,6 @@ class DocumentController {
                 }
             }
         }
-    }
-
-    /**
-     * {@code POST /callback-host} adds one host to the server allow-list. Only an admin may call it.
-     */
-    def addCallbackHost() {
-        boolean errorResponse = false
-        try {
-            boolean admin = org.springframework.security.core.context.SecurityContextHolder.context?.authentication?.authorities?.any {
-                it.authority == 'ROLE_ADMIN'
-            } as boolean
-            requireAdmin(callerFromContext(request.userPrincipal), admin)
-            String host = request.getParameter('host')
-            if (!host?.trim()) {
-                byte[] body = Compression.readLimited(request.inputStream)
-                host = new String(body, 'UTF-8').trim()
-            }
-            boolean added = CallbackAllowList.add(host)
-            response.status = added ? 201 : 200
-            response.outputStream << String.format("Callback host '%s' listed.%n", CallbackAllowList.requireHost(host))
-            response.outputStream.flush()
-        } catch (e) {
-            errorResponse = true
-            processThrowable(e)
-        } finally {
-            skipView()
-            if (!errorResponse) {
-                try {
-                    response.outputStream.close()
-                } catch (IOException ignored) {
-                }
-            }
-        }
-    }
-
-    /**
-     * {@code POST /bucket} sets the one bucket for a user. Only an admin may call it.
-     * The line is read again on the next store. A restart is not required.
-     */
-    def setBucket() {
-        boolean errorResponse = false
-        try {
-            boolean admin = org.springframework.security.core.context.SecurityContextHolder.context?.authentication?.authorities?.any {
-                it.authority == 'ROLE_ADMIN'
-            } as boolean
-            requireAdmin(callerFromContext(request.userPrincipal), admin)
-            BucketFile.Record record = readBucket()
-            boolean created = BucketFile.save(record.user, record.endpoint, record.region, record.bucket, record.accessKey, record.secret)
-            response.status = created ? 201 : 200
-            response.outputStream << String.format("Bucket '%s' configured for '%s'.%n", record.bucket, record.user)
-            response.outputStream.flush()
-        } catch (e) {
-            errorResponse = true
-            processThrowable(e)
-        } finally {
-            skipView()
-            if (!errorResponse) {
-                try {
-                    response.outputStream.close()
-                } catch (IOException ignored) {
-                }
-            }
-        }
-    }
-
-    private BucketFile.Record readBucket() {
-        String user = request.getParameter('user')
-        if (user?.trim()) {
-            return BucketFile.record(
-                    user,
-                    request.getParameter('endpoint'),
-                    request.getParameter('region'),
-                    request.getParameter('bucket'),
-                    request.getParameter('accessKey'),
-                    request.getParameter('secret'))
-        }
-        byte[] body = Compression.readLimited(request.inputStream)
-        BucketFile.parseLine(new String(body, 'UTF-8'))
     }
 
     private ObjectStorage storage() {
