@@ -52,7 +52,17 @@ Each application has its own instruction set, and a set can grow without adding 
 
 ### F7. Delivery that is not the HTTP body
 
-Not implemented. The response is still the file bytes, held in a `byte[]` on the `Document` object. Large batches need "write this PDF to object storage and POST this URL". Object storage stays later.
+Status: **not implemented**.
+
+The response is still the file bytes, held in a `byte[]` on the `Document` object.
+
+Each user has a bucket configured ahead of time. The request cannot name an arbitrary bucket. The bucket must be one already allowed for that user.
+
+On the POST, the caller chooses delivery: stream the file, store it, or both. Stream keeps the response body as the file. `POST /document/generate` stays synchronous. Store writes to that user's allowed bucket and does not force the bytes back as the HTTP body. Both streams the body and stores a copy.
+
+The store is S3-compatible. MinIO is the development server. Odisee does not expire or delete objects. Retention belongs to the bucket.
+
+Jobs stay private to the user. A callback still goes only to a host on `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous.
 
 Depends on: B1 (done — the heap leak made this worse).
 
