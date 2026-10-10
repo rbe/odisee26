@@ -8,7 +8,7 @@ These are product additions, not bugfixes. They assume the request contract and 
 
 Status: **landed in wave 6**.
 
-`POST /document/generate` stays synchronous. The response body stays the file bytes. `POST /document/jobs` returns HTTP 202 and a JSON job id. `GET /document/jobs/{id}` returns JSON: `status`, `failedInstruction`, and `file` (base64, or null until the job has a file). The caller is `callerFromContext`, the same source as generate. No login is HTTP 401. A job id that is not in that user's list is HTTP 404.
+`POST /document/generate` stays synchronous. The response body stays the file bytes for `stream` and `both`. `POST /document/jobs` returns HTTP 202 and a JSON job id. `GET /document/jobs/{id}` returns JSON: `status`, `failedInstruction`, and `file` (base64, or null until the job has a file). The caller is `callerFromContext`, the same source as generate. No login is HTTP 401. A job id that is not in that user's list is HTTP 404.
 
 The list is `var/user/{name}/jobs.json`. One file per user. It is not process memory and not a shared table. The generated file stays under that user's `output` directory. Object storage is F7.
 
@@ -26,7 +26,7 @@ Status: **landed in wave 6**.
 
 `GET /template/{name}` (context path `/odisee`) requires a login. The body is JSON: `name`, `revision`, `userFields`, `bookmarks`, `tables`, and `revisions`. Those come from that user's `var/user/{name}/template` only. Another user's template is HTTP 404. No login is HTTP 401. The caller is the security context (`callerFromContext`), the same source as `POST /document/generate`.
 
-`POST /document/generate?dryRun=true` requires a login. It opens the template, applies the instructions, and does not save a file under `output`. A failed instruction is HTTP 422 and does not drop a pool slot. A UNO deadline still drops the slot. The synchronous `POST /document/generate` response stays the file bytes.
+`POST /document/generate?dryRun=true` requires a login. It opens the template, applies the instructions, and does not save a file under `output`. A failed instruction is HTTP 422 and does not drop a pool slot. A UNO deadline still drops the slot. The synchronous `POST /document/generate` response stays the file bytes for `stream` and `both`.
 
 ### F4. Working template revisions
 

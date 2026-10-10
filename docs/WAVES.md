@@ -105,11 +105,11 @@ Status: **landed** for F1, F3, F4, F5, F6, F7, F8, and F10. F4, F3, and F10 land
 
 F4. `TemplateLocator` reads `var/user/{name}/template/{templateName}/rev/{n}.ott`. `LATEST` is the highest number there or in the flat `Name.ott` / `Name_revN.ott` files. A missing revision is HTTP 404. One user cannot read another user's revisions.
 
-F3. `GET /template/{name}` requires a login and lists that user's fields, bookmarks, tables, and revisions. Another user's template is HTTP 404. `POST /document/generate?dryRun=true` requires a login, resolves instructions, and writes no file under `output`. An instruction failure is HTTP 422 and does not drop a pool slot unless a UNO deadline fires. `GET /ready` stays anonymous. `POST /document/generate` stays synchronous and still returns the file bytes.
+F3. `GET /template/{name}` requires a login and lists that user's fields, bookmarks, tables, and revisions. Another user's template is HTTP 404. `POST /document/generate?dryRun=true` requires a login, resolves instructions, and writes no file under `output`. An instruction failure is HTTP 422 and does not drop a pool slot unless a UNO deadline fires. `GET /ready` stays anonymous. `POST /document/generate` stays synchronous and still returns the file bytes for `stream` and `both`.
 
 F10. A changed `etc/odiinst` reloads the pool in this JVM. The 8th field is the group; a blank group is `group0`. The v2 `<group name="..."/>` value selects that group. A failed health check drops a remote host and does not signal a healthy local `soffice`. The probe keeps the wave 3 deadline.
 
-F1. `POST /document/generate` stays synchronous and still returns the file bytes. `POST /document/jobs` returns HTTP 202 and a job id. `GET /document/jobs/{id}` returns `status`, `failedInstruction`, and `file`. Jobs are private. The list is `var/user/{name}/jobs.json`. The caller is `callerFromContext`. `GET /ready` stays anonymous.
+F1. `POST /document/generate` stays synchronous and still returns the file bytes for `stream` and `both`. `POST /document/jobs` returns HTTP 202 and a job id. `GET /document/jobs/{id}` returns `status`, `failedInstruction`, and `file`. Jobs are private. The list is `var/user/{name}/jobs.json`. The caller is `callerFromContext`. `GET /ready` stays anonymous.
 
 F8. The callback is a query parameter on `POST /document/jobs`, not on the synchronous POST. Odisee POSTs the status only when that host is on `$ODISEE_HOME/etc/callback-hosts`. An admin adds a host with `POST /callback-host`. A URL off the list does not get a POST.
 
