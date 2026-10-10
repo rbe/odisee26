@@ -1,5 +1,9 @@
 FROM ubuntu:26.04 AS packages
 
+ENV TZ=Europe/Berlin \
+    LANG=en_US.UTF-8 \
+    ODISEE_HOME=/home/odisee
+
 # Headless Writer only. Calc and Impress are not installed.
 # Docs, package indexes, and Writer files that conversion does not read are
 # removed in this same layer so the runtime stage does not contain them.
@@ -27,10 +31,10 @@ RUN apt-get update \
     && rm -f /usr/share/libreoffice/share/config/images_*.zip \
     && rm -rf /tmp/* /var/tmp/*
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod 755 /entrypoint.sh
-
 FROM packages
 
-EXPOSE 2002
-ENTRYPOINT ["/entrypoint.sh"]
+LABEL maintainer="Ralf Bensmann <ralf@art-of-coding.eu>"
+LABEL vendor="Art of Coding UG"
+LABEL project="Odisee"
+
+CMD ["bash"]

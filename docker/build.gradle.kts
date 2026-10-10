@@ -4,42 +4,26 @@ plugins {
 
 apply(from = rootProject.file("gradle/docker-executable.gradle.kts"))
 
-val archLinuxVersion = "base"
-val openSuseVersion = "15.6"
+val ubuntuVersion = "26.04"
 val dockerExecutable = extra["dockerExecutable"] as String
 
-tasks.register<Copy>("prepareArchLinuxLibreOfficeDocker") {
+tasks.register<Copy>("prepareUbuntuLibreOfficeDocker") {
     group = "Odisee"
-    description = "Stage the Arch Linux LibreOffice image context"
-    from("src/main/docker/archlinux-libreoffice")
-    into(layout.buildDirectory.dir("docker/archlinux-libreoffice"))
+    description = "Stage the Ubuntu LibreOffice image context"
+    from("src/main/docker/ubuntu-libreoffice")
+    into(layout.buildDirectory.dir("docker/ubuntu-libreoffice"))
 }
 
-tasks.register<Exec>("buildArchLinuxLibreOfficeImage") {
+tasks.register<Exec>("buildUbuntuLibreOfficeImage") {
     group = "Odisee"
-    description = "Build odisee/archlinux-libreoffice. Requires Docker. Not part of the default build."
-    dependsOn("prepareArchLinuxLibreOfficeDocker")
-    workingDir(layout.buildDirectory.dir("docker/archlinux-libreoffice"))
-    commandLine(dockerExecutable, "build", "-t", "odisee/archlinux-libreoffice:$archLinuxVersion", ".")
-}
-
-tasks.register<Copy>("prepareOpenSuseLibreOfficeDocker") {
-    group = "Odisee"
-    description = "Stage the openSUSE LibreOffice image context"
-    from("src/main/docker/opensuse-libreoffice")
-    into(layout.buildDirectory.dir("docker/opensuse-libreoffice"))
-}
-
-tasks.register<Exec>("buildOpenSuseLibreOfficeImage") {
-    group = "Odisee"
-    description = "Build odisee/opensuse-libreoffice. Requires Docker. Not part of the default build."
-    dependsOn("prepareOpenSuseLibreOfficeDocker")
-    workingDir(layout.buildDirectory.dir("docker/opensuse-libreoffice"))
-    commandLine(dockerExecutable, "build", "-t", "odisee/opensuse-libreoffice:$openSuseVersion", ".")
+    description = "Build odisee/ubuntu-libreoffice. Requires Docker. Not part of the default build."
+    dependsOn("prepareUbuntuLibreOfficeDocker")
+    workingDir(layout.buildDirectory.dir("docker/ubuntu-libreoffice"))
+    commandLine(dockerExecutable, "build", "-t", "odisee/ubuntu-libreoffice:$ubuntuVersion", ".")
 }
 
 tasks.register("buildAllDockerImages") {
     group = "Odisee"
-    description = "Build the optional LibreOffice base images."
-    dependsOn("buildArchLinuxLibreOfficeImage", "buildOpenSuseLibreOfficeImage")
+    description = "Build the optional LibreOffice base image."
+    dependsOn("buildUbuntuLibreOfficeImage")
 }
