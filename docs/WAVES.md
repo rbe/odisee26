@@ -27,8 +27,8 @@ Build:
 - JDK 21, Gradle 8.14.5, Grails 7.2.4.
 - UNO classes come from Maven Central (`org.libreoffice:libreoffice` and `org.libreoffice:unoloader` at 26.2.2, the newest 26.2 still jars published there). The older `juh`, `jurt`, `ridl`, and `unoil` coordinates are empty stubs at that version. `compileJava` does not download a LibreOffice `.deb`.
 - `./gradlew build` compiles, runs the unit tests, and writes `build/distributions/odisee-2.6-linux-x86_64.zip`. GitHub Actions does the same on JDK 21 and publishes the zip on a `v*` tag.
-- `./gradlew :webservice:test` does not start Docker. `./gradlew :webservice:libreOfficeTest` builds `webservice/src/test/docker/libreoffice` (Ubuntu 26.04, distro LibreOffice) and runs tests 1–3.
-- The service image is `./gradlew :webservice:buildOdiseeImage` (Ubuntu 26.04, OpenJDK 21, distro LibreOffice). It is not part of `build`.
+- `./gradlew :webservice:test` does not start Docker. `./gradlew :webservice:libreOfficeTest` builds `webservice/src/test/docker/libreoffice` (Ubuntu 26.04, headless LibreOffice Writer) and runs tests 1–3.
+- The service image is `./gradlew :webservice:buildOdiseeImage` (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). It is not part of `build`.
 - `oxt/buildExtension` downloads ant-contrib and xmltask, then runs the Ant `world-production` target. Configuration of the webservice does not import that Ant build. Gradle is started with `--add-exports` for `java.xml/com.sun.org.apache.xpath.internal` and `java.xml/com.sun.org.apache.xpath.internal.objects` because xmltask 1.16 calls those JDK-internal XPath classes.
 
 ## Wave 2 — One request contract
