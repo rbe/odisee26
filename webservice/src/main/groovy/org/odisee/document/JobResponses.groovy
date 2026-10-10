@@ -31,7 +31,9 @@ final class JobResponses {
                 status           : job?.status,
                 failedInstruction: job?.failedInstruction,
                 filename         : job?.filename,
-                file             : file == null ? null : Base64.encoder.encodeToString(file)
+                file             : file == null ? null : Base64.encoder.encodeToString(file),
+                bucket           : job?.bucket,
+                key              : job?.key
         ])
     }
 

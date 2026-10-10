@@ -59,6 +59,17 @@ public class OdiseeJsonTest {
                 + "\"filename\":\"pdf/AGB.pdf\"}]}]}}],\"response\":{\"base64\":false}}", OdiseeJson.fromXml(xml));
     }
 
+    @Test
+    public void deliveryAttributeIsAJsonField() {
+        final String xml = "<odisee delivery=\"both\"><request name=\"One\">"
+                + "<template name=\"Letter\" outputFormat=\"pdf\"/>"
+                + "<instructions><userfield name=\"Hallo\">x</userfield></instructions>"
+                + "</request></odisee>";
+        assertEquals("{\"request\":[{\"name\":\"One\",\"template\":{\"name\":\"Letter\",\"outputFormat\":\"pdf\"},"
+                + "\"instructions\":[{\"instruction\":\"userfield\",\"name\":\"Hallo\",\"value\":\"x\"}]}],"
+                + "\"delivery\":\"both\"}", OdiseeJson.fromXml(xml));
+    }
+
     private static String resource(final String name) throws IOException {
         try (InputStream in = OdiseeJsonTest.class.getResourceAsStream("/" + name)) {
             if (in == null) {

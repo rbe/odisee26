@@ -40,4 +40,26 @@ public class OdiseeClientSchemaTest {
                 Files.readAllBytes(Path.of("src/main/schema/request.xsd")));
     }
 
+    @Test
+    public void deliveryIsOnTheV2Request() throws Exception {
+        final OdiseeClient client = new OdiseeClient("http://127.0.0.1:8080/odisee/document/generate");
+        client.createRequest("Letter", OutputFormat.PDF);
+        client.delivery("store");
+        final Path out = Files.createTempFile("odisee", ".xml");
+        client.saveRequestTo(out);
+        final String xml = Files.readString(out);
+        assertTrue(xml.contains("delivery=\"store\""));
+        assertTrue(xml.contains("http://xmlns.odisee.de/v2/request"));
+
+        SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+                .newSchema(Path.of("src/main/schema/request.xsd").toFile())
+                .newValidator()
+                .validate(new StreamSource(out.toFile()));
+
+        client.useJson();
+        final Path json = Files.createTempFile("odisee", ".json");
+        client.saveRequestTo(json);
+        assertTrue(Files.readString(json).contains("\"delivery\":\"store\""));
+    }
+
 }

@@ -34,6 +34,8 @@ class JobService {
 
     OdiseeService odiseeService
 
+    ObjectStorage objectStorage
+
     Executor executor
 
     Closure poster = { URI uri, String body -> CallbackPoster.post(uri, body) }
@@ -75,11 +77,17 @@ class JobService {
                 ])
             } else {
                 String relative = writeFile(user, id, document)
+                Delivery.StoredObject stored = null
+                if (Delivery.mode(xml) != Delivery.STREAM) {
+                    stored = Delivery.put(user, document, storage())
+                }
                 JobStore.update(user, id, [
                         status           : 'succeeded',
                         failedInstruction: null,
                         file             : relative,
-                        filename         : document.filename
+                        filename         : document.filename,
+                        bucket           : stored?.bucket,
+                        key              : stored?.key
                 ])
             }
         } catch (OdiseeException e) {
@@ -116,6 +124,10 @@ class JobService {
         } catch (Exception e) {
             log.error("Job ${id} callback failed", e)
         }
+    }
+
+    private ObjectStorage storage() {
+        objectStorage ?: new S3ObjectStorage()
     }
 
     private static String writeFile(String user, String id, Document document) {

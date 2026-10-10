@@ -70,6 +70,10 @@ public final class OdiseeJson {
         if (response != null) {
             body.put("response", response);
         }
+        final String delivery = root.getAttribute("delivery");
+        if (delivery != null && !delivery.isEmpty()) {
+            body.put("delivery", delivery);
+        }
         return write(body);
     }
 

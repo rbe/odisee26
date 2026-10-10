@@ -15,6 +15,7 @@ class UrlMappings {
         '/document/jobs'(controller: 'document', action: 'submitJob', method: 'POST')
         '/document/jobs/$id'(controller: 'document', action: 'showJob', method: 'GET')
         '/callback-host'(controller: 'document', action: 'addCallbackHost', method: 'POST')
+        '/bucket'(controller: 'document', action: 'setBucket', method: 'POST')
     }
 
 }

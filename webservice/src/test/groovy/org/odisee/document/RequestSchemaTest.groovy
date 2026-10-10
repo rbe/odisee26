@@ -159,6 +159,36 @@ class RequestSchemaTest extends GroovyTestCase {
         assertTrue(error.message.startsWith('Invalid request:'))
     }
 
+    void testDeliveryIsStreamStoreOrBoth() {
+        ['stream', 'store', 'both'].each { String mode ->
+            def root = RequestSchema.parse("""<odisee delivery="${mode}">
+  <request name="One">
+    <template name="Letter" outputFormat="pdf"/>
+    <instructions><userfield name="Hallo">x</userfield></instructions>
+  </request>
+</odisee>""".getBytes('UTF-8'))
+            assertEquals(mode, root.getAttribute('delivery'))
+        }
+        OdiseeException error = reject('''<odisee delivery="s3">
+  <request name="One">
+    <template name="Letter" outputFormat="pdf"/>
+    <instructions><userfield name="Hallo">x</userfield></instructions>
+  </request>
+</odisee>''')
+        assertTrue(error.message.startsWith('Invalid request:'))
+    }
+
+    void testRequestCannotNameABucket() {
+        OdiseeException error = reject('''<odisee delivery="store">
+  <request name="One">
+    <template name="Letter" outputFormat="pdf"/>
+    <instructions><userfield name="Hallo">x</userfield></instructions>
+    <bucket>other-bucket</bucket>
+  </request>
+</odisee>''')
+        assertEquals('The request cannot name a bucket', error.message)
+    }
+
     void testDoctypeIsRejected() {
         String xml = '''<?xml version="1.0"?>
 <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>

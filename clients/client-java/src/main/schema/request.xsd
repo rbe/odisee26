@@ -22,6 +22,23 @@
                 </xs:element>
                 <xs:element ref="odisee:response" minOccurs="0" maxOccurs="1"/>
             </xs:sequence>
+            <xs:attribute name="delivery" default="stream">
+                <xs:annotation>
+                    <xs:documentation>
+                        How the generated file is delivered: stream, store, or both.
+                        The default is stream, which returns the file as the response body.
+                        store writes the caller's configured bucket and returns the object location.
+                        both returns the file and stores a copy. The request cannot name a bucket.
+                    </xs:documentation>
+                </xs:annotation>
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:enumeration value="stream"/>
+                        <xs:enumeration value="store"/>
+                        <xs:enumeration value="both"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>
         </xs:complexType>
     </xs:element>
     <xs:element name="request">

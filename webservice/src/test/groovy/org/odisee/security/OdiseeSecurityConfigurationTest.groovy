@@ -97,6 +97,12 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         mvc.perform(post('/callback-host').with(httpBasic('root', 'root-secret'))).andExpect(status().isCreated())
     }
 
+    void testNonAdminCannotSetABucket() {
+        mvc.perform(post('/bucket')).andExpect(status().isUnauthorized())
+        mvc.perform(post('/bucket').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isForbidden())
+        mvc.perform(post('/bucket').with(httpBasic('root', 'root-secret'))).andExpect(status().isCreated())
+    }
+
     @Configuration
     @EnableWebMvc
     @Import(OdiseeSecurityConfiguration)
@@ -145,6 +151,12 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         @ResponseStatus(HttpStatus.CREATED)
         String callbackHost() {
             'listed'
+        }
+
+        @PostMapping('/bucket')
+        @ResponseStatus(HttpStatus.CREATED)
+        String bucket() {
+            'configured'
         }
     }
 

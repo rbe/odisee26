@@ -45,6 +45,8 @@ dependencies {
     implementation("org.libreoffice:libreoffice:$libreOfficeVersion")
     implementation("org.libreoffice:unoloader:$libreOfficeVersion")
     implementation("org.apache.pdfbox:pdfbox:3.0.8")
+    implementation("software.amazon.awssdk:s3:2.55.14")
+    implementation("software.amazon.awssdk:url-connection-client:2.55.14")
 
     runtimeOnly("org.springframework.boot:spring-boot-starter-tomcat")
 

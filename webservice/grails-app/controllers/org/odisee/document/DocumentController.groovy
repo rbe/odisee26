@@ -31,6 +31,8 @@ class DocumentController {
 
     JobService jobService
 
+    ObjectStorage objectStorage
+
     /**
      * Grails stores the request before Spring Security wraps it, so
      * {@code request.userPrincipal} stays null after a successful Basic login.
@@ -73,6 +75,7 @@ class DocumentController {
         boolean errorResponse = false
         try {
             final Principal caller = requireCaller(callerFromContext(request.userPrincipal))
+            Delivery.rejectNamedStorage(request)
             final boolean dryRun = dryRunRequested(request.getParameter('dryRun'))
             final Element xml = readRequestElement()
             if (dryRun) {
@@ -85,7 +88,7 @@ class DocumentController {
                 if (null == document) {
                     throw new OdiseeException('Cannot send stream, no document')
                 }
-                DocumentStreamer.stream(response, document)
+                Delivery.respond(response, caller.name, xml, document, storage())
             }
         } catch (e) {
             errorResponse = true
@@ -130,6 +133,7 @@ class DocumentController {
         boolean errorResponse = false
         try {
             final Principal caller = requireCaller(callerFromContext(request.userPrincipal))
+            Delivery.rejectNamedStorage(request)
             final Element xml = readRequestElement()
             final String callback = callbackForJob(request.getParameter('callback'))
             final String id = jobService.submit(caller, xml, callback)
@@ -212,6 +216,55 @@ class DocumentController {
                 }
             }
         }
+    }
+
+    /**
+     * {@code POST /bucket} sets the one bucket for a user. Only an admin may call it.
+     * The line is read again on the next store. A restart is not required.
+     */
+    def setBucket() {
+        boolean errorResponse = false
+        try {
+            boolean admin = org.springframework.security.core.context.SecurityContextHolder.context?.authentication?.authorities?.any {
+                it.authority == 'ROLE_ADMIN'
+            } as boolean
+            requireAdmin(callerFromContext(request.userPrincipal), admin)
+            BucketFile.Record record = readBucket()
+            boolean created = BucketFile.save(record.user, record.endpoint, record.region, record.bucket, record.accessKey, record.secret)
+            response.status = created ? 201 : 200
+            response.outputStream << String.format("Bucket '%s' configured for '%s'.%n", record.bucket, record.user)
+            response.outputStream.flush()
+        } catch (e) {
+            errorResponse = true
+            processThrowable(e)
+        } finally {
+            skipView()
+            if (!errorResponse) {
+                try {
+                    response.outputStream.close()
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private BucketFile.Record readBucket() {
+        String user = request.getParameter('user')
+        if (user?.trim()) {
+            return BucketFile.record(
+                    user,
+                    request.getParameter('endpoint'),
+                    request.getParameter('region'),
+                    request.getParameter('bucket'),
+                    request.getParameter('accessKey'),
+                    request.getParameter('secret'))
+        }
+        byte[] body = Compression.readLimited(request.inputStream)
+        BucketFile.parseLine(new String(body, 'UTF-8'))
+    }
+
+    private ObjectStorage storage() {
+        objectStorage ?: new S3ObjectStorage()
     }
 
     /**

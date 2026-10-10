@@ -11,6 +11,7 @@ package org.odisee.json
 import groovy.json.JsonSlurper
 import groovy.xml.MarkupBuilder
 import org.odisee.api.OdiseeException
+import org.odisee.document.Delivery
 import org.odisee.xml.XmlHelper
 import org.w3c.dom.Element
 
@@ -79,6 +80,7 @@ final class JsonRequest {
         if (!(parsed instanceof Map)) {
             throw new OdiseeException('JSON request must be an object')
         }
+        Delivery.rejectKeys(parsed)
         final String xml = toXml((Map) parsed)
         try {
             final Element element = XmlHelper.asElement(xml)
@@ -102,7 +104,7 @@ final class JsonRequest {
         final MarkupBuilder xml = new MarkupBuilder(writer)
         xml.doubleQuotes = true
         xml.mkp.xmlDeclaration(version: '1.0', encoding: 'UTF-8')
-        xml.odisee {
+        xml.odisee(rootAttrs(root)) {
             requests.each { Object req ->
                 appendRequest(xml, req)
             }
@@ -114,6 +116,17 @@ final class JsonRequest {
             }
         }
         writer.toString()
+    }
+
+    private static Map<String, String> rootAttrs(Map root) {
+        if (root.delivery == null) {
+            return [:]
+        }
+        final String value = stringify(root.delivery)
+        if (!Delivery.MODES.contains(value)) {
+            throw new OdiseeException("Invalid delivery '${value}'", OdiseeException.BAD_REQUEST)
+        }
+        [delivery: value]
     }
 
     private static void appendRequest(MarkupBuilder xml, Object req) {
