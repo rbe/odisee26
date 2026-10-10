@@ -16,9 +16,34 @@ export JAVA_HOME=/path/to/jdk-21
 
 `build/distributions/odisee-2.6-linux-x86_64.zip`
 
+The zip contains `application.jar`, `bin/odictl`, `etc/`, the Java client, the LibreOffice extension, and the HTML documentation.
+
 GitHub Actions uploads that zip on every push and pull request. A git tag `v*` also publishes it as a GitHub Release.
 
 Docker image tasks are not part of `build`. They need a local Docker daemon. `:webservice:buildOdiseeImage` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts `alpine/minio:RELEASE.2025-10-15T17-29-55Z`, stores one object, and reads it back. The same image is the `minio` service in `webservice/src/main/docker/docker-compose.yml`. `:webservice:test` does not start MinIO.
+
+## Proxy
+
+An HTTP proxy is optional.
+
+Docker reads `/.env`:
+
+```text
+HTTP_PROXY=http://proxy.example.com:8888
+HTTPS_PROXY=http://proxy.example.com:8888
+NON_PROXY=localhost,example.com
+```
+
+Gradle reads `$HOME/.gradle/gradle.properties`:
+
+```text
+systemProp.http.proxyHost=proxy.example.com
+systemProp.http.proxyPort=8888
+systemProp.http.nonProxyHosts=localhost|127.0.0.1|example.com
+systemProp.https.proxyHost=proxy.example.com
+systemProp.https.proxyPort=8888
+systemProp.https.nonProxyHosts=localhost|127.0.0.1|example.com
+```
 
 ## Run the distribution
 

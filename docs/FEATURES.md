@@ -74,6 +74,8 @@ The callback belongs on the job, not on `POST /document/generate`. `POST /docume
 
 ## Operations
 
+Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays generate, jobs, templates, and `/ready`. `POST /user`, `POST /callback-host`, and `POST /bucket` are to be replaced by `odictl` subcommands. That replacement is decided and not implemented.
+
 ### F9. Authenticated multi-tenancy
 
 Status: **landed in wave 4**.
