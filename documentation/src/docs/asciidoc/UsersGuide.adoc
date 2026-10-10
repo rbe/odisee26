@@ -66,7 +66,13 @@ the API.
 === Request contract
 
 `POST /document/generate` is synchronous.
-The response body is the file.
+`odisee/@delivery` is `stream`, `store`, or `both`.
+The default is `stream`.
+For `stream` and `both`, the HTTP response is the generated document.
+For `store`, the body is JSON `bucket` and `key`, and the file is only in the user's bucket.
+`both` stores a copy, identified by the `X-Odisee-Object` header (`bucket/key`).
+A request cannot name the bucket.
+`$ODISEE_HOME/etc/buckets` and the `minio` compose service are in the administrators guide, <<object-storage>>.
 It validates XML against the v2 request schema (`http://xmlns.odisee.de/v2/request`).
 A document with no namespace is that same shape.
 The v3 namespace and the v2.6 namespace are HTTP 400.
@@ -123,6 +129,10 @@ Gzip works for both formats: the service looks at the gzip magic bytes before it
 
 JSON field names are camelCase.
 They map onto the existing XML attributes (`preSaveMacro` becomes `pre-save-macro`, `postMacro` becomes `post-macro`, and so on).
+`delivery` is the field for `odisee/@delivery`.
+It sits on the same object as `request`.
+The values are `stream`, `store`, and `both`.
+The default is `stream`.
 `instructions` is an array, and the array order is the order the instructions run.
 `table` is accepted as an alias of `texttable`.
 On an `input` step, `file` from older XML is sent as `filename`.
@@ -177,7 +187,8 @@ Post-processing looks like this:
 ----
 
 `response.base64` is accepted and stored on the request.
-The HTTP response is still the generated document itself.
+For `stream` and `both`, the HTTP response is still the generated document itself.
+For `store`, the body is the bucket and the key.
 
 ==== Clients
 
@@ -228,7 +239,7 @@ A few follow-ups are worth doing while this interface is still young:
 
 . Validate JSON against `request.schema.json` at the edge and return the failing field in `{"error":"..."}`. The converter already rejects unknown instructions and a missing template name; a schema check would cover the rest without another hand-written branch.
 . Publish an OpenAPI description of `POST /document/generate` with both `application/json` and `text/xml` request bodies. The client libraries would then be able to grow from one description instead of each one owning a copy of the XML-to-JSON mapping.
-. Honor `response.base64`. The field is accepted today and the document is still returned as raw bytes. Callers that want a JSON conversation end to end need a base64 document (and, later, page count and template revision) selected with `Accept`.
+. Honor `response.base64`. The field is accepted today and, for `stream` and `both`, the document is still returned as raw bytes. Callers that want a JSON conversation end to end need a base64 document (and, later, page count and template revision) selected with `Accept`.
 . Keep XML as the execution format until a single in-memory request model replaces both the DOM walk and the JSON converter. Two encodings of one model drift; one model with two parsers does not.
 . Point the Oracle package at `/document/generate`. It still posts to `/oooDocument/generate`, which is the previous route.
 
