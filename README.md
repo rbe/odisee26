@@ -18,7 +18,7 @@ export JAVA_HOME=/path/to/jdk-21
 
 GitHub Actions uploads that zip on every push and pull request. A git tag `v*` also publishes it as a GitHub Release.
 
-Docker image tasks are not part of `build`. They need a local Docker daemon. `:webservice:buildOdiseeImage` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`.
+Docker image tasks are not part of `build`. They need a local Docker daemon. `:webservice:buildOdiseeImage` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts `alpine/minio:RELEASE.2025-10-15T17-29-55Z`, stores one object, and reads it back. The same image is the `minio` service in `webservice/src/main/docker/docker-compose.yml`. `:webservice:test` does not start MinIO.
 
 ## Run the distribution
 

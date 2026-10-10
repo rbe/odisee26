@@ -49,6 +49,7 @@ class OdiseeSecurityConfiguration {
                     auth.requestMatchers(HttpMethod.GET, '/ready', '/ready/**').permitAll()
                     auth.requestMatchers(HttpMethod.POST, '/user').hasRole('ADMIN')
                     auth.requestMatchers(HttpMethod.POST, '/callback-host').hasRole('ADMIN')
+                    auth.requestMatchers(HttpMethod.POST, '/bucket').hasRole('ADMIN')
                     auth.anyRequest().authenticated()
                 }
         http.build()

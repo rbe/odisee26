@@ -101,7 +101,7 @@ Calc and Impress stay out of this wave. Wave 6 adds their instruction sets (F6).
 
 ## Wave 6 — Features
 
-Status: **landed** for F1, F3, F4, F5, F6, F8, and F10. F4, F3, and F10 landed in pull request 8. F1, F5, F6, and F8 landed in pull request 9 (`d8db005`). F7 is not implemented. Each user has a bucket configured ahead of time, and the request cannot name an arbitrary bucket. The caller chooses stream, store, or both. The store is S3-compatible. MinIO is the development server. Odisee does not expire or delete objects.
+Status: **landed** for F1, F3, F4, F5, F6, F7, F8, and F10. F4, F3, and F10 landed in pull request 8. F1, F5, F6, and F8 landed in pull request 9 (`d8db005`). F7 stores into the one bucket configured for that user. The caller chooses stream, store, or both. The store is S3-compatible. MinIO is the development server. Odisee does not expire or delete objects.
 
 F4. `TemplateLocator` reads `var/user/{name}/template/{templateName}/rev/{n}.ott`. `LATEST` is the highest number there or in the flat `Name.ott` / `Name_revN.ott` files. A missing revision is HTTP 404. One user cannot read another user's revisions.
 
@@ -117,7 +117,7 @@ F5. v2 `output/format/@type` is the extension. `format/options/option` carries P
 
 F6. One instruction set per application. Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`. Calc starts with `cell` (sheet and coordinate). Impress starts with `shape` (name). A set can grow on its own. There is no shared `named` tag. A Calc save with no instructions is not this feature.
 
-F7 is not implemented. Each user has a bucket configured ahead of time. The request cannot name an arbitrary bucket. The bucket must be one already allowed for that user. On the POST, the caller chooses stream, store, or both. Stream keeps the response body as the file, and `POST /document/generate` stays synchronous. Store writes to that user's allowed bucket and does not force the bytes back as the HTTP body. Both streams the body and stores a copy. The store is S3-compatible. MinIO is the development server. Odisee does not expire or delete objects. Retention belongs to the bucket. Jobs stay private to the user. A callback still goes only to a host on `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous.
+F7 is implemented. Each user has one bucket in `$ODISEE_HOME/etc/buckets`, read on each store. An admin writes that file with `POST /bucket`. The v2 field is `odisee/@delivery` (`stream`, `store`, or `both`; the default is `stream`). JSON uses `delivery`. A v3 namespace is still HTTP 400. Stream keeps the response body as the file, and `POST /document/generate` stays synchronous. Store writes to that user's bucket and the body is the bucket and the key. Both returns the file and stores a copy, identified in the `X-Odisee-Object` header. The request cannot name a bucket. The server chooses the key. Endpoint, region, bucket, access key, and secret come from that user's line. The store is S3-compatible. MinIO is the development server. Odisee does not expire, delete, or set a lifecycle on the object. Retention belongs to the bucket. `POST /document/jobs` uses the same choice, and `var/user/{name}/jobs.json` stores the bucket and the key. Jobs stay private to the user. A callback still goes only to a host on `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous.
 
 ## Refactorings
 

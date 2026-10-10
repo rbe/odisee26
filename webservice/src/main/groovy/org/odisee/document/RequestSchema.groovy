@@ -79,6 +79,7 @@ final class RequestSchema {
         if (namespace && V2 != namespace) {
             throw new OdiseeException("Request namespace '${namespace}' is not accepted. Use the v2 request schema.", OdiseeException.BAD_REQUEST)
         }
+        Delivery.rejectOverrides(root)
         try {
             final Validator validator = SCHEMA.newValidator()
             validator.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, '')

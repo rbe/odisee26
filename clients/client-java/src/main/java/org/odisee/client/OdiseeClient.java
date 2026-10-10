@@ -179,6 +179,14 @@ public final class OdiseeClient {
         return this;
     }
 
+    /**
+     * {@code stream}, {@code store}, or {@code both}. Absent means stream.
+     */
+    public OdiseeClient delivery(final String mode) {
+        odisee.setDelivery(mode);
+        return this;
+    }
+
     public Request createRequest(final String template, final OutputFormat outputFormat) {
         odisee.getRequest().add(actualRequest);
         setLatestTemplate(template, outputFormat);

@@ -1,6 +1,6 @@
 # Odisee feature ideas
 
-These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F1, F3, F4, F5, F6, F8, and F10 shipped with wave 6. F9 shipped with wave 4. F11 landed with wave 2. F7 is not implemented yet.
+These are product additions, not bugfixes. They assume the request contract and the office pool from `docs/WAVES.md` are trustworthy. F2 shipped with wave 3. F1, F3, F4, F5, F6, F8, and F10 shipped with wave 6. F9 shipped with wave 4. F11 landed with wave 2. F7 is implemented.
 
 ## Generation API
 
@@ -10,7 +10,7 @@ Status: **landed in wave 6**.
 
 `POST /document/generate` stays synchronous. The response body stays the file bytes. `POST /document/jobs` returns HTTP 202 and a JSON job id. `GET /document/jobs/{id}` returns JSON: `status`, `failedInstruction`, and `file` (base64, or null until the job has a file). The caller is `callerFromContext`, the same source as generate. No login is HTTP 401. A job id that is not in that user's list is HTTP 404.
 
-The list is `var/user/{name}/jobs.json`. One file per user. It is not process memory and not a shared table. The generated file stays under that user's `output` directory. Object storage is F7 and is not this change.
+The list is `var/user/{name}/jobs.json`. One file per user. It is not process memory and not a shared table. The generated file stays under that user's `output` directory. Object storage is F7.
 
 Depends on: wave 2 status codes, wave 3 pool deadlines.
 
@@ -52,17 +52,17 @@ Each application has its own instruction set, and a set can grow without adding 
 
 ### F7. Delivery that is not the HTTP body
 
-Status: **not implemented**.
+Status: **implemented**.
 
-The response is still the file bytes, held in a `byte[]` on the `Document` object.
+Each user has one bucket, configured ahead of time in `$ODISEE_HOME/etc/buckets`. One line is `username endpoint region bucket accessKey secret`. The file is read on each store, so a restart is not required. An admin writes it with `POST /bucket`. A caller who is not an admin cannot set a bucket. The request cannot name a bucket, an endpoint, or credentials. A user with no line in that file is rejected when delivery is `store` or `both`.
 
-Each user has a bucket configured ahead of time. The request cannot name an arbitrary bucket. The bucket must be one already allowed for that user.
+The v2 request (`http://xmlns.odisee.de/v2/request`) carries `odisee/@delivery`: `stream`, `store`, or `both`. The default is `stream`, so a request without the attribute stays a file body. JSON uses the same field, `delivery`. A v3 namespace is still HTTP 400. The server archive element stays.
 
-On the POST, the caller chooses delivery: stream the file, store it, or both. Stream keeps the response body as the file. `POST /document/generate` stays synchronous. Store writes to that user's allowed bucket and does not force the bytes back as the HTTP body. Both streams the body and stores a copy.
+`stream` returns the file as the body. `POST /document/generate` stays synchronous. `store` writes the object to that user's bucket and the body is JSON `bucket` and `key`, not the file bytes. `both` returns the file and stores a copy. The object is identified in the `X-Odisee-Object` response header (`bucket/key`).
 
-The store is S3-compatible. MinIO is the development server. Odisee does not expire or delete objects. Retention belongs to the bucket.
+The store is S3-compatible. Endpoint, region, bucket, access key, and secret come from that user's line, so MinIO works in development. Odisee does not expire, delete, or set a lifecycle on the object. The server chooses the object key. The key stays inside that user's bucket.
 
-Jobs stay private to the user. A callback still goes only to a host on `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous.
+`POST /document/jobs` uses the same choice. The job record in `var/user/{name}/jobs.json` stores the bucket and the key. A callback still goes only to a host on `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous. Jobs stay private to the user.
 
 Depends on: B1 (done — the heap leak made this worse).
 

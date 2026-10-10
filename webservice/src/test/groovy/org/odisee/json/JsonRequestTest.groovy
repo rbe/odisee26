@@ -161,6 +161,28 @@ class JsonRequestTest {
     }
 
     @Test
+    void deliveryIsTheV2AttributeAndABucketIsRejected() {
+        final Element xml = JsonRequest.toElement('''
+        {"delivery":"both","request":{"template":{"name":"Letter","outputFormat":"pdf"},
+          "archive":{"files":true},"instructions":[{"instruction":"userfield","name":"Hallo","value":"x"}]}}
+        ''')
+        assertEquals('both', xml.getAttribute('delivery'))
+        use(DOMCategory) {
+            assertEquals('true', xml.request[0].archive[0].'@files')
+        }
+        RequestSchema.validate(xml)
+        try {
+            JsonRequest.toElement('''
+            {"delivery":"store","bucket":"other-bucket","request":{"template":{"name":"Letter"},"instructions":[]}}
+            ''')
+            fail('bucket field')
+        } catch (OdiseeException e) {
+            assertEquals(OdiseeException.BAD_REQUEST, e.httpStatus)
+            assertEquals('The request cannot name a bucket', e.message)
+        }
+    }
+
+    @Test
     void detectsJsonBody() {
         assertTrue(JsonRequest.looksLikeJson('  \n {"request":[]}'.bytes))
         assertTrue(!JsonRequest.looksLikeJson('<odisee/>'.bytes))
