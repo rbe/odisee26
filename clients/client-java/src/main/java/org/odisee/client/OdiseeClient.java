@@ -13,7 +13,6 @@
 package org.odisee.client;
 
 import de.odisee.xml.server.request.Action;
-import de.odisee.xml.server.request.Archive;
 import de.odisee.xml.server.request.Input;
 import de.odisee.xml.server.request.Instructions;
 import de.odisee.xml.server.request.Macro;
@@ -167,28 +166,6 @@ public final class OdiseeClient {
         userfield.setContent(value);
         getInstructionsObject(actualRequest).add(userfield);
         return this;
-    }
-
-    /**
-     * @deprecated Since 2.6 there's no archiving.
-     */
-    @Deprecated(since = "2.6", forRemoval = true)
-    public OdiseeClient setArchive(final Request request, boolean database, boolean files) {
-        final Archive archive = request.getArchive();
-        if (null == archive) {
-            request.setArchive(factory.createArchive());
-        }
-        request.getArchive().setDatabase(database);
-        request.getArchive().setFiles(files);
-        return this;
-    }
-
-    /**
-     * @deprecated Since 2.6 there's no archiving.
-     */
-    @Deprecated(since = "2.6", forRemoval = true)
-    public OdiseeClient setArchive(final boolean database, final boolean filesystem) {
-        return setArchive(actualRequest, database, filesystem);
     }
 
     public OdiseeClient setLatestTemplate(final String template, final OutputFormat outputFormat) {

@@ -43,7 +43,6 @@ public class OdiseeClientTest {
         final OdiseeClient client = new OdiseeClient(url/*, odiseeUsername, odiseePassword*/);
         // Set values
         client.createRequest("HalloOdisee", OutputFormat.PDF);
-        client.setArchive(false, true);
         client.setUserfield("Hallo", "Odisee");
         // Save request to disk
         final Path path = Files.createTempFile(Paths.get("target"), "odisee_", ".xml");
@@ -68,7 +67,6 @@ public class OdiseeClientTest {
         final OdiseeClient client = new OdiseeClient(url/*, odiseeUsername, odiseePassword*/);
         // Set values
         client.createRequest("HalloOdisee", OutputFormat.PDF);
-        client.setArchive(false, true);
         client.setUserfield("Hallo", "Odisee");
         // Save request to disk
         final Path path = Files.createTempFile(Paths.get("target"), "odisee_", ".xml.gz");
