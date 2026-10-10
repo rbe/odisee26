@@ -101,7 +101,7 @@ Calc and Impress stay out of this wave. Wave 6 adds their instruction sets (F6).
 
 ## Wave 6 — Features
 
-Status: **landed** for F1, F3, F4, F5, F6, F8, and F10. F4, F3, and F10 landed in pull request 8. F1, F5, F6, and F8 landed in pull request 9 (`d8db005`). F7 object storage is not implemented and stays later.
+Status: **landed** for F1, F3, F4, F5, F6, F8, and F10. F4, F3, and F10 landed in pull request 8. F1, F5, F6, and F8 landed in pull request 9 (`d8db005`). F7 is not implemented. Each user has a bucket configured ahead of time, and the request cannot name an arbitrary bucket. The caller chooses stream, store, or both. The store is S3-compatible. MinIO is the development server. Odisee does not expire or delete objects.
 
 F4. `TemplateLocator` reads `var/user/{name}/template/{templateName}/rev/{n}.ott`. `LATEST` is the highest number there or in the flat `Name.ott` / `Name_revN.ott` files. A missing revision is HTTP 404. One user cannot read another user's revisions.
 
@@ -117,7 +117,7 @@ F5. v2 `output/format/@type` is the extension. `format/options/option` carries P
 
 F6. One instruction set per application. Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`. Calc starts with `cell` (sheet and coordinate). Impress starts with `shape` (name). A set can grow on its own. There is no shared `named` tag. A Calc save with no instructions is not this feature.
 
-F7 is not implemented. Object storage stays later.
+F7 is not implemented. Each user has a bucket configured ahead of time. The request cannot name an arbitrary bucket. The bucket must be one already allowed for that user. On the POST, the caller chooses stream, store, or both. Stream keeps the response body as the file, and `POST /document/generate` stays synchronous. Store writes to that user's allowed bucket and does not force the bytes back as the HTTP body. Both streams the body and stores a copy. The store is S3-compatible. MinIO is the development server. Odisee does not expire or delete objects. Retention belongs to the bucket. Jobs stay private to the user. A callback still goes only to a host on `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous.
 
 ## Refactorings
 
