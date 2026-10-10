@@ -1,7 +1,6 @@
 rootProject.name = "Odisee"
 
 include("documentation")
-include("docker")
 include("webservice")
 include("oxt")
 include(":clients:client-java")

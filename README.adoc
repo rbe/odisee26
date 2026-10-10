@@ -30,7 +30,7 @@ export JAVA_HOME=/path/to/jdk-21
 
 The zip contains `application.jar`, `bin/odictl`, `etc/`, the Java client, the LibreOffice extension, and the HTML documentation.
 
-Docker image tasks (`:docker:buildAllDockerImages`, `:webservice:buildOdiseeImage`) are not part of `build`. They need a local Docker daemon. `:docker:buildAllDockerImages` builds `odisee/ubuntu-libreoffice:26.04` (Ubuntu 26.04, headless LibreOffice Writer). The service image is Ubuntu 26.04 with OpenJDK 21 and headless Writer.
+`:webservice:buildOdiseeImage` and `:webservice:libreOfficeTest` are not part of `build`. They need a local Docker daemon. The service image is Ubuntu 26.04 with OpenJDK 21 and headless LibreOffice Writer. The test image is `webservice/src/test/docker/libreoffice`.
 
 GitHub Actions runs the same `./gradlew build` and uploads the zip. A git tag `v*` also publishes that zip as a GitHub Release.
 
