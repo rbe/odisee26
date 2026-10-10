@@ -103,9 +103,10 @@ Jobs are private to the caller.
 The list is `var/user/{name}/jobs.json`.
 A callback is a query parameter on `POST /document/jobs`.
 `POST /document/generate` does not read a callback.
-Odisee POSTs the status only when that host is listed in `$ODISEE_HOME/etc/callback-hosts`.
-`odictl callback-host HOST` appends a host.
-A URL whose host is off the list does not get a POST.
+Odisee POSTs the status only when that host is listed for that user in `$ODISEE_HOME/etc/callback-hosts`.
+`odictl callback-host USER HOST` appends a line.
+A host listed for one user does not allow another user's callback.
+A URL whose host is off that user's list does not get a POST.
 
 === Instructions
 

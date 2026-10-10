@@ -85,21 +85,26 @@ class OdictlTest extends GroovyTestCase {
     }
 
     void testCallbackHostAppendsAHostTheServerReads() {
-        succeed('callback-host', 'hooks.example')
-        succeed('callback-host', 'Hooks.Example')
+        succeed('callback-host', 'ctlada', 'hooks.example')
+        succeed('callback-host', 'ctlada', 'Hooks.Example')
+        succeed('callback-host', 'ctlbucket', 'other.example')
 
-        assertTrue(CallbackAllowList.permits('https://hooks.example/done'))
-        assertFalse(CallbackAllowList.permits('https://other.example/done'))
-        List<String> hosts = Files.readAllLines(CallbackAllowList.location()).findAll { it.trim() && !it.trim().startsWith('#') }
-        assertEquals(['hooks.example'], hosts)
+        assertTrue(CallbackAllowList.permits('ctlada', 'https://hooks.example/done'))
+        assertFalse(CallbackAllowList.permits('ctlada', 'https://other.example/done'))
+        assertTrue(CallbackAllowList.permits('ctlbucket', 'https://other.example/done'))
+        assertFalse(CallbackAllowList.permits('ctlbucket', 'https://hooks.example/done'))
+        List<String> lines = Files.readAllLines(CallbackAllowList.location()).findAll { it.trim() && !it.trim().startsWith('#') }
+        assertEquals(['ctlada hooks.example', 'ctlbucket other.example'], lines)
     }
 
     void testBadCallbackHostFails() {
-        String output = fail('callback-host', 'https://hooks.example/done')
+        String output = fail('callback-host', 'ctlada', 'https://hooks.example/done')
+        String badUser = fail('callback-host', '../ctlada', 'hooks.example')
 
         assertTrue(output.contains('Invalid callback host'))
+        assertTrue(badUser.contains('Invalid user'))
         assertFalse(Files.exists(CallbackAllowList.location()))
-        assertFalse(CallbackAllowList.permits('https://hooks.example/done'))
+        assertFalse(CallbackAllowList.permits('ctlada', 'https://hooks.example/done'))
     }
 
     void testBucketWritesTheLineTheServerReads() {

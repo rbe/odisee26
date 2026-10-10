@@ -10,7 +10,7 @@ Write in concise, pinpointed language.
 
 The book under `documentation/` stays AsciiDoc. `README.md` is the GitHub landing page and the file `packageDistribution` copies into the zip.
 
-Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays: generate, jobs, templates, and `/ready`. `odictl user NAME PASSWORD` writes `$ODISEE_HOME/etc/users` and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. `odictl callback-host HOST` appends a host to `$ODISEE_HOME/etc/callback-hosts`. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`. The server reads those files on use. There is no second config channel.
+Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays: generate, jobs, templates, and `/ready`. `odictl user NAME PASSWORD` writes `$ODISEE_HOME/etc/users` and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. `odictl callback-host USER HOST` appends a host for that user to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`. The server reads those files on use. There is no second config channel.
 
 Configuration the server reads stays in `$ODISEE_HOME/etc`, one directory mounted into every replica. The server does not grow a second config channel.
 

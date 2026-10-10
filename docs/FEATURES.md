@@ -62,7 +62,7 @@ The v2 request (`http://xmlns.odisee.de/v2/request`) carries `odisee/@delivery`:
 
 The store is S3-compatible. Endpoint, region, bucket, access key, and secret come from that user's line, so MinIO works in development. Odisee does not expire, delete, or set a lifecycle on the object. The server chooses the object key. The key stays inside that user's bucket.
 
-`POST /document/jobs` uses the same choice. The job record in `var/user/{name}/jobs.json` stores the bucket and the key. A callback still goes only to a host on `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous. Jobs stay private to the user.
+`POST /document/jobs` uses the same choice. The job record in `var/user/{name}/jobs.json` stores the bucket and the key. A callback still goes only to a host listed for that user in `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous. Jobs stay private to the user.
 
 Depends on: B1 (done — the heap leak made this worse).
 
@@ -70,11 +70,11 @@ Depends on: B1 (done — the heap leak made this worse).
 
 Status: **landed in wave 6**.
 
-The callback belongs on the job, not on `POST /document/generate`. `POST /document/jobs?callback=https://host/path` stores that URL on the job. When the job finishes, Odisee POSTs JSON (`id`, `status`, `failedInstruction`, and `file` set to `/odisee/document/jobs/{id}`) only if the URL's host is on the server allow-list. `odictl callback-host HOST` appends a host. The list is `$ODISEE_HOME/etc/callback-hosts`. A URL whose host is off the list does not get a POST. The synchronous generate route does not read a callback.
+The callback belongs on the job, not on `POST /document/generate`. `POST /document/jobs?callback=https://host/path` stores that URL on the job. When the job finishes, Odisee POSTs JSON (`id`, `status`, `failedInstruction`, and `file` set to `/odisee/document/jobs/{id}`) only if the URL's host is listed for that user. `odictl callback-host USER HOST` appends `username host` to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. A URL whose host is off that user's list does not get a POST. The synchronous generate route does not read a callback.
 
 ## Operations
 
-Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays generate, jobs, templates, and `/ready`. `odictl user NAME PASSWORD` writes `$ODISEE_HOME/etc/users` and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. A bad name fails. An existing user fails. There is no default password. `odictl callback-host HOST` appends a host to `$ODISEE_HOME/etc/callback-hosts`. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`. The server reads those files on use. There is no second config channel.
+Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays generate, jobs, templates, and `/ready`. `odictl user NAME PASSWORD` writes `$ODISEE_HOME/etc/users` and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. A bad name fails. An existing user fails. There is no default password. `odictl callback-host USER HOST` appends a host for that user to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`. The server reads those files on use. There is no second config channel.
 
 ### F9. Authenticated multi-tenancy
 

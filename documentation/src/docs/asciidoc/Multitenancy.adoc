@@ -57,7 +57,9 @@ Callback hosts
 ^^^^^^^^^^^^^^
 
 `POST /odisee/document/jobs?callback=https://host/path` stores that URL on the job.
-Odisee POSTs only when that host is listed in `$ODISEE_HOME/etc/callback-hosts`.
-`odictl callback-host HOST` appends a host.
-A URL whose host is off the list does not get a POST.
+Odisee POSTs only when that host is listed for that user in `$ODISEE_HOME/etc/callback-hosts`.
+One line is `username host`.
+`odictl callback-host USER HOST` appends a line.
+A host listed for one user does not allow another user's callback.
+A URL whose host is off that user's list does not get a POST.
 `POST /odisee/document/generate` does not read a callback.

@@ -126,12 +126,14 @@ class JobApiTest extends GroovyTestCase {
         }
         jobs.executor = inline()
         jobs.poster = { URI uri, String body -> posted = true }
-        CallbackAllowList.add('hooks.example')
+        CallbackAllowList.add('bee', '203.0.113.5')
+        CallbackAllowList.add(ada, 'hooks.example')
         jobs.submit(principal(ada), request(), 'http://203.0.113.5/done')
 
         assertFalse(posted)
-        assertFalse(CallbackAllowList.permits('http://203.0.113.5/done'))
-        assertTrue(CallbackAllowList.permits('https://hooks.example/done'))
+        assertFalse(CallbackAllowList.permits(ada, 'http://203.0.113.5/done'))
+        assertTrue(CallbackAllowList.permits('bee', 'http://203.0.113.5/done'))
+        assertTrue(CallbackAllowList.permits(ada, 'https://hooks.example/done'))
     }
 
     void testAllowListedCallbackIsPosted() {
@@ -147,7 +149,7 @@ class JobApiTest extends GroovyTestCase {
         }
         server.start()
         try {
-            CallbackAllowList.add('127.0.0.1')
+            CallbackAllowList.add(ada, '127.0.0.1')
             JobService jobs = service(ada) { Document document ->
                 document.filename = 'Letter.pdf'
                 document.bytes = 'pdf'.getBytes('UTF-8')
@@ -164,19 +166,22 @@ class JobApiTest extends GroovyTestCase {
         }
     }
 
-    void testAdminMaintainsTheAllowList() {
-        assertTrue(CallbackAllowList.add('Hooks.Example'))
-        assertFalse(CallbackAllowList.add('hooks.example'))
-        assertTrue(CallbackAllowList.hosts(CallbackAllowList.location()).contains('hooks.example'))
-        assertTrue(CallbackAllowList.permits('https://HOOKS.example/done'))
+    void testCallbackHostIsPerUser() {
+        assertTrue(CallbackAllowList.add('ada', 'Hooks.Example'))
+        assertFalse(CallbackAllowList.add('ada', 'hooks.example'))
+        assertTrue(CallbackAllowList.add('bee', 'hooks.example'))
+        assertTrue(CallbackAllowList.hosts(CallbackAllowList.location(), 'ada').contains('hooks.example'))
+        assertTrue(CallbackAllowList.permits('ada', 'https://HOOKS.example/done'))
+        assertTrue(CallbackAllowList.permits('bee', 'https://hooks.example/done'))
+        assertFalse(CallbackAllowList.permits('cara', 'https://hooks.example/done'))
         try {
-            CallbackAllowList.add('https://hooks.example/done')
+            CallbackAllowList.add('ada', 'https://hooks.example/done')
             fail('url is not a host')
         } catch (OdiseeException e) {
             assertEquals(OdiseeException.BAD_REQUEST, e.httpStatus)
         }
-        assertFalse(CallbackAllowList.permits('file:///tmp/x'))
-        assertFalse(CallbackAllowList.permits('not a url'))
+        assertFalse(CallbackAllowList.permits('ada', 'file:///tmp/x'))
+        assertFalse(CallbackAllowList.permits('ada', 'not a url'))
     }
 
     void testSynchronousGenerateDoesNotWriteAJobList() {

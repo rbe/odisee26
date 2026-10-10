@@ -115,8 +115,8 @@ class JobService {
         if (!callback) {
             return
         }
-        if (!CallbackAllowList.permits(callback)) {
-            log.info("Job ${id} callback host is not on the allow-list")
+        if (!CallbackAllowList.permits(user, callback)) {
+            log.info("Job ${id} callback host is not on the allow-list for '${user}'")
             return
         }
         try {

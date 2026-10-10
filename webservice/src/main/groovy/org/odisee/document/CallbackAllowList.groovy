@@ -10,6 +10,7 @@ package org.odisee.document
 
 import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
+import org.odisee.io.SafePaths
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -17,8 +18,9 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
 /**
- * One server allow-list of callback hosts. An admin maintains
- * {@code $ODISEE_HOME/etc/callback-hosts}. A URL is posted only when its host is on that list.
+ * Per-user callback hosts in {@code $ODISEE_HOME/etc/callback-hosts}.
+ * One line is {@code username host}. A URL is posted only when its host is listed for that user.
+ * A host listed for one user does not allow another user's callback.
  */
 final class CallbackAllowList {
 
@@ -31,9 +33,15 @@ final class CallbackAllowList {
         OdiseePath.ODISEE_HOME.resolve('etc').resolve('callback-hosts')
     }
 
-    static Set<String> hosts(Path file) {
+    static Set<String> hosts(Path file, String user) {
         Set<String> names = new LinkedHashSet<>()
-        if (file == null || !Files.exists(file)) {
+        if (file == null || !Files.exists(file) || user == null) {
+            return names
+        }
+        String name
+        try {
+            name = SafePaths.requireSimpleName(user, 'user')
+        } catch (OdiseeException ignored) {
             return names
         }
         Files.readAllLines(file, StandardCharsets.UTF_8).each { String line ->
@@ -41,32 +49,38 @@ final class CallbackAllowList {
             if (!trimmed || trimmed.startsWith('#')) {
                 return
             }
-            names.add(trimmed.toLowerCase())
+            String[] parts = trimmed.split(/\s+/)
+            if (parts.length == 2 && parts[0] == name) {
+                names.add(parts[1].toLowerCase())
+            }
         }
         names
     }
 
     /**
-     * @return true when the host was not already on the list
+     * @return true when this user did not already list the host
      */
-    static boolean add(String host) {
+    static boolean add(String user, String host) {
+        String name = SafePaths.requireSimpleName(user, 'user')
         String safe = requireHost(host)
         synchronized (LOCK) {
             Path file = location()
             Files.createDirectories(file.parent)
-            Set<String> current = hosts(file)
-            if (current.contains(safe.toLowerCase())) {
+            if (hosts(file, name).contains(safe.toLowerCase())) {
                 return false
             }
-            String prefix = Files.exists(file) && Files.size(file) > 0 ? System.lineSeparator() : ''
-            Files.writeString(file, prefix + safe + System.lineSeparator(), StandardCharsets.UTF_8,
+            boolean empty = !Files.exists(file) || Files.size(file) == 0
+            String prefix = empty
+                    ? "# Odisee callback hosts. One line: username host${System.lineSeparator()}# A host listed for one user does not allow another user's callback.${System.lineSeparator()}"
+                    : ''
+            Files.writeString(file, prefix + name + ' ' + safe + System.lineSeparator(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND)
             return true
         }
     }
 
-    static boolean permits(String url) {
-        permits(url, hosts(location()))
+    static boolean permits(String user, String url) {
+        permits(url, hosts(location(), user))
     }
 
     static boolean permits(String url, Set<String> allowed) {

@@ -232,7 +232,7 @@ Accounts, callback hosts, and buckets
                                         var/user/<name>/template, work, and output.
                                         A bad name fails. An existing user fails.
                                         There is no default password.
-  callback-host <host>                  Append one host to etc/callback-hosts.
+  callback-host <user> <host>           Append one host for that user to etc/callback-hosts.
   bucket <user> <endpoint> <region> <bucket> <accessKey> <secret>
                                         Write that user's line in etc/buckets.
                                         The secret is the rest of the line.
@@ -418,42 +418,50 @@ odictl_require_host() {
 
 odictl_host_listed() {
     local file="$1"
-    local host="$2"
-    local line trimmed lower want
+    local user="$2"
+    local host="$3"
+    local line trimmed first rest lower want
     [[ -f "$file" ]] || return 1
     want=$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')
     while IFS= read -r line || [[ -n "$line" ]]
     do
         trimmed=$(odictl_trim "$line")
         [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
-        lower=$(printf '%s' "$trimmed" | tr '[:upper:]' '[:lower:]')
+        first="${trimmed%%[[:space:]]*}"
+        rest=$(odictl_trim "${trimmed#"$first"}")
+        [[ "$first" == "$user" ]] || continue
+        lower=$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')
         [[ "$lower" == "$want" ]] && return 0
     done < "$file"
     return 1
 }
 
 odictl_cmd_callback_host() {
-    if [[ $# -ne 1 ]]
+    if [[ $# -ne 2 ]]
     then
-        odictl_fail "usage: odictl callback-host <host>"
+        odictl_fail "usage: odictl callback-host <user> <host>"
     fi
-    local host file
-    host=$(odictl_require_host "$1") || exit 1
+    local user host file
+    user=$(odictl_require_user_name "$1") || exit 1
+    host=$(odictl_require_host "$2") || exit 1
     odictl_lock
     file="${ODISEE_HOME}/etc/callback-hosts"
-    if odictl_host_listed "$file" "$host"
+    if odictl_host_listed "$file" "$user" "$host"
     then
-        echo "Odisee: Callback host '${host}' listed."
+        echo "Odisee: Callback host '${host}' listed for '${user}'."
         exit 0
     fi
     mkdir -p "${ODISEE_HOME}/etc" || odictl_fail "could not create ${ODISEE_HOME}/etc"
     if [[ -s "$file" ]]
     then
-        printf '\n%s\n' "$host" >> "$file" || odictl_fail "could not write ${file}"
+        printf '%s %s\n' "$user" "$host" >> "$file" || odictl_fail "could not write ${file}"
     else
-        printf '%s\n' "$host" >> "$file" || odictl_fail "could not write ${file}"
+        printf '%s\n' \
+            '# Odisee callback hosts. One line: username host' \
+            "# A host listed for one user does not allow another user's callback." \
+            "${user} ${host}" >> "$file" || odictl_fail "could not write ${file}"
     fi
-    echo "Odisee: Callback host '${host}' listed."
+    echo "Odisee: Callback host '${host}' listed for '${user}'."
     exit 0
 }
 
