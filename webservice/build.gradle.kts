@@ -73,6 +73,8 @@ tasks.named<Test>("test") {
     systemProperty("ODISEE_HOME", odiseeTestHome.get().asFile.absolutePath)
     // Talks to LibreOffice. Run it with libreOfficeTest.
     exclude("**/GenerationBasisTest.class")
+    // Talks to MinIO. Run it with minioTest.
+    exclude("**/MinioStoreTest.class")
     doFirst {
         odiseeTestHome.get().asFile.mkdirs()
     }
@@ -117,6 +119,61 @@ tasks.register<Exec>("startLibreOffice") {
         exit 1
         """.trimIndent(),
     )
+}
+
+val minioImage = "alpine/minio:RELEASE.2025-10-15T17-29-55Z"
+
+tasks.register<Exec>("startMinio") {
+    group = "Odisee"
+    description = "Run MinIO in Docker on 127.0.0.1:9000 for minioTest"
+    val dockerBin = "'" + dockerExecutable.replace("'", "'\\''") + "'"
+    val image = minioImage
+    commandLine(
+        "bash",
+        "-lc",
+        """
+        set -eu
+        $dockerBin rm -f odisee-minio-test >/dev/null 2>&1 || true
+        $dockerBin run -d --name odisee-minio-test \
+            -p 127.0.0.1:9000:9000 \
+            -e MINIO_ROOT_USER=odisee \
+            -e MINIO_ROOT_PASSWORD=odisee-secret \
+            $image \
+            server /tmp/minio --console-address :9001
+        for i in ${'$'}(seq 1 60); do
+            if command -v curl >/dev/null 2>&1; then
+                curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null && exit 0
+            elif command -v python3 >/dev/null 2>&1; then
+                python3 -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:9000/minio/health/live", timeout=2)' && exit 0
+            elif bash -c 'echo >/dev/tcp/127.0.0.1/9000' 2>/dev/null; then
+                exit 0
+            fi
+            sleep 1
+        done
+        echo 'MinIO did not open http://127.0.0.1:9000/minio/health/live' >&2
+        $dockerBin logs odisee-minio-test >&2 || true
+        exit 1
+        """.trimIndent(),
+    )
+}
+
+tasks.register<Test>("minioTest") {
+    group = "Odisee"
+    description = "Store one object in MinIO and read it back. Not part of the default test task."
+    dependsOn("startMinio", "testClasses")
+    val testSourceSet = sourceSets.getByName("test")
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    include("**/MinioStoreTest.class")
+    systemProperty("ODISEE_HOME", odiseeTestHome.get().asFile.absolutePath)
+    systemProperty("odisee.minio.endpoint", "http://127.0.0.1:9000")
+    systemProperty("odisee.minio.region", "us-east-1")
+    systemProperty("odisee.minio.bucket", "odisee")
+    systemProperty("odisee.minio.accessKey", "odisee")
+    systemProperty("odisee.minio.secret", "odisee-secret")
+    doFirst {
+        odiseeTestHome.get().asFile.mkdirs()
+    }
 }
 
 tasks.register<Test>("libreOfficeTest") {

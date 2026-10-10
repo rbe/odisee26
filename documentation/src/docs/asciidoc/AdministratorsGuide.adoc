@@ -223,6 +223,48 @@ Instance: odi1
   Autostart.............. true
 ----
 
+[[object-storage]]
+=== Object storage
+
+`store` and `both` write the generated file to the caller's bucket.
+The default delivery is still `stream`.
+The bucket is one line in `$ODISEE_HOME/etc/buckets`:
+
+[source]
+----
+username endpoint region bucket accessKey secret
+----
+
+The service image ships with `docker-compose.yml`.
+The `minio` service runs next to `odisee` on the `odisee-backend` network.
+Its image is `alpine/minio:RELEASE.2025-10-15T17-29-55Z`, the current MinIO community release.
+Upstream `minio/minio` is not published for an anonymous pull, so the compose file pins this image instead.
+The API is port 9000.
+The console is port 9001.
+`MINIO_ROOT_USER` is `odisee` and `MINIO_ROOT_PASSWORD` is `odisee-secret`.
+The command is `minio server /data`.
+Objects stay on the `miniodata` volume.
+The service does not expire objects, delete them, or set a lifecycle.
+The image runs as user `minio`, which cannot write a fresh Docker volume, so the service starts as root.
+
+From the Odisee container the endpoint is `http://minio:9000`.
+A line for the `odisee` user is:
+
+[source]
+----
+odisee http://minio:9000 us-east-1 odisee odisee odisee-secret
+----
+
+Create the bucket `odisee` once, in the console or with `CreateBucket`.
+Do not add an expiration or a lifecycle rule.
+Odisee does not create that bucket and does not delete the object.
+The `odisee` volume is mounted read-only, so put this line in the volume before the service starts.
+A host outside this compose network uses that host's endpoint in the same line.
+A bare-metal install edits the endpoint and keeps the rest of the line.
+
+`./gradlew :webservice:minioTest` starts a throwaway MinIO container, stores one object, and reads it back.
+`./gradlew :webservice:test` does not start MinIO.
+
 === Web Server
 
 ==== Apache httpd
