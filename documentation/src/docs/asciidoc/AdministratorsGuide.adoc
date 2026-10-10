@@ -145,8 +145,14 @@ file contains the following information, each separated by a pipe `|`:
 
 [source]
 ----
-instance name|ip address|port|path to LibreOffice installation||options when starting LibreOffice executable|autostart?
+instance name|ip address|port|path to LibreOffice installation||options when starting LibreOffice executable|autostart|group
 ----
+
+The group field is optional.
+A blank group is `group0`.
+The request element `<group name="..."/>` selects that group.
+A changed `etc/odiinst` reloads the pool in this JVM.
+A restart is not required.
 
 Through this file distributed installations can be supported (Odisee and
 LibreOffice instances on different servers), but it should be optional
@@ -156,8 +162,8 @@ To configure two LibreOffice instances use this:
 
 [source]
 ----
-odi1|127.0.0.1|2001|/usr/local/lib/libreoffice||nologo nodefault nolockcheck nocrashreport|true
-odi2|127.0.0.1|2002|/usr/local/lib/libreoffice||nologo nodefault nolockcheck nocrashreport|true
+odi1|127.0.0.1|2001|/usr/local/lib/libreoffice||nologo nodefault nolockcheck nocrashreport|true|group0
+odi2|127.0.0.1|2002|/usr/local/lib/libreoffice||nologo nodefault nolockcheck nocrashreport|true|group0
 ----
 
 If you need more instances, just duplicate the last line and set a new
@@ -174,9 +180,15 @@ Start
 ~~~~~
 
 There are two components that need to be started: LibreOffice
-instance(s) and Odisee — a Java Web Container,
-http://tomcat.apache.org[Apache Tomcat] by default. To start Odisee
-along with LibreOffice instances just use `odictl -q start`:
+instance(s) and Odisee.
+`odictl -q start` starts both.
+Odisee runs as `java -jar`.
+Embedded Tomcat serves HTTP.
+Accounts are `$ODISEE_HOME/etc/users`.
+`java -jar` reads that file.
+It does not read `odisee-users.xml`.
+`GET /ready` is anonymous.
+See <<multitenancy>>.
 
 [source,bash,linenums]
 ----
@@ -256,3 +268,5 @@ ln -s ../conf.avail/XX-foo.conf
 
 Check also https://wiki.archlinux.org/index.php/Font_Configuration
 and https://wiki.archlinux.org/index.php/Fonts.
+
+include::Multitenancy.adoc[]

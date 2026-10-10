@@ -45,6 +45,7 @@
           "type": "array",
           "items": { "$ref": "#/definitions/instruction" }
         },
+        "output": { "$ref": "#/definitions/output" },
         "postProcess": { "$ref": "#/definitions/postProcess" }
       }
     },
@@ -76,11 +77,12 @@
       "properties": {
         "instruction": {
           "type": "string",
-          "enum": ["userfield", "texttable", "table", "image", "autotext", "bookmark", "macro"]
+          "enum": ["userfield", "texttable", "table", "image", "autotext", "bookmark", "macro", "cell", "shape"]
         },
         "name": { "type": "string" },
         "value": { "type": ["string", "number", "boolean"] },
         "postMacro": { "type": "string" },
+        "sheet": { "type": "string", "description": "Calc sheet name when instruction is cell." },
         "coordinate": { "type": "string" },
         "cellAlign": { "type": "string" },
         "cellWidth": { "type": "string" },
@@ -138,6 +140,33 @@
       "properties": {
         "element": { "type": "string", "enum": ["result-placeholder", "input"] },
         "filename": { "type": "string" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format"],
+      "properties": {
+        "format": { "$ref": "#/definitions/format" }
+      }
+    },
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "description": "File extension. This is the format when it is present." },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "value"],
+            "properties": {
+              "name": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        }
       }
     },
     "response": {

@@ -4,14 +4,14 @@ Work is ordered so each wave leaves the server able to generate a document. Late
 
 ## Wave 1 — Correctness of one request
 
-Status: **landed in this change**.
+Status: **landed**.
 
 Scope:
 
 - A new map and a new document list per call (`RequestContext`). Documents produced inside one XML body accumulate. The next HTTP call does not see them.
 - Template lookup honors a numeric revision and `LATEST` (`TemplateLocator`). `Name.ott` remains revision 1 when no `_revN` file exists.
 - `etc/odiinst` host and port are the addresses the pool dials (`OdiinstParser`).
-- v2 `template/@outputFormat` and v3 `output/format/@type` both select the file extension (`OutputFormats`).
+- This wave read v2 `template/@outputFormat` and v3 `output/format/@type`. Wave 2 rejected the v3 namespace. Wave 6 reads v2 `output/format` (`OutputFormats`). `template/@outputFormat` applies when `output` is absent. A v3 namespace is HTTP 400.
 - A failed instruction fails the request (HTTP 422) after the office document is closed.
 - One dead office connection is returned to the pool and the next connection is tried. Startup fails when zero connections bootstrap.
 - Template names and merge inputs must stay inside their root (`SafePaths`).
@@ -33,9 +33,9 @@ Build:
 
 ## Wave 2 — One request contract
 
-Status: **landed in this change**.
+Status: **landed**.
 
-The schema is v2 (`template/@outputFormat`, `webservice/src/main/resources/xml/v2/request.xsd`). v3 and v2.6 are HTTP 400. A document with no namespace is the same v2 shape. `output/format` is rejected. Instructions may appear in any order. The legacy `ooo` element is accepted and ignored.
+The schema is v2 (`webservice/src/main/resources/xml/v2/request.xsd`). v3 and v2.6 are HTTP 400. A document with no namespace is the same v2 shape. Wave 2 rejected `output/format`. Wave 6 added `output/format` to this same v2 schema. `template/@outputFormat` applies when `output` is absent. When `output/format/@type` is present, that type is the format. Instructions may appear in any order. The legacy `ooo` element is accepted and ignored.
 
 - `RequestSchema` validates the body before generation. The parser rejects a `DOCTYPE` and does not read external entities (B8, B9).
 - `Compression.readLimited` caps the raw body at 8 MiB and the expanded body at 32 MiB (B19).
@@ -44,7 +44,7 @@ The schema is v2 (`template/@outputFormat`, `webservice/src/main/resources/xml/v
 
 ## Wave 3 — Pool stays up
 
-Status: **landed in this change**.
+Status: **landed**.
 
 - Deadline on UNO `open`, instruction, and `save` (`UnoCall`, default 120s, `odisee.uno.deadline.ms`). On deadline, close the document (2s, `odisee.uno.close.deadline.ms`), drop the slot, and stop the local `soffice` so `odiwatchdog` sees the port close and restarts it (B14). A dropped slot rejoins after `connect()` succeeds again. `/ready` pings an idle slot the same way and drops it when the ping does not return (`odisee.uno.recover.deadline.ms`, default 500ms).
 - `GET /ready` is HTTP 200 only when at least one office port accepts a UNO connection, otherwise 503. The JSON body is the pool gauges: pool size, in-use count, last generation time, instruction failures, and `soffice` restarts (F2).
@@ -53,7 +53,7 @@ Status: **landed in this change**.
 
 ## Wave 4 — Tenancy
 
-Status: **landed in this change**.
+Status: **landed**.
 
 - `POST /document/generate` requires a logged-in user. No login is HTTP 401. The hardcoded `odisee` principal is gone (B21, B22).
 - Spring Security reads bcrypt hashes from `$ODISEE_HOME/etc/users`. Embedded Tomcat stays. `java -jar` does not read `odisee-users.xml`.
@@ -84,7 +84,7 @@ Tests 1–3 use a Writer template with the user field `Hallo` and read the text 
 
 That builds `webservice/src/test/docker/libreoffice`, starts the container, and runs tests 1–3. `./gradlew :webservice:test` runs tests 4 and 5 with the other unit tests and does not start Docker.
 
-Status: **landed in this change**.
+Status: **landed**.
 
 The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`.
 
@@ -97,11 +97,11 @@ The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:jav
 
 The proof found two failures and fixed them. A logged-in call had a null `request.userPrincipal`, so generate returned 401 (B31). Saving the active DOM request cast it to `GPathResult` and failed before LibreOffice (B32).
 
-Calc and Impress stay out of this wave. The remote tests in `OdiseeClientTest` stay `@Ignore`. They still point at `service3.odisee.de`.
+Calc and Impress stay out of this wave. Wave 6 adds their instruction sets (F6). The remote tests in `OdiseeClientTest` stay `@Ignore`. They still point at `service3.odisee.de`.
 
 ## Wave 6 — Features
 
-Status: **F4, F3, and F10 landed earlier in wave 6**. **F1, F5, F6, and F8 land in this change**. F7 stays later. Object storage is not in this change.
+Status: **landed** for F1, F3, F4, F5, F6, F8, and F10. F4, F3, and F10 landed in pull request 8. F1, F5, F6, and F8 landed in pull request 9 (`d8db005`). F7 object storage is not implemented and stays later.
 
 F4. `TemplateLocator` reads `var/user/{name}/template/{templateName}/rev/{n}.ott`. `LATEST` is the highest number there or in the flat `Name.ott` / `Name_revN.ott` files. A missing revision is HTTP 404. One user cannot read another user's revisions.
 
@@ -117,7 +117,7 @@ F5. v2 `output/format/@type` is the extension. `format/options/option` carries P
 
 F6. One instruction set per application. Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`. Calc starts with `cell` (sheet and coordinate). Impress starts with `shape` (name). A set can grow on its own. There is no shared `named` tag. A Calc save with no instructions is not this feature.
 
-F7 is not in this change.
+F7 is not implemented. Object storage stays later.
 
 ## Refactorings
 
@@ -184,9 +184,7 @@ template.'@outputFormat'?.toString()?.split(',')?.each { format ->
 }
 ```
 
-After, `OutputFormats.fromRequest` returns the attribute when it is non-blank, otherwise each v3 `output/format/@type`.
-
-Wave 2 stopped reading v3 `output/format`. `OutputFormats.fromRequest` reads only `template/@outputFormat`.
+After, `OutputFormats.fromRequest` uses v2 `output/format/@type` when it is present. Otherwise it uses `template/@outputFormat`. A v3 namespace is HTTP 400. The `.pdfa` suffix remains the PDF/A fallback when the request did not set a PDF version.
 
 ### Dispatch
 
@@ -197,7 +195,7 @@ methodName = tagName[0].toUpperCase() + tagName[1..-1]
 OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
 ```
 
-After, instruction names must be in `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, `Macro`. Post-process types must be `merge-with` or `merge-results`. Anything else is an error, and an instruction error still closes the `XComponent`.
+After, each application has its own instruction set. Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`. Calc uses `Cell`. Impress uses `Shape`. Post-process types must be `merge-with` or `merge-results`. A tag from another application's set is an error, and an instruction error still closes the `XComponent`.
 
 ### Paths
 
