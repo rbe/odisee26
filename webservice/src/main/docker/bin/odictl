@@ -227,12 +227,369 @@ Maintenance
        restart                          Restart instance(s).
        updateoxt                        Update extensions under extensions/ and (re-)install them.
 
+Accounts, callback hosts, and buckets
+  user <name> <password>                Add one user. Writes etc/users and creates
+                                        var/user/<name>/template, work, and output.
+                                        A bad name fails. An existing user fails.
+                                        There is no default password.
+  callback-host <user> <host>           Append one host for that user to etc/callback-hosts.
+  bucket <user> <endpoint> <region> <bucket> <accessKey> <secret>
+                                        Write that user's line in etc/buckets.
+                                        The secret is the rest of the line.
+
 Common options
   -h                                    Show help.
   -H                                    Show examples.
   -z                                    Force an operation.
 
 EOF
+}
+
+# ---------------------------------------------------------------------------
+#
+# Accounts, callback hosts, and buckets.
+# The person who can run odictl is the admin. There is no HTTP role check.
+#
+# ---------------------------------------------------------------------------
+
+odictl_fail() {
+    echo "Odisee: $*" >&2
+    exit 1
+}
+
+odictl_trim() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+odictl_lock() {
+    mkdir -p "${ODISEE_HOME}/etc" || odictl_fail "could not create ${ODISEE_HOME}/etc"
+    exec 9>>"${ODISEE_HOME}/etc/.odictl.lock" || odictl_fail "could not lock ${ODISEE_HOME}/etc"
+    flock 9 || odictl_fail "could not lock ${ODISEE_HOME}/etc"
+}
+
+odictl_write_private() {
+    local dest="$1"
+    shift
+    local dir tmp
+    dir=$(dirname "$dest")
+    mkdir -p "$dir" || odictl_fail "could not create ${dir}"
+    tmp=$(mktemp "${dir}/.odictl.XXXXXX") || odictl_fail "could not write ${dest}"
+    chmod 600 "$tmp" || true
+    if [[ $# -gt 0 ]]
+    then
+        printf '%s\n' "$@" > "$tmp" || odictl_fail "could not write ${dest}"
+    else
+        : > "$tmp"
+    fi
+    mv -f "$tmp" "$dest" || odictl_fail "could not write ${dest}"
+    chmod 600 "$dest" || true
+}
+
+odictl_require_user_name() {
+    local name="$1"
+    local backslash='\'
+    if [[ -z "$name" || "$name" == *'/'* || "$name" == *"$backslash"* || "$name" == *'..'* || "$name" == *'*'* || "$name" == *'?'* || "$name" == *'['* ]]
+    then
+        odictl_fail "Invalid user '${name}'"
+    fi
+    local trimmed
+    trimmed=$(odictl_trim "$name")
+    if [[ -z "$trimmed" ]]
+    then
+        odictl_fail "Invalid user '${name}'"
+    fi
+    printf '%s' "$trimmed"
+}
+
+odictl_user_exists() {
+    local file="$1"
+    local name="$2"
+    local line trimmed first
+    [[ -f "$file" ]] || return 1
+    while IFS= read -r line || [[ -n "$line" ]]
+    do
+        trimmed=$(odictl_trim "$line")
+        [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
+        first="${trimmed%%[[:space:]]*}"
+        [[ "$first" == "$name" ]] && return 0
+    done < "$file"
+    return 1
+}
+
+odictl_bcrypt_jar() {
+    if [[ -n "${ODICTL_BCRYPT_JAR:-}" && -f "${ODICTL_BCRYPT_JAR}" ]]
+    then
+        printf '%s' "${ODICTL_BCRYPT_JAR}"
+        return 0
+    fi
+    if [[ -f "${SCRIPT_DIR}/odihash.jar" ]]
+    then
+        printf '%s' "${SCRIPT_DIR}/odihash.jar"
+        return 0
+    fi
+    if [[ -n "${ODISEE_HOME:-}" && -f "${ODISEE_HOME}/bin/odihash.jar" ]]
+    then
+        printf '%s' "${ODISEE_HOME}/bin/odihash.jar"
+        return 0
+    fi
+    local built="${SCRIPT_DIR}/../../../../build/odihash/odihash.jar"
+    if [[ -f "$built" ]]
+    then
+        printf '%s' "$built"
+        return 0
+    fi
+    return 1
+}
+
+odictl_hash_password() {
+    local jar hash
+    jar=$(odictl_bcrypt_jar) || odictl_fail "bcrypt helper not found"
+    hash=$(java -jar "$jar" "$1") || odictl_fail "bcrypt helper failed"
+    if [[ ! "$hash" =~ ^\$2[aby]\$ ]]
+    then
+        odictl_fail "bcrypt helper failed"
+    fi
+    printf '%s' "$hash"
+}
+
+odictl_user_write() {
+    local file="$1"
+    local name="$2"
+    local hash="$3"
+    local -a out=()
+    local raw
+    if [[ -f "$file" ]]
+    then
+        while IFS= read -r raw || [[ -n "$raw" ]]
+        do
+            out+=("$raw")
+        done < "$file"
+    else
+        out+=('# Odisee users. One line: username bcrypt-hash [admin]')
+        out+=('# The server reads this file. It does not read odisee-users.xml.')
+    fi
+    out+=("${name} ${hash}")
+    odictl_write_private "$file" "${out[@]}"
+}
+
+odictl_cmd_user() {
+    if [[ $# -ne 2 ]]
+    then
+        odictl_fail "usage: odictl user <name> <password>"
+    fi
+    local name password trimmed hash file
+    name=$(odictl_require_user_name "$1") || exit 1
+    password="$2"
+    trimmed=$(odictl_trim "$password")
+    if [[ -z "$trimmed" ]]
+    then
+        odictl_fail "Password is required"
+    fi
+    odictl_lock
+    file="${ODISEE_HOME}/etc/users"
+    if odictl_user_exists "$file" "$name"
+    then
+        odictl_fail "User '${name}' already exists"
+    fi
+    hash=$(odictl_hash_password "$password") || exit 1
+    odictl_user_write "$file" "$name" "$hash"
+    mkdir -p \
+        "${ODISEE_HOME}/var/user/${name}/template" \
+        "${ODISEE_HOME}/var/user/${name}/work" \
+        "${ODISEE_HOME}/var/user/${name}/output" \
+        || odictl_fail "could not create directories for '${name}'"
+    echo "Odisee: User '${name}' created."
+    exit 0
+}
+
+odictl_require_host() {
+    local host trimmed
+    host="$1"
+    trimmed=$(odictl_trim "$host")
+    if [[ ! "$trimmed" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]
+    then
+        odictl_fail "Invalid callback host '${host}'"
+    fi
+    printf '%s' "$trimmed"
+}
+
+odictl_host_listed() {
+    local file="$1"
+    local user="$2"
+    local host="$3"
+    local line trimmed first rest lower want
+    [[ -f "$file" ]] || return 1
+    want=$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')
+    while IFS= read -r line || [[ -n "$line" ]]
+    do
+        trimmed=$(odictl_trim "$line")
+        [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
+        first="${trimmed%%[[:space:]]*}"
+        rest=$(odictl_trim "${trimmed#"$first"}")
+        [[ "$first" == "$user" ]] || continue
+        lower=$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')
+        [[ "$lower" == "$want" ]] && return 0
+    done < "$file"
+    return 1
+}
+
+odictl_cmd_callback_host() {
+    if [[ $# -ne 2 ]]
+    then
+        odictl_fail "usage: odictl callback-host <user> <host>"
+    fi
+    local user host file
+    user=$(odictl_require_user_name "$1") || exit 1
+    host=$(odictl_require_host "$2") || exit 1
+    odictl_lock
+    file="${ODISEE_HOME}/etc/callback-hosts"
+    if odictl_host_listed "$file" "$user" "$host"
+    then
+        echo "Odisee: Callback host '${host}' listed for '${user}'."
+        exit 0
+    fi
+    mkdir -p "${ODISEE_HOME}/etc" || odictl_fail "could not create ${ODISEE_HOME}/etc"
+    if [[ -s "$file" ]]
+    then
+        printf '%s %s\n' "$user" "$host" >> "$file" || odictl_fail "could not write ${file}"
+    else
+        printf '%s\n' \
+            '# Odisee callback hosts. One line: username host' \
+            "# A host listed for one user does not allow another user's callback." \
+            "${user} ${host}" >> "$file" || odictl_fail "could not write ${file}"
+    fi
+    echo "Odisee: Callback host '${host}' listed for '${user}'."
+    exit 0
+}
+
+odictl_require_token() {
+    local value="$1"
+    local label="$2"
+    local pattern="$3"
+    local token
+    token=$(odictl_trim "$value")
+    if [[ ! "$token" =~ $pattern ]]
+    then
+        odictl_fail "Invalid ${label} '${value}'"
+    fi
+    printf '%s' "$token"
+}
+
+odictl_require_endpoint() {
+    local value rest hostpart lower
+    value=$(odictl_trim "$1")
+    lower="${value,,}"
+    if [[ ! "$lower" =~ ^https?:// ]]
+    then
+        odictl_fail "Invalid endpoint '${1}'"
+    fi
+    rest="${value#*://}"
+    if [[ -z "$rest" || "$rest" == /* || "$rest" == *@* || "$rest" == *\?* || "$rest" == *#* ]]
+    then
+        odictl_fail "Invalid endpoint '${1}'"
+    fi
+    hostpart="${rest%%/*}"
+    if [[ -z "$hostpart" ]]
+    then
+        odictl_fail "Invalid endpoint '${1}'"
+    fi
+    printf '%s' "$value"
+}
+
+odictl_require_bucket_name() {
+    local token
+    token=$(odictl_require_token "$1" bucket '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$') || exit 1
+    if [[ "$token" == *..* ]]
+    then
+        odictl_fail "Invalid bucket '${1}'"
+    fi
+    printf '%s' "$token"
+}
+
+odictl_bucket_write() {
+    local file="$1"
+    local user="$2"
+    local line="$3"
+    local -a out=()
+    local raw trimmed first replaced=0
+    if [[ -f "$file" ]]
+    then
+        while IFS= read -r raw || [[ -n "$raw" ]]
+        do
+            trimmed=$(odictl_trim "$raw")
+            if [[ -z "$trimmed" || "$trimmed" == \#* ]]
+            then
+                out+=("$raw")
+                continue
+            fi
+            first="${trimmed%%[[:space:]]*}"
+            if [[ "$first" == "$user" ]]
+            then
+                if [[ $replaced -eq 0 ]]
+                then
+                    out+=("$line")
+                    replaced=1
+                fi
+                continue
+            fi
+            out+=("$raw")
+        done < "$file"
+    else
+        out+=('# Odisee object storage. One line: username endpoint region bucket accessKey secret')
+        out+=('# The server reads this file on each store. A restart is not required.')
+    fi
+    if [[ $replaced -eq 0 ]]
+    then
+        out+=("$line")
+    fi
+    odictl_write_private "$file" "${out[@]}"
+}
+
+odictl_cmd_bucket() {
+    if [[ $# -lt 6 ]]
+    then
+        odictl_fail "Bucket configuration requires user, endpoint, region, bucket, accessKey, and secret"
+    fi
+    local user endpoint region bucket access secret line file
+    user=$(odictl_require_user_name "$1") || exit 1
+    endpoint=$(odictl_require_endpoint "$2") || exit 1
+    region=$(odictl_require_token "$3" region '^[a-z0-9-]+$') || exit 1
+    bucket=$(odictl_require_bucket_name "$4") || exit 1
+    access=$(odictl_require_token "$5" accessKey '^[A-Za-z0-9._-]{1,128}$') || exit 1
+    shift 5
+    secret=$(odictl_trim "$*")
+    if [[ -z "$secret" || "$secret" == *$'\n'* || "$secret" == *$'\r'* ]]
+    then
+        odictl_fail "A secret is required"
+    fi
+    line="${user} ${endpoint} ${region} ${bucket} ${access} ${secret}"
+    odictl_lock
+    file="${ODISEE_HOME}/etc/buckets"
+    odictl_bucket_write "$file" "$user" "$line"
+    echo "Odisee: Bucket '${bucket}' configured for '${user}'."
+    exit 0
+}
+
+odictl_manage() {
+    local cmd="$1"
+    shift
+    case "$cmd" in
+        user)
+            odictl_cmd_user "$@"
+            ;;
+        callback-host)
+            odictl_cmd_callback_host "$@"
+            ;;
+        bucket)
+            odictl_cmd_bucket "$@"
+            ;;
+        *)
+            odictl_fail "Unknown command '${cmd}'"
+            ;;
+    esac
 }
 
 # ---------------------------------------------------------------------------
@@ -281,6 +638,16 @@ CMD_NOGO[e]="c d r"
 CMD_NOGO[r]="c d e"
 #
 CMDOK=true
+
+# Accounts, callback hosts, and buckets. Flags such as -q stay below.
+if [[ $# -ge 1 && "$1" != -* ]]
+then
+    case "$1" in
+        user|callback-host|bucket)
+            odictl_manage "$@"
+            ;;
+    esac
+fi
 
 # Parse parameters
 while getopts ":cdehHmLrszf:i:l:o:p:q:t:u:x:y:" opt

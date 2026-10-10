@@ -35,7 +35,6 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         Files.deleteIfExists(PasswordFile.location())
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder()
         PasswordFile.create(PasswordFile.location(), 'ada', 'ada-secret', false, encoder)
-        PasswordFile.create(PasswordFile.location(), 'root', 'root-secret', true, encoder)
         context = new AnnotationConfigWebApplicationContext()
         context.setServletContext(new MockServletContext())
         context.register(SecurityProbeConfig)
@@ -69,18 +68,6 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         mvc.perform(post('/document/generate').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
     }
 
-    void testCreateUserWithoutLoginIs401() {
-        mvc.perform(post('/user')).andExpect(status().isUnauthorized())
-    }
-
-    void testCreateUserWithoutAdminIs403() {
-        mvc.perform(post('/user').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isForbidden())
-    }
-
-    void testAdminCanCallCreateUser() {
-        mvc.perform(post('/user').with(httpBasic('root', 'root-secret'))).andExpect(status().isCreated())
-    }
-
     void testJobWithoutLoginIs401() {
         mvc.perform(post('/document/jobs')).andExpect(status().isUnauthorized())
         mvc.perform(get('/document/jobs/abc')).andExpect(status().isUnauthorized())
@@ -89,18 +76,6 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
     void testJobWithLoginIsAllowed() {
         mvc.perform(post('/document/jobs').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isAccepted())
         mvc.perform(get('/document/jobs/abc').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
-    }
-
-    void testCallbackHostRequiresAdmin() {
-        mvc.perform(post('/callback-host')).andExpect(status().isUnauthorized())
-        mvc.perform(post('/callback-host').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isForbidden())
-        mvc.perform(post('/callback-host').with(httpBasic('root', 'root-secret'))).andExpect(status().isCreated())
-    }
-
-    void testNonAdminCannotSetABucket() {
-        mvc.perform(post('/bucket')).andExpect(status().isUnauthorized())
-        mvc.perform(post('/bucket').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isForbidden())
-        mvc.perform(post('/bucket').with(httpBasic('root', 'root-secret'))).andExpect(status().isCreated())
     }
 
     @Configuration
@@ -130,12 +105,6 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
             'ok'
         }
 
-        @PostMapping('/user')
-        @ResponseStatus(HttpStatus.CREATED)
-        String createUser() {
-            'created'
-        }
-
         @PostMapping('/document/jobs')
         @ResponseStatus(HttpStatus.ACCEPTED)
         String submitJob() {
@@ -145,18 +114,6 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         @GetMapping('/document/jobs/{id}')
         String showJob() {
             'job'
-        }
-
-        @PostMapping('/callback-host')
-        @ResponseStatus(HttpStatus.CREATED)
-        String callbackHost() {
-            'listed'
-        }
-
-        @PostMapping('/bucket')
-        @ResponseStatus(HttpStatus.CREATED)
-        String bucket() {
-            'configured'
         }
     }
 

@@ -25,22 +25,21 @@ If `etc/users` is missing, the server creates the first admin only when both `OD
 Otherwise it creates no users.
 There is no default password.
 
-An admin creates the next user with `POST /odisee/user`.
-Send HTTP Basic as that admin.
-The JSON body is `{"name":"...","password":"..."}`.
-The call appends a line to `etc/users` and creates `template`, `work`, and `output` under `var/user/{name}/`.
+The next user is `odictl user NAME PASSWORD`.
+The command appends a bcrypt line to `etc/users` and creates `template`, `work`, and `output` under `var/user/NAME/`.
 The new user is not an admin.
-No login is HTTP 401.
-A logged-in user without role `admin` is HTTP 403.
-A bad name is HTTP 400.
-An existing user is HTTP 409.
+A bad name fails.
+An existing user fails.
+There is no default password.
+The person who can run `odictl` is the admin.
 
 [[permissions]]
 Permissions
 ~~~~~~~~~~~
 
 `etc/users` is readable and writable by the server user only.
-This server does not create users with `odictl` and does not configure SFTP.
+`odictl user` writes that file.
+This server does not configure SFTP.
 
 [[access-to-http-service]]
 Access to HTTP Service
@@ -58,8 +57,9 @@ Callback hosts
 ^^^^^^^^^^^^^^
 
 `POST /odisee/document/jobs?callback=https://host/path` stores that URL on the job.
-Odisee POSTs only when that host is listed in `$ODISEE_HOME/etc/callback-hosts`.
-An admin adds a host with `POST /odisee/callback-host`.
-Send HTTP Basic as that admin.
-A URL whose host is off the list does not get a POST.
+Odisee POSTs only when that host is listed for that user in `$ODISEE_HOME/etc/callback-hosts`.
+One line is `username host`.
+`odictl callback-host USER HOST` appends a line.
+A host listed for one user does not allow another user's callback.
+A URL whose host is off that user's list does not get a POST.
 `POST /odisee/document/generate` does not read a callback.
