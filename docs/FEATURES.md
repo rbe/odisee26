@@ -102,4 +102,4 @@ Done in wave 2. The server and the Java client use v2. Wave 6 adds `output/forma
 
 One fixture `.ott`, one XML request, one assertion on the PDF text (PDFBox is already a dependency). Run it in CI against the Docker image. Wave 1 tests the helpers without starting office; they do not prove a document was filled in.
 
-Wave 5 proves that request through the Java client against a local server (`:clients:client-java:javaClientOfficeTest`). CI still does not run that task.
+Wave 5 proves that request through the Java client against a local server (`:clients:client-java:javaClientOfficeTest`). The GitHub Actions job `java-client-office` has Docker and runs that task. `./gradlew build` stays free of Docker.
