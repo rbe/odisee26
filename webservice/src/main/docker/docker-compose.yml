@@ -33,6 +33,22 @@ services:
       - odisee-backend
       - odisee-outside
 
+  # Keycloak 26.8.0. The realm file is imported on start.
+  # One confidential client uses the client-credentials grant.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ["start-dev", "--import-realm", "--hostname=http://keycloak:8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak/odisee-realm.json:/opt/keycloak/data/import/odisee-realm.json:ro
+    ports:
+      - "8180:8080"
+    networks:
+      - odisee-backend
+      - odisee-outside
+
 volumes:
   odisee:
     driver: local

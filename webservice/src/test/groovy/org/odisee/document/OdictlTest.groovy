@@ -3,6 +3,7 @@ package org.odisee.document
 import groovy.test.GroovyTestCase
 import org.odisee.io.OdiseePath
 import org.odisee.io.TenantPaths
+import org.odisee.security.MachineFile
 import org.odisee.security.PasswordFile
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 
@@ -23,8 +24,10 @@ class OdictlTest extends GroovyTestCase {
         Files.deleteIfExists(PasswordFile.location())
         Files.deleteIfExists(CallbackAllowList.location())
         Files.deleteIfExists(BucketFile.location())
+        Files.deleteIfExists(MachineFile.location())
         deleteUser('ctlada')
         deleteUser('ctlbucket')
+        deleteUser('ctlmachine')
     }
 
     @Override
@@ -32,8 +35,10 @@ class OdictlTest extends GroovyTestCase {
         Files.deleteIfExists(PasswordFile.location())
         Files.deleteIfExists(CallbackAllowList.location())
         Files.deleteIfExists(BucketFile.location())
+        Files.deleteIfExists(MachineFile.location())
         deleteUser('ctlada')
         deleteUser('ctlbucket')
+        deleteUser('ctlmachine')
     }
 
     void testUserWritesBcryptLineAndDirectories() {
@@ -125,6 +130,47 @@ class OdictlTest extends GroovyTestCase {
         assertEquals('other-files', replaced.bucket)
         assertEquals('next secret', replaced.secret)
         assertEquals('http://127.0.0.1:9000', replaced.endpoint)
+    }
+
+    void testMachineWritesTheLineTheServerReads() {
+        succeed('user', 'ctlmachine', 's3cret-value')
+
+        String output = succeed('machine', 'odisee-machine', 'ctlmachine', 'http://keycloak:8080/realms/odisee/', 'odisee')
+
+        assertTrue(output.contains("Machine 'odisee-machine' uses 'ctlmachine'."))
+        MachineFile.Record record = MachineFile.read(MachineFile.location())
+        assertEquals('odisee-machine', record.clientId)
+        assertEquals('ctlmachine', record.username)
+        assertEquals('http://keycloak:8080/realms/odisee', record.issuer)
+        assertEquals('odisee', record.audience)
+        Set<PosixFilePermission> perms = Files.getPosixFilePermissions(MachineFile.location())
+        assertFalse(perms.contains(PosixFilePermission.GROUP_READ))
+        assertFalse(perms.contains(PosixFilePermission.OTHERS_READ))
+
+        succeed('machine', 'other-machine', 'ctlmachine', 'http://127.0.0.1:8180/realms/odisee', 'odisee')
+        MachineFile.Record replaced = MachineFile.read(MachineFile.location())
+        assertEquals('other-machine', replaced.clientId)
+        assertEquals('http://127.0.0.1:8180/realms/odisee', replaced.issuer)
+        List<String> lines = Files.readAllLines(MachineFile.location()).findAll { it.trim() && !it.trim().startsWith('#') }
+        assertEquals(1, lines.size())
+    }
+
+    void testMachineRequiresAnExistingUser() {
+        String output = fail('machine', 'odisee-machine', 'ctlmachine', 'http://keycloak:8080/realms/odisee', 'odisee')
+
+        assertTrue(output.contains("User 'ctlmachine' does not exist"))
+        assertFalse(Files.exists(MachineFile.location()))
+    }
+
+    void testBadMachineIssuerFails() {
+        succeed('user', 'ctlmachine', 's3cret-value')
+
+        String output = fail('machine', 'odisee-machine', 'ctlmachine', 'ftp://keycloak/realms/odisee', 'odisee')
+        String badClient = fail('machine', 'bad client', 'ctlmachine', 'http://keycloak:8080/realms/odisee', 'odisee')
+
+        assertTrue(output.contains('Invalid issuer'))
+        assertTrue(badClient.contains('Invalid client'))
+        assertFalse(Files.exists(MachineFile.location()))
     }
 
     void testBadBucketFails() {

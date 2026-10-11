@@ -17,11 +17,14 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext
 import org.springframework.web.servlet.config.annotation.EnableWebMvc
 
+import org.springframework.security.core.context.SecurityContextHolder
+
 import java.nio.file.Files
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 class OdiseeSecurityConfigurationTest extends GroovyTestCase {
@@ -46,10 +49,12 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
     protected void tearDown() {
         context?.close()
         Files.deleteIfExists(PasswordFile.location())
+        Files.deleteIfExists(MachineFile.location())
     }
 
     void testReadyStaysAnonymous() {
         mvc.perform(get('/ready')).andExpect(status().isOk())
+        mvc.perform(get('/ready').header('Authorization', 'Bearer not-a-token')).andExpect(status().isOk())
     }
 
     void testTemplateWithoutLoginIs401() {
@@ -78,6 +83,41 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
         mvc.perform(get('/document/jobs/abc').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
     }
 
+    void testGenerateAndJobsAcceptTheMachineTokenAsTheConfiguredUser() {
+        FakeMachineToken fake = FakeMachineToken.start()
+        try {
+            fake.writeBinding('odisee-machine', 'ada', 'odisee')
+            String token = fake.sign(
+                    azp: 'odisee-machine',
+                    preferred_username: 'bob',
+                    sub: 'bob',
+                    user: 'carol'
+            )
+            mvc.perform(post('/document/generate').header('Authorization', "Bearer ${token}"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string('ada'))
+            mvc.perform(post('/document/jobs').header('Authorization', "Bearer ${token}"))
+                    .andExpect(status().isAccepted())
+                    .andExpect(content().string('ada'))
+        } finally {
+            fake.stop()
+            Files.deleteIfExists(MachineFile.location())
+        }
+    }
+
+    void testGenerateRejectsAMachineTokenForADifferentAudience() {
+        FakeMachineToken fake = FakeMachineToken.start()
+        try {
+            fake.writeBinding('odisee-machine', 'ada', 'odisee')
+            String token = fake.sign(azp: 'odisee-machine', aud: 'account', preferred_username: 'ada')
+            mvc.perform(post('/document/generate').header('Authorization', "Bearer ${token}"))
+                    .andExpect(status().isUnauthorized())
+        } finally {
+            fake.stop()
+            Files.deleteIfExists(MachineFile.location())
+        }
+    }
+
     @Configuration
     @EnableWebMvc
     @Import(OdiseeSecurityConfiguration)
@@ -100,15 +140,19 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
             'catalog'
         }
 
-        @PostMapping('/document/generate')
+        @PostMapping(path = '/document/generate', produces = 'text/plain')
         String generate() {
-            'ok'
+            caller()
         }
 
-        @PostMapping('/document/jobs')
+        @PostMapping(path = '/document/jobs', produces = 'text/plain')
         @ResponseStatus(HttpStatus.ACCEPTED)
         String submitJob() {
-            'accepted'
+            caller()
+        }
+
+        private static String caller() {
+            SecurityContextHolder.context?.authentication?.name
         }
 
         @GetMapping('/document/jobs/{id}')

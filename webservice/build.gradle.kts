@@ -37,6 +37,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-logging")
     implementation("org.springframework.boot:spring-boot-starter-tomcat")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-autoconfigure")
     implementation("org.apache.groovy:groovy-dateutil")
     implementation("org.apache.groovy:groovy-xml")
@@ -95,6 +96,8 @@ tasks.named<Test>("test") {
     exclude("**/GenerationBasisTest.class")
     // Talks to MinIO. Run it with minioTest.
     exclude("**/MinioStoreTest.class")
+    // Talks to Keycloak. Run it with keycloakTest.
+    exclude("**/KeycloakClientCredentialsTest.class")
     doFirst {
         odiseeTestHome.get().asFile.mkdirs()
     }
@@ -191,6 +194,59 @@ tasks.register<Test>("minioTest") {
     systemProperty("odisee.minio.bucket", "odisee")
     systemProperty("odisee.minio.accessKey", "odisee")
     systemProperty("odisee.minio.secret", "odisee-secret")
+    doFirst {
+        odiseeTestHome.get().asFile.mkdirs()
+    }
+}
+
+// Same tag as src/main/docker/docker-compose.yml.
+val keycloakImage = "quay.io/keycloak/keycloak:26.8.0"
+
+tasks.register<Exec>("startKeycloak") {
+    group = "Odisee"
+    description = "Run Keycloak in Docker on 127.0.0.1:8180 for keycloakTest"
+    val dockerBin = "'" + dockerExecutable.replace("'", "'\\''") + "'"
+    val image = keycloakImage
+    val realm = file("src/main/docker/keycloak/odisee-realm.json").absolutePath.replace("'", "'\\''")
+    commandLine(
+        "bash",
+        "-lc",
+        """
+        set -eu
+        $dockerBin rm -f odisee-keycloak-test >/dev/null 2>&1 || true
+        $dockerBin run -d --name odisee-keycloak-test \
+            -p 127.0.0.1:8180:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+            -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            -v '$realm:/opt/keycloak/data/import/odisee-realm.json:ro' \
+            $image \
+            start-dev --import-realm
+        for i in ${'$'}(seq 1 180); do
+            if command -v curl >/dev/null 2>&1; then
+                curl -fsS http://127.0.0.1:8180/realms/odisee/.well-known/openid-configuration >/dev/null && exit 0
+            elif command -v python3 >/dev/null 2>&1; then
+                python3 -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8180/realms/odisee/.well-known/openid-configuration", timeout=2)' && exit 0
+            fi
+            sleep 1
+        done
+        echo 'Keycloak did not open the odisee realm' >&2
+        $dockerBin logs odisee-keycloak-test >&2 || true
+        exit 1
+        """.trimIndent(),
+    )
+}
+
+tasks.register<Test>("keycloakTest") {
+    group = "Odisee"
+    description = "Obtain one client-credentials token from Keycloak and map it to an Odisee user. Not part of the default test task."
+    dependsOn("startKeycloak", "testClasses")
+    val testSourceSet = sourceSets.getByName("test")
+    testClassesDirs = testSourceSet.output.classesDirs
+    classpath = testSourceSet.runtimeClasspath
+    include("**/KeycloakClientCredentialsTest.class")
+    systemProperty("ODISEE_HOME", odiseeTestHome.get().asFile.absolutePath)
+    systemProperty("odisee.keycloak.issuer", "http://127.0.0.1:8180/realms/odisee")
+    systemProperty("odisee.keycloak.tokenUrl", "http://127.0.0.1:8180/realms/odisee/protocol/openid-connect/token")
     doFirst {
         odiseeTestHome.get().asFile.mkdirs()
     }

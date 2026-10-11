@@ -187,6 +187,7 @@ There is no default password.
 A host listed for one user does not allow another user's callback.
 `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`.
 The secret is the rest of the line and may contain spaces.
+`odictl machine CLIENT USER ISSUER AUDIENCE` writes `$ODISEE_HOME/etc/oidc`.
 The server reads those files on use.
 There is no second config channel.
 The person who can run `odictl` is the admin.
@@ -287,6 +288,75 @@ A bare-metal install passes that host's endpoint to `odictl bucket`.
 
 `./gradlew :webservice:minioTest` starts a throwaway MinIO container, stores one object, and reads it back.
 `./gradlew :webservice:test` does not start MinIO.
+
+[[machine-login]]
+=== Machine login
+
+A machine uses one confidential Keycloak client and the client-credentials grant.
+The `keycloak` service runs next to `odisee` on the `odisee-backend` network.
+It is also on `odisee-outside`, so a machine on the host can request a token.
+Its image is `quay.io/keycloak/keycloak:26.8.0`.
+The command is `start-dev --import-realm --hostname=http://keycloak:8080`.
+The realm file is `keycloak/odisee-realm.json`, mounted at `/opt/keycloak/data/import/odisee-realm.json`.
+Keycloak imports that file on start.
+The realm is `odisee`.
+The client id is `odisee-machine`.
+The client secret is `odisee-machine-secret`.
+The client is confidential.
+The authorization code, implicit, and password grants are off.
+The access token audience includes `odisee`.
+The published port is 8180.
+Inside the compose network the port is 8080.
+`KC_BOOTSTRAP_ADMIN_USERNAME` is `admin` and `KC_BOOTSTRAP_ADMIN_PASSWORD` is `admin`.
+
+The issuer Odisee checks is `http://keycloak:8080/realms/odisee`.
+The hostname on the service is that URL, so a token requested through the host port still carries that issuer.
+Odisee reads the signing keys from `{issuer}/protocol/openid-connect/certs`.
+That URL comes from the configured issuer.
+It is not a claim in the token.
+
+Create the Odisee user first.
+Then map the client:
+
+[source,bash]
+----
+odictl user press s3cret
+odictl machine odisee-machine press http://keycloak:8080/realms/odisee odisee
+----
+
+`odictl machine CLIENT USER ISSUER AUDIENCE` writes one line in `$ODISEE_HOME/etc/oidc`:
+
+[source]
+----
+client username issuer audience
+----
+
+The server reads that file on use.
+The Odisee user is the username on that line.
+Templates, work, and output stay under `var/user/{username}/`.
+A claim in the token does not select a different user.
+`preferred_username` for this client is `service-account-odisee-machine`.
+That name is not the Odisee user.
+
+A machine requests a token with the client-credentials grant:
+
+[source,bash]
+----
+curl -s -X POST http://keycloak:8080/realms/odisee/protocol/openid-connect/token \
+  -d grant_type=client_credentials \
+  -d client_id=odisee-machine \
+  -d client_secret=odisee-machine-secret
+----
+
+From the host, use `http://127.0.0.1:8180/realms/odisee/protocol/openid-connect/token`.
+Send the access token as `Authorization: Bearer` on `POST /odisee/document/generate` and `POST /odisee/document/jobs`.
+HTTP Basic stays for existing callers.
+`GET /odisee/ready` stays anonymous.
+There is no HTTP admin route.
+
+`./gradlew :webservice:keycloakTest` starts its own Keycloak container and requests one client-credentials token.
+That task does not use this compose file.
+`./gradlew :webservice:test` does not start Keycloak.
 
 === Web Server
 

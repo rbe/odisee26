@@ -45,12 +45,18 @@ This server does not configure SFTP.
 Access to HTTP Service
 ^^^^^^^^^^^^^^^^^^^^^^
 
-`POST /odisee/document/generate` requires HTTP Basic.
+`POST /odisee/document/generate` and `POST /odisee/document/jobs` accept HTTP Basic.
+They also accept a Bearer JWT for the machine client in `$ODISEE_HOME/etc/oidc`.
+`odictl machine CLIENT USER ISSUER AUDIENCE` writes that file.
+One line is `client username issuer audience`.
+The Odisee user is the username on that line.
+A claim in the token does not select a different user.
 No login is HTTP 401 and does not generate a document.
 Any authenticated user may run macros.
 The macro name, library, and language must be plain names.
 A bad name is HTTP 400.
 `GET /odisee/ready` stays anonymous.
+The Keycloak compose service is in the administrators guide, <<machine-login>>.
 
 [[callback-hosts]]
 Callback hosts
