@@ -30,7 +30,7 @@ import static org.junit.Assert.fail;
 /**
  * The Hallo request through {@link OdiseeClient} against a local server.
  * LibreOffice is the container started by {@code :webservice:startLibreOffice}.
- * This class is not part of the default test task.
+ * Plain and gzip bodies both run here. This class is not part of the default test task.
  */
 public class OdiseeClientLocalTest {
 
@@ -97,12 +97,19 @@ public class OdiseeClientLocalTest {
 
         final byte[] pdf = client.process(false);
 
-        assertTrue("PDF is empty. " + tail(serverLog), pdf != null && pdf.length > 4);
-        assertEquals('%', (char) pdf[0]);
-        try (PDDocument document = Loader.loadPDF(pdf)) {
-            final String text = new PDFTextStripper().getText(document);
-            assertTrue(text, text.contains(VALUE));
-        }
+        assertPdfContains(pdf, VALUE);
+    }
+
+    @Test
+    public void compressedHalloValueIsInThePdf() throws Exception {
+        final String value = "gzip-hallo";
+        final OdiseeClient client = new OdiseeClient(generateUrl, USER, PASSWORD);
+        client.createRequest("Letter", OutputFormat.PDF);
+        client.setUserfield("Hallo", value);
+
+        final byte[] pdf = client.process(true);
+
+        assertPdfContains(pdf, value);
     }
 
     @Test
@@ -120,6 +127,15 @@ public class OdiseeClientLocalTest {
             assertEquals(e.getMessage(), 401, e.getHttpStatus());
         }
         assertEquals(before, filesUnder(output));
+    }
+
+    private static void assertPdfContains(final byte[] pdf, final String value) throws IOException {
+        assertTrue("PDF is empty. " + tail(serverLog), pdf != null && pdf.length > 4);
+        assertEquals('%', (char) pdf[0]);
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            final String text = new PDFTextStripper().getText(document);
+            assertTrue(text, text.contains(value));
+        }
     }
 
     private static void prepareHome(final int officePort) throws IOException {
