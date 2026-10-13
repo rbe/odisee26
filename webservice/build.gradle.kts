@@ -262,5 +262,60 @@ tasks.register<Exec>("buildOdiseeImage") {
     description = "Build the Odisee service image. Requires Docker. Not part of the default build."
     dependsOn("prepareOdiseeDocker")
     workingDir(dockerBuildDir)
-    commandLine(dockerExecutable, "build", "-t", "odisee/webservice:$version", ".")
+    commandLine(
+        dockerExecutable,
+        "build",
+        "-t", "odisee/odisee:$version",
+        "-t", "odisee/webservice:$version",
+        ".",
+    )
+}
+
+tasks.register<Exec>("startStack") {
+    group = "Odisee"
+    description = "Build the Odisee image and start odisee, minio, and keycloak. Not part of the default build."
+    dependsOn("buildOdiseeImage")
+    val dockerBin = "'" + dockerExecutable.replace("'", "'\\''") + "'"
+    val composeDir = file("src/main/docker").absolutePath.replace("'", "'\\''")
+    val imageVersion = version.toString().replace("'", "'\\''")
+    commandLine(
+        "bash",
+        "-lc",
+        """
+        set -eu
+        export VERSION='$imageVersion'
+        if $dockerBin compose version >/dev/null 2>&1; then
+            compose=( $dockerBin compose )
+        elif command -v docker-compose >/dev/null 2>&1; then
+            compose=( docker-compose )
+        else
+            echo 'docker compose is required' >&2
+            exit 1
+        fi
+        "${'$'}{compose[@]}" -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' up -d
+        for i in ${'$'}(seq 1 180); do
+            minio=0
+            keycloak=0
+            ready=0
+            if command -v curl >/dev/null 2>&1; then
+                curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null && minio=1 || true
+                curl -fsS http://127.0.0.1:8180/realms/odisee/.well-known/openid-configuration >/dev/null && keycloak=1 || true
+                code=${'$'}(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/odisee/ready || true)
+                if [ "${'$'}code" = 200 ]; then ready=1; fi
+            elif bash -c 'echo >/dev/tcp/127.0.0.1/8080' 2>/dev/null \
+                && bash -c 'echo >/dev/tcp/127.0.0.1/9000' 2>/dev/null \
+                && bash -c 'echo >/dev/tcp/127.0.0.1/8180' 2>/dev/null; then
+                exit 0
+            fi
+            if [ "${'$'}minio" = 1 ] && [ "${'$'}keycloak" = 1 ] && [ "${'$'}ready" = 1 ]; then
+                exit 0
+            fi
+            sleep 1
+        done
+        echo 'odisee, minio, or keycloak did not become ready' >&2
+        "${'$'}{compose[@]}" -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' ps >&2 || true
+        "${'$'}{compose[@]}" -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' logs --tail 80 >&2 || true
+        exit 1
+        """.trimIndent(),
+    )
 }

@@ -20,7 +20,7 @@ The zip contains `application.jar`, `bin/odictl`, `etc/`, the Java client, the L
 
 GitHub Actions uploads that zip on every push and pull request. A git tag `v*` also publishes it as a GitHub Release.
 
-Docker image tasks are not part of `build`. They need a local Docker daemon. `:webservice:buildOdiseeImage` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts `alpine/minio:RELEASE.2025-10-15T17-29-55Z`, stores one object, and reads it back. The same image is the `minio` service in `webservice/src/main/docker/docker-compose.yml`. `:webservice:test` does not start MinIO.
+Docker tasks are not part of `build`. They need a local Docker daemon. `:webservice:startStack` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer) and starts `odisee`, `minio`, and `keycloak` from `webservice/src/main/docker/docker-compose.yml`. Odisee listens on port 8080, MinIO on 9000, and Keycloak on 8180. `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts a throwaway MinIO and stores one object. `:webservice:test` does not start Docker.
 
 ## Proxy
 

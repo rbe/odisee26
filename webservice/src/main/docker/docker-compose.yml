@@ -6,8 +6,9 @@ services:
     environment:
       - TZ=Europe/Berlin
       - LANG=en_US.UTF-8
+    ports:
+      - "8080:8080"
     volumes:
-      - odisee:/home/odisee:ro
       - odiseevar:/home/odisee/var:rw
     networks:
       - odisee-backend
@@ -50,8 +51,6 @@ services:
       - odisee-outside
 
 volumes:
-  odisee:
-    driver: local
   odiseevar:
     driver: local
   miniodata:
