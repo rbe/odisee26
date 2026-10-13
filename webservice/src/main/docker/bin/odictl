@@ -227,19 +227,16 @@ Maintenance
        restart                          Restart instance(s).
        updateoxt                        Update extensions under extensions/ and (re-)install them.
 
-Accounts, callback hosts, buckets, and machine clients
-  user <name> <password>                Add one user. Writes etc/users and creates
-                                        var/user/<name>/template, work, and output.
+Accounts, callback hosts, and buckets
+  user <name>                           Create the Keycloak user, a confidential client
+                                        whose id is <name>, and var/user/<name>/template,
+                                        work, and output. Prints the client id and secret.
                                         A bad name fails. An existing user fails.
-                                        There is no default password.
+                                        There is no password file.
   callback-host <user> <host>           Append one host for that user to etc/callback-hosts.
   bucket <user> <endpoint> <region> <bucket> <accessKey> <secret>
                                         Write that user's line in etc/buckets.
                                         The secret is the rest of the line.
-  machine <client> <user> <issuer> <audience>
-                                        Write etc/oidc. One confidential client maps
-                                        to that Odisee user. The token cannot name
-                                        a different user. The user must already exist.
 
 Common options
   -h                                    Show help.
@@ -251,7 +248,7 @@ EOF
 
 # ---------------------------------------------------------------------------
 #
-# Accounts, callback hosts, buckets, and machine clients.
+# Accounts, callback hosts, and buckets.
 # The person who can run odictl is the admin. There is no HTTP role check.
 #
 # ---------------------------------------------------------------------------
@@ -308,105 +305,161 @@ odictl_require_user_name() {
     printf '%s' "$trimmed"
 }
 
-odictl_user_exists() {
-    local file="$1"
-    local name="$2"
-    local line trimmed first
-    [[ -f "$file" ]] || return 1
-    while IFS= read -r line || [[ -n "$line" ]]
-    do
-        trimmed=$(odictl_trim "$line")
-        [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
-        first="${trimmed%%[[:space:]]*}"
-        [[ "$first" == "$name" ]] && return 0
-    done < "$file"
-    return 1
-}
-
-odictl_bcrypt_jar() {
-    if [[ -n "${ODICTL_BCRYPT_JAR:-}" && -f "${ODICTL_BCRYPT_JAR}" ]]
-    then
-        printf '%s' "${ODICTL_BCRYPT_JAR}"
-        return 0
-    fi
-    if [[ -f "${SCRIPT_DIR}/odihash.jar" ]]
-    then
-        printf '%s' "${SCRIPT_DIR}/odihash.jar"
-        return 0
-    fi
-    if [[ -n "${ODISEE_HOME:-}" && -f "${ODISEE_HOME}/bin/odihash.jar" ]]
-    then
-        printf '%s' "${ODISEE_HOME}/bin/odihash.jar"
-        return 0
-    fi
-    local built="${SCRIPT_DIR}/../../../../build/odihash/odihash.jar"
-    if [[ -f "$built" ]]
-    then
-        printf '%s' "$built"
-        return 0
-    fi
-    return 1
-}
-
-odictl_hash_password() {
-    local jar hash
-    jar=$(odictl_bcrypt_jar) || odictl_fail "bcrypt helper not found"
-    hash=$(java -jar "$jar" "$1") || odictl_fail "bcrypt helper failed"
-    if [[ ! "$hash" =~ ^\$2[aby]\$ ]]
-    then
-        odictl_fail "bcrypt helper failed"
-    fi
-    printf '%s' "$hash"
-}
-
-odictl_user_write() {
-    local file="$1"
-    local name="$2"
-    local hash="$3"
-    local -a out=()
-    local raw
-    if [[ -f "$file" ]]
-    then
-        while IFS= read -r raw || [[ -n "$raw" ]]
-        do
-            out+=("$raw")
-        done < "$file"
-    else
-        out+=('# Odisee users. One line: username bcrypt-hash [admin]')
-        out+=('# The server reads this file. It does not read odisee-users.xml.')
-    fi
-    out+=("${name} ${hash}")
-    odictl_write_private "$file" "${out[@]}"
-}
-
 odictl_cmd_user() {
-    if [[ $# -ne 2 ]]
+    if [[ $# -ne 1 ]]
     then
-        odictl_fail "usage: odictl user <name> <password>"
+        odictl_fail "usage: odictl user <name>"
     fi
-    local name password trimmed hash file
+    local name issuer admin password base realm token secret file
     name=$(odictl_require_user_name "$1") || exit 1
-    password="$2"
-    trimmed=$(odictl_trim "$password")
-    if [[ -z "$trimmed" ]]
+    if [[ "$name" == "odisee-ui" ]]
     then
-        odictl_fail "Password is required"
+        odictl_fail "Invalid user '${name}'"
     fi
+    issuer=$(odictl_require_issuer "${ODISEE_KEYCLOAK_ISSUER:-http://keycloak:8080/realms/odisee}") || exit 1
+    admin=$(odictl_trim "${ODISEE_KEYCLOAK_ADMIN:-}")
+    password="${ODISEE_KEYCLOAK_ADMIN_PASSWORD:-}"
+    if [[ -z "$admin" || -z "$(odictl_trim "$password")" ]]
+    then
+        odictl_fail "Keycloak admin credentials are required"
+    fi
+    command -v curl >/dev/null 2>&1 || odictl_fail "curl is required"
     odictl_lock
-    file="${ODISEE_HOME}/etc/users"
-    if odictl_user_exists "$file" "$name"
+    if [[ -d "${ODISEE_HOME}/var/user/${name}" ]]
     then
         odictl_fail "User '${name}' already exists"
     fi
-    hash=$(odictl_hash_password "$password") || exit 1
-    odictl_user_write "$file" "$name" "$hash"
-    mkdir -p \
+    base="${issuer%/realms/*}"
+    realm="${issuer##*/}"
+    token=$(odictl_keycloak_admin_token "$base" "$admin" "$password") || exit 1
+    secret=$(odictl_client_secret) || exit 1
+    odictl_keycloak_create_client "$base" "$realm" "$token" "$name" "$secret" || exit 1
+    if ! odictl_keycloak_create_user "$base" "$realm" "$token" "$name"
+    then
+        odictl_keycloak_delete_client "$base" "$realm" "$token" "$name" || true
+        exit 1
+    fi
+    if ! mkdir -p \
         "${ODISEE_HOME}/var/user/${name}/template" \
         "${ODISEE_HOME}/var/user/${name}/work" \
-        "${ODISEE_HOME}/var/user/${name}/output" \
-        || odictl_fail "could not create directories for '${name}'"
+        "${ODISEE_HOME}/var/user/${name}/output"
+    then
+        odictl_keycloak_delete_user "$base" "$realm" "$token" "$name" || true
+        odictl_keycloak_delete_client "$base" "$realm" "$token" "$name" || true
+        odictl_fail "could not create directories for '${name}'"
+    fi
+    file="${ODISEE_HOME}/etc/oidc"
+    odictl_write_private "$file" \
+        '# Odisee OpenID Connect. The server reads this file on use.' \
+        "issuer ${issuer}" \
+        'audience odisee' \
+        'ui-client odisee-ui'
     echo "Odisee: User '${name}' created."
+    echo "client_id=${name}"
+    echo "client_secret=${secret}"
     exit 0
+}
+
+odictl_client_secret() {
+    od -An -tx1 -N 32 /dev/urandom | tr -d ' \n'
+}
+
+odictl_json_token() {
+    local body="$1" field="$2"
+    printf '%s' "$body" | sed -n "s/.*\"${field}\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" | head -n 1
+}
+
+odictl_keycloak_admin_token() {
+    local base="$1" user="$2" password="$3" body token
+    body=$(curl -fsS -X POST "${base}/realms/master/protocol/openid-connect/token" \
+        -H 'Content-Type: application/x-www-form-urlencoded' \
+        --data-urlencode 'grant_type=password' \
+        --data-urlencode 'client_id=admin-cli' \
+        --data-urlencode "username=${user}" \
+        --data-urlencode "password=${password}") || odictl_fail "Keycloak admin login failed"
+    token=$(odictl_json_token "$body" access_token)
+    if [[ -z "$token" ]]
+    then
+        odictl_fail "Keycloak admin login failed"
+    fi
+    printf '%s' "$token"
+}
+
+odictl_keycloak_code() {
+    local method="$1" url="$2" token="$3" json="${4:-}"
+    local code
+    if [[ -n "$json" ]]
+    then
+        code=$(curl -sS -o /dev/null -w '%{http_code}' -X "$method" "$url" \
+            -H "Authorization: Bearer ${token}" \
+            -H 'Content-Type: application/json' \
+            -d "$json") || odictl_fail "Keycloak request failed"
+    else
+        code=$(curl -sS -o /dev/null -w '%{http_code}' -X "$method" "$url" \
+            -H "Authorization: Bearer ${token}") || odictl_fail "Keycloak request failed"
+    fi
+    printf '%s' "$code"
+}
+
+odictl_keycloak_create_client() {
+    local base="$1" realm="$2" token="$3" name="$4" secret="$5" json code
+    json=$(printf '%s' \
+        "{\"clientId\":\"${name}\",\"enabled\":true,\"protocol\":\"openid-connect\"," \
+        "\"publicClient\":false,\"secret\":\"${secret}\",\"clientAuthenticatorType\":\"client-secret\"," \
+        "\"serviceAccountsEnabled\":true,\"standardFlowEnabled\":false,\"implicitFlowEnabled\":false," \
+        "\"directAccessGrantsEnabled\":false,\"fullScopeAllowed\":true," \
+        "\"protocolMappers\":[{\"name\":\"odisee-audience\",\"protocol\":\"openid-connect\"," \
+        "\"protocolMapper\":\"oidc-audience-mapper\",\"consentRequired\":false," \
+        "\"config\":{\"included.custom.audience\":\"odisee\",\"access.token.claim\":\"true\",\"id.token.claim\":\"false\"}}]}")
+    code=$(odictl_keycloak_code POST "${base}/admin/realms/${realm}/clients" "$token" "$json") || exit 1
+    if [[ "$code" == "201" || "$code" == "204" ]]
+    then
+        return 0
+    fi
+    if [[ "$code" == "409" ]]
+    then
+        odictl_fail "User '${name}' already exists"
+    fi
+    odictl_fail "Keycloak client was not created (${code})"
+}
+
+odictl_keycloak_create_user() {
+    local base="$1" realm="$2" token="$3" name="$4" code
+    code=$(odictl_keycloak_code POST "${base}/admin/realms/${realm}/users" "$token" \
+        "{\"username\":\"${name}\",\"enabled\":true}") || return 1
+    if [[ "$code" == "201" || "$code" == "204" ]]
+    then
+        return 0
+    fi
+    if [[ "$code" == "409" ]]
+    then
+        echo "Odisee: User '${name}' already exists" >&2
+        return 1
+    fi
+    echo "Odisee: Keycloak user was not created (${code})" >&2
+    return 1
+}
+
+odictl_keycloak_id() {
+    local url="$1" token="$2" body id
+    body=$(curl -fsS -H "Authorization: Bearer ${token}" "$url") || return 1
+    id=$(odictl_json_token "$body" id)
+    [[ -n "$id" ]] || return 1
+    printf '%s' "$id"
+}
+
+odictl_keycloak_delete_client() {
+    local base="$1" realm="$2" token="$3" name="$4" id
+    id=$(odictl_keycloak_id "${base}/admin/realms/${realm}/clients?clientId=${name}" "$token") || return 0
+    curl -fsS -X DELETE -H "Authorization: Bearer ${token}" \
+        "${base}/admin/realms/${realm}/clients/${id}" >/dev/null || true
+}
+
+odictl_keycloak_delete_user() {
+    local base="$1" realm="$2" token="$3" name="$4" id
+    id=$(odictl_keycloak_id "${base}/admin/realms/${realm}/users?username=${name}&exact=true" "$token") || return 0
+    curl -fsS -X DELETE -H "Authorization: Bearer ${token}" \
+        "${base}/admin/realms/${realm}/users/${id}" >/dev/null || true
 }
 
 odictl_require_host() {
@@ -607,31 +660,6 @@ odictl_require_issuer() {
     printf '%s' "$value"
 }
 
-odictl_cmd_machine() {
-    if [[ $# -ne 4 ]]
-    then
-        odictl_fail "usage: odictl machine <client> <user> <issuer> <audience>"
-    fi
-    local client user issuer audience file
-    client=$(odictl_require_token "$1" client '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$') || exit 1
-    user=$(odictl_require_user_name "$2") || exit 1
-    issuer=$(odictl_require_issuer "$3") || exit 1
-    audience=$(odictl_require_token "$4" audience '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$') || exit 1
-    odictl_lock
-    file="${ODISEE_HOME}/etc/users"
-    if ! odictl_user_exists "$file" "$user"
-    then
-        odictl_fail "User '${user}' does not exist"
-    fi
-    file="${ODISEE_HOME}/etc/oidc"
-    odictl_write_private "$file" \
-        '# Odisee machine client. One line: client username issuer audience' \
-        '# The token cannot name a different user. The server uses the username on this line.' \
-        "${client} ${user} ${issuer} ${audience}"
-    echo "Odisee: Machine '${client}' uses '${user}'."
-    exit 0
-}
-
 odictl_manage() {
     local cmd="$1"
     shift
@@ -644,9 +672,6 @@ odictl_manage() {
             ;;
         bucket)
             odictl_cmd_bucket "$@"
-            ;;
-        machine)
-            odictl_cmd_machine "$@"
             ;;
         *)
             odictl_fail "Unknown command '${cmd}'"
@@ -701,11 +726,11 @@ CMD_NOGO[r]="c d e"
 #
 CMDOK=true
 
-# Accounts, callback hosts, buckets, and machine clients. Flags such as -q stay below.
+# Accounts, callback hosts, and buckets. Flags such as -q stay below.
 if [[ $# -ge 1 && "$1" != -* ]]
 then
     case "$1" in
-        user|callback-host|bucket|machine)
+        user|callback-host|bucket)
             odictl_manage "$@"
             ;;
     esac

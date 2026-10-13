@@ -74,15 +74,15 @@ The callback belongs on the job, not on `POST /document/generate`. `POST /docume
 
 ## Operations
 
-Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays generate, jobs, templates, and `/ready`. `odictl user NAME PASSWORD` writes `$ODISEE_HOME/etc/users` and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. A bad name fails. An existing user fails. There is no default password. `odictl callback-host USER HOST` appends a host for that user to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`. `odictl machine CLIENT USER ISSUER AUDIENCE` writes `$ODISEE_HOME/etc/oidc`. The server reads those files on use. There is no second config channel.
+Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays generate, jobs, templates, and `/ready`. `odictl user NAME` creates the Keycloak user, a confidential client whose id is `NAME`, and `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. It prints the client id and secret. A bad name fails. An existing user fails. There is no password file. `odictl callback-host USER HOST` appends a host for that user to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`. The server reads `$ODISEE_HOME/etc` on use, including `etc/oidc` for the issuer and audience. There is no second config channel.
 
 ### F9. Authenticated multi-tenancy
 
-Status: **landed in wave 4**. OpenID Connect for machines is this slice. SFTP is not implemented.
+Status: **landed in wave 4**. OpenID Connect replaces HTTP Basic. SFTP is not implemented.
 
-Wave 4 requires HTTP Basic. Passwords are bcrypt hashes in `$ODISEE_HOME/etc/users`. `java -jar` does not read `odisee-users.xml`. `odictl user NAME PASSWORD` adds one bcrypt line and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. Any authenticated user may run macros. `GET /ready` is anonymous.
+Wave 4 logged callers in with HTTP Basic and bcrypt hashes in `$ODISEE_HOME/etc/users`. That password file is gone. `java -jar` does not read `odisee-users.xml`. Any authenticated user may run macros. `GET /ready` is anonymous.
 
-A machine uses one confidential Keycloak client and the client-credentials grant. The compose service is `keycloak` on `odisee-backend`. The realm is imported from `webservice/src/main/docker/keycloak/odisee-realm.json`. `odictl machine CLIENT USER ISSUER AUDIENCE` writes `$ODISEE_HOME/etc/oidc`. The server reads that file on use. `POST /document/generate` and `POST /document/jobs` accept that client's Bearer JWT. The token's issuer and audience must match the file. The Odisee user is the username on that line, so `var/user/{name}/` still applies. A claim in the token does not select a different user. HTTP Basic stays for existing callers. `GET /ready` stays anonymous. SFTP homes are not implemented.
+`odictl user NAME` creates the Keycloak user, the directories under `var/user/NAME/`, and one confidential client whose id is `NAME`. It prints the client id and secret. The API client sends `Authorization: Bearer` from the client-credentials grant. Odisee checks the issuer and the audience in `$ODISEE_HOME/etc/oidc`. The client id is the Odisee user, so `var/user/{name}/` still applies. A username claim on that token does not select a different user. The UI client `odisee-ui` uses `preferred_username` for a later browser login. `GET /ready` stays anonymous. SFTP homes are not implemented.
 
 Depends on: wave 4 (authentication and per-user directories are done).
 

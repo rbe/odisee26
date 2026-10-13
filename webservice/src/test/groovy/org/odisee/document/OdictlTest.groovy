@@ -1,12 +1,15 @@
 package org.odisee.document
 
+import com.sun.net.httpserver.HttpExchange
+import com.sun.net.httpserver.HttpHandler
+import com.sun.net.httpserver.HttpServer
 import groovy.test.GroovyTestCase
 import org.odisee.io.OdiseePath
 import org.odisee.io.TenantPaths
-import org.odisee.security.MachineFile
-import org.odisee.security.PasswordFile
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.odisee.security.OidcFile
 
+import java.net.InetSocketAddress
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
 import java.util.concurrent.TimeUnit
@@ -17,75 +20,87 @@ import java.util.concurrent.TimeUnit
  */
 class OdictlTest extends GroovyTestCase {
 
-    private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder()
+    private HttpServer keycloak
+
+    private String issuer
 
     @Override
     protected void setUp() {
-        Files.deleteIfExists(PasswordFile.location())
+        Files.deleteIfExists(OidcFile.location())
         Files.deleteIfExists(CallbackAllowList.location())
         Files.deleteIfExists(BucketFile.location())
-        Files.deleteIfExists(MachineFile.location())
         deleteUser('ctlada')
         deleteUser('ctlbucket')
-        deleteUser('ctlmachine')
+        keycloak = fakeKeycloak()
+        issuer = "http://127.0.0.1:${keycloak.address.port}/realms/odisee"
     }
 
     @Override
     protected void tearDown() {
-        Files.deleteIfExists(PasswordFile.location())
+        keycloak?.stop(0)
+        Files.deleteIfExists(OidcFile.location())
         Files.deleteIfExists(CallbackAllowList.location())
         Files.deleteIfExists(BucketFile.location())
-        Files.deleteIfExists(MachineFile.location())
         deleteUser('ctlada')
         deleteUser('ctlbucket')
-        deleteUser('ctlmachine')
     }
 
-    void testUserWritesBcryptLineAndDirectories() {
-        String output = succeed('user', 'ctlada', 's3cret-value')
+    void testUserCreatesTheClientDirectoriesAndPrintsTheSecret() {
+        String output = succeed('user', 'ctlada')
 
         assertTrue(output.contains("User 'ctlada' created."))
-        String text = Files.readString(PasswordFile.location())
-        assertFalse(text.contains('s3cret-value'))
-        PasswordFile.Record record = PasswordFile.find(PasswordFile.location(), 'ctlada')
-        assertNotNull(record)
-        assertFalse(record.admin)
-        assertTrue(encoder.matches('s3cret-value', record.hash))
+        assertTrue(output.contains('client_id=ctlada'))
+        String secret = output.readLines().find { it.startsWith('client_secret=') }?.substring('client_secret='.length())
+        assertNotNull(secret)
+        assertTrue(secret.length() >= 32)
+        assertFalse(Files.exists(OdiseePath.ODISEE_HOME.resolve('etc').resolve('users')))
         assertTrue(Files.isDirectory(TenantPaths.templateDir('ctlada')))
         assertTrue(Files.isDirectory(TenantPaths.workDir('ctlada')))
         assertTrue(Files.isDirectory(TenantPaths.outputDir('ctlada')))
-        Set<PosixFilePermission> perms = Files.getPosixFilePermissions(PasswordFile.location())
+        OidcFile.Record record = OidcFile.read(OidcFile.location())
+        assertEquals(issuer, record.issuer)
+        assertEquals('odisee', record.audience)
+        assertEquals('odisee-ui', record.uiClient)
+        String oidc = Files.readString(OidcFile.location())
+        assertFalse(oidc.contains(secret))
+        Set<PosixFilePermission> perms = Files.getPosixFilePermissions(OidcFile.location())
         assertFalse(perms.contains(PosixFilePermission.GROUP_READ))
         assertFalse(perms.contains(PosixFilePermission.OTHERS_READ))
     }
 
     void testBadUserNameFailsAndCreatesNothing() {
-        String output = fail('user', '../ctlada', 's3cret-value')
+        String output = denied('user', '../ctlada')
 
         assertTrue(output.contains('Invalid user'))
-        assertFalse(Files.exists(PasswordFile.location()))
-        assertFalse(Files.exists(OdiseePath.ODISEE_VAR.resolve('ctlada')))
-        assertFalse(Files.exists(OdiseePath.ODISEE_VAR.resolve('user').resolve('ctlada')))
+        assertFalse(Files.exists(OidcFile.location()))
+        assertFalse(Files.exists(TenantPaths.userRoot('ctlada')))
     }
 
     void testExistingUserFails() {
-        succeed('user', 'ctlada', 's3cret-value')
-        String hash = PasswordFile.find(PasswordFile.location(), 'ctlada').hash
+        succeed('user', 'ctlada')
 
-        String output = fail('user', 'ctlada', 'other-value')
+        String output = denied('user', 'ctlada')
 
         assertTrue(output.contains("User 'ctlada' already exists"))
-        assertEquals(hash, PasswordFile.find(PasswordFile.location(), 'ctlada').hash)
-        assertFalse(PasswordFile.find(PasswordFile.location(), 'ctlada').admin)
+        assertTrue(Files.isDirectory(TenantPaths.templateDir('ctlada')))
     }
 
-    void testUserRequiresPassword() {
-        String missing = fail('user', 'ctlada')
-        String blank = fail('user', 'ctlada', '   ')
+    void testUserTakesANameOnly() {
+        String missing = denied('user')
+        String extra = denied('user', 'ctlada', 's3cret-value')
+        String reserved = denied('user', 'odisee-ui')
 
-        assertTrue(missing.contains('Password is required') || missing.contains('usage:'))
-        assertTrue(blank.contains('Password is required'))
-        assertFalse(Files.exists(PasswordFile.location()))
+        assertTrue(missing.contains('usage:'))
+        assertTrue(extra.contains('usage:'))
+        assertTrue(reserved.contains('Invalid user'))
+        assertFalse(Files.exists(TenantPaths.userRoot('ctlada')))
+        assertFalse(Files.exists(TenantPaths.userRoot('odisee-ui')))
+    }
+
+    void testUserWithoutAdminCredentialsFails() {
+        String output = run(false, ['ODISEE_KEYCLOAK_ADMIN': '', 'ODISEE_KEYCLOAK_ADMIN_PASSWORD': ''], 'user', 'ctlada')
+
+        assertTrue(output.contains('Keycloak admin credentials are required'))
         assertFalse(Files.exists(TenantPaths.userRoot('ctlada')))
     }
 
@@ -103,8 +118,8 @@ class OdictlTest extends GroovyTestCase {
     }
 
     void testBadCallbackHostFails() {
-        String output = fail('callback-host', 'ctlada', 'https://hooks.example/done')
-        String badUser = fail('callback-host', '../ctlada', 'hooks.example')
+        String output = denied('callback-host', 'ctlada', 'https://hooks.example/done')
+        String badUser = denied('callback-host', '../ctlada', 'hooks.example')
 
         assertTrue(output.contains('Invalid callback host'))
         assertTrue(badUser.contains('Invalid user'))
@@ -132,69 +147,38 @@ class OdictlTest extends GroovyTestCase {
         assertEquals('http://127.0.0.1:9000', replaced.endpoint)
     }
 
-    void testMachineWritesTheLineTheServerReads() {
-        succeed('user', 'ctlmachine', 's3cret-value')
-
-        String output = succeed('machine', 'odisee-machine', 'ctlmachine', 'http://keycloak:8080/realms/odisee/', 'odisee')
-
-        assertTrue(output.contains("Machine 'odisee-machine' uses 'ctlmachine'."))
-        MachineFile.Record record = MachineFile.read(MachineFile.location())
-        assertEquals('odisee-machine', record.clientId)
-        assertEquals('ctlmachine', record.username)
-        assertEquals('http://keycloak:8080/realms/odisee', record.issuer)
-        assertEquals('odisee', record.audience)
-        Set<PosixFilePermission> perms = Files.getPosixFilePermissions(MachineFile.location())
-        assertFalse(perms.contains(PosixFilePermission.GROUP_READ))
-        assertFalse(perms.contains(PosixFilePermission.OTHERS_READ))
-
-        succeed('machine', 'other-machine', 'ctlmachine', 'http://127.0.0.1:8180/realms/odisee', 'odisee')
-        MachineFile.Record replaced = MachineFile.read(MachineFile.location())
-        assertEquals('other-machine', replaced.clientId)
-        assertEquals('http://127.0.0.1:8180/realms/odisee', replaced.issuer)
-        List<String> lines = Files.readAllLines(MachineFile.location()).findAll { it.trim() && !it.trim().startsWith('#') }
-        assertEquals(1, lines.size())
-    }
-
-    void testMachineRequiresAnExistingUser() {
-        String output = fail('machine', 'odisee-machine', 'ctlmachine', 'http://keycloak:8080/realms/odisee', 'odisee')
-
-        assertTrue(output.contains("User 'ctlmachine' does not exist"))
-        assertFalse(Files.exists(MachineFile.location()))
-    }
-
-    void testBadMachineIssuerFails() {
-        succeed('user', 'ctlmachine', 's3cret-value')
-
-        String output = fail('machine', 'odisee-machine', 'ctlmachine', 'ftp://keycloak/realms/odisee', 'odisee')
-        String badClient = fail('machine', 'bad client', 'ctlmachine', 'http://keycloak:8080/realms/odisee', 'odisee')
-
-        assertTrue(output.contains('Invalid issuer'))
-        assertTrue(badClient.contains('Invalid client'))
-        assertFalse(Files.exists(MachineFile.location()))
-    }
-
     void testBadBucketFails() {
-        String output = fail('bucket', 'ctlbucket', 'ftp://minio:9000', 'us-east-1', 'odisee-files', 'minio', 'minio-secret')
+        String output = denied('bucket', 'ctlbucket', 'ftp://minio:9000', 'us-east-1', 'odisee-files', 'minio', 'minio-secret')
 
         assertTrue(output.contains('Invalid endpoint'))
         assertFalse(Files.exists(BucketFile.location()))
     }
 
-    private static String succeed(String... args) {
-        run(true, args)
+    private String succeed(String... args) {
+        run(true, [:], args)
     }
 
-    private static String fail(String... args) {
-        run(false, args)
+    private String denied(String... args) {
+        run(false, [:], args)
     }
 
-    private static String run(boolean ok, String... args) {
+    private String run(boolean ok, Map<String, String> extra, String... args) {
         File script = new File('src/main/docker/bin/odictl')
         assertTrue(script.file)
         String home = System.getProperty('ODISEE_HOME')
         assertNotNull(home)
         ProcessBuilder builder = new ProcessBuilder([script.absolutePath, *args])
         builder.environment().put('ODISEE_HOME', home)
+        builder.environment().put('ODISEE_KEYCLOAK_ISSUER', issuer)
+        builder.environment().put('ODISEE_KEYCLOAK_ADMIN', 'admin')
+        builder.environment().put('ODISEE_KEYCLOAK_ADMIN_PASSWORD', 'admin-secret')
+        extra.each { String key, String value ->
+            if (value == null || value.isEmpty()) {
+                builder.environment().remove(key)
+            } else {
+                builder.environment().put(key, value)
+            }
+        }
         builder.redirectErrorStream(true)
         Process process = builder.start()
         String output = process.inputStream.getText('UTF-8')
@@ -209,6 +193,39 @@ class OdictlTest extends GroovyTestCase {
             assertTrue(output, process.exitValue() != 0)
         }
         output
+    }
+
+    private static HttpServer fakeKeycloak() {
+        HttpServer server = HttpServer.create(new InetSocketAddress('127.0.0.1', 0), 0)
+        server.createContext('/realms/master/protocol/openid-connect/token', json('{"access_token":"admin-token"}'))
+        server.createContext('/admin/realms/odisee/clients', empty(201))
+        server.createContext('/admin/realms/odisee/users', empty(201))
+        server.start()
+        server
+    }
+
+    private static HttpHandler json(String body) {
+        new HttpHandler() {
+            @Override
+            void handle(HttpExchange exchange) {
+                exchange.requestBody.readAllBytes()
+                byte[] bytes = body.getBytes(StandardCharsets.UTF_8)
+                exchange.responseHeaders.set('Content-Type', 'application/json')
+                exchange.sendResponseHeaders(200, bytes.length)
+                exchange.responseBody.withCloseable { it.write(bytes) }
+            }
+        }
+    }
+
+    private static HttpHandler empty(int status) {
+        new HttpHandler() {
+            @Override
+            void handle(HttpExchange exchange) {
+                exchange.requestBody.readAllBytes()
+                exchange.sendResponseHeaders(status, -1)
+                exchange.close()
+            }
+        }
     }
 
     private static void deleteUser(String name) {

@@ -12,34 +12,31 @@ import jakarta.servlet.http.HttpServletRequest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
-import org.springframework.security.config.Customizer
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
-import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.core.userdetails.UserDetailsService
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver
 import org.springframework.security.web.SecurityFilterChain
 
 /**
- * HTTP Basic against {@code $ODISEE_HOME/etc/users}. Embedded Tomcat stays.
- * A machine Bearer JWT is checked against {@code $ODISEE_HOME/etc/oidc}.
- * {@code GET /ready} is anonymous.
+ * Bearer JWT against {@code $ODISEE_HOME/etc/oidc}. Embedded Tomcat stays.
+ * {@code GET /ready} is anonymous. There is no HTTP Basic login.
  */
 @Configuration
 @EnableWebSecurity
 class OdiseeSecurityConfiguration {
 
+    /**
+     * Stops Boot from generating a local password. Passwords are not an Odisee login.
+     */
     @Bean
-    PasswordEncoder passwordEncoder() {
-        new BCryptPasswordEncoder()
-    }
-
-    @Bean
-    UserDetailsService passwordFileUsers() {
-        new PasswordFileUserDetailsService()
+    UserDetailsService noPasswordUsers() {
+        return { String username ->
+            throw new UsernameNotFoundException(username ?: '')
+        } as UserDetailsService
     }
 
     @Bean
@@ -48,7 +45,6 @@ class OdiseeSecurityConfiguration {
                 .csrf { it.disable() }
                 .anonymous { it.disable() }
                 .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-                .httpBasic(Customizer.withDefaults())
                 .oauth2ResourceServer { oauth2 ->
                     oauth2.bearerTokenResolver(bearerTokenResolver())
                     oauth2.jwt { jwt ->

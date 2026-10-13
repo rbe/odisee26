@@ -10,21 +10,17 @@
   "bruteForceProtected": false,
   "clients": [
     {
-      "clientId": "odisee-machine",
-      "name": "Odisee machine",
+      "clientId": "odisee-ui",
+      "name": "Odisee UI",
       "enabled": true,
       "protocol": "openid-connect",
-      "publicClient": false,
-      "secret": "odisee-machine-secret",
-      "clientAuthenticatorType": "client-secret",
-      "serviceAccountsEnabled": true,
-      "standardFlowEnabled": false,
+      "publicClient": true,
+      "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "authorizationServicesEnabled": false,
-      "fullScopeAllowed": true,
-      "redirectUris": [],
-      "webOrigins": [],
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:8080/*"],
+      "webOrigins": ["+"],
       "protocolMappers": [
         {
           "name": "odisee-audience",

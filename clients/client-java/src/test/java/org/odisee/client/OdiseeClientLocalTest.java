@@ -6,7 +6,7 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -16,6 +16,12 @@ import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.Signature;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Arrays;
+import java.util.Base64;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -36,7 +42,9 @@ public class OdiseeClientLocalTest {
 
     private static final String USER = "odisee";
 
-    private static final String PASSWORD = "hallo-secret";
+    private static String accessToken;
+
+    private static com.sun.net.httpserver.HttpServer jwks;
 
     private static final String VALUE = "client-hallo";
 
@@ -79,7 +87,7 @@ public class OdiseeClientLocalTest {
             server = builder.start();
             waitUntilReady(httpPort);
         } catch (AssertionError | Exception e) {
-            stopServer();
+            stopLocalServer();
             throw e;
         }
     }
@@ -87,11 +95,15 @@ public class OdiseeClientLocalTest {
     @AfterClass
     public static void stopLocalServer() {
         stopServer();
+        if (jwks != null) {
+            jwks.stop(0);
+            jwks = null;
+        }
     }
 
     @Test
     public void halloValueIsInThePdf() throws Exception {
-        final OdiseeClient client = new OdiseeClient(generateUrl, USER, PASSWORD);
+        final OdiseeClient client = OdiseeClient.bearer(generateUrl, accessToken);
         client.createRequest("Letter", OutputFormat.PDF);
         client.setUserfield("Hallo", VALUE);
 
@@ -122,19 +134,70 @@ public class OdiseeClientLocalTest {
         assertEquals(before, filesUnder(output));
     }
 
-    private static void prepareHome(final int officePort) throws IOException {
+    private static void prepareHome(final int officePort) throws Exception {
         Files.createDirectories(home.resolve("etc"));
         Files.writeString(home.resolve("etc/odiinst"),
                 "odi1|127.0.0.1|" + officePort + "|/usr/lib/libreoffice||nologo|true\n");
-        final String hash = new BCryptPasswordEncoder().encode(PASSWORD);
-        Files.writeString(home.resolve("etc/users"),
-                "# Odisee users. One line: username bcrypt-hash [admin]\n"
-                        + USER + " " + hash + "\n");
+        jwks = startJwks();
+        final String issuer = "http://127.0.0.1:" + jwks.getAddress().getPort() + "/realms/odisee";
+        Files.writeString(home.resolve("etc/oidc"),
+                "# Odisee OpenID Connect. The server reads this file on use.\n"
+                        + "issuer " + issuer + "\n"
+                        + "audience odisee\n"
+                        + "ui-client odisee-ui\n");
         final Path userRoot = home.resolve("var/user").resolve(USER);
         Files.createDirectories(userRoot.resolve("template"));
         Files.createDirectories(userRoot.resolve("work"));
         Files.createDirectories(userRoot.resolve("output"));
         LetterTemplate.write(userRoot.resolve("template").resolve("Letter.ott"));
+        accessToken = sign(issuer);
+    }
+
+    private static KeyPair keys;
+
+    private static HttpServer startJwks() throws Exception {
+        final KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        keys = generator.generateKeyPair();
+        final RSAPublicKey publicKey = (RSAPublicKey) keys.getPublic();
+        final String jwk = "{\"kty\":\"RSA\",\"kid\":\"odisee-test\",\"alg\":\"RS256\",\"use\":\"sig\","
+                + "\"n\":\"" + unsigned(publicKey.getModulus().toByteArray()) + "\","
+                + "\"e\":\"" + unsigned(publicKey.getPublicExponent().toByteArray()) + "\"}";
+        final byte[] body = ("{\"keys\":[" + jwk + "]}").getBytes(StandardCharsets.UTF_8);
+        final HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/realms/odisee/protocol/openid-connect/certs", exchange -> {
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        return server;
+    }
+
+    private static String sign(final String issuer) throws Exception {
+        final long now = System.currentTimeMillis() / 1000L;
+        final String header = url("{\"alg\":\"RS256\",\"kid\":\"odisee-test\",\"typ\":\"JWT\"}"
+                .getBytes(StandardCharsets.UTF_8));
+        final String payload = url(("{\"iss\":\"" + issuer + "\",\"aud\":\"odisee\",\"azp\":\"" + USER
+                + "\",\"client_id\":\"" + USER
+                + "\",\"preferred_username\":\"service-account-odisee\",\"iat\":" + now
+                + ",\"exp\":" + (now + 600) + "}").getBytes(StandardCharsets.UTF_8));
+        final String input = header + "." + payload;
+        final Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initSign(keys.getPrivate());
+        signature.update(input.getBytes(StandardCharsets.UTF_8));
+        return input + "." + url(signature.sign());
+    }
+
+    private static String unsigned(final byte[] value) {
+        final byte[] trimmed = value.length > 1 && value[0] == 0
+                ? Arrays.copyOfRange(value, 1, value.length) : value;
+        return url(trimmed);
+    }
+
+    private static String url(final byte[] value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }
 
     private static void assertOfficeIsUp(final int port) {

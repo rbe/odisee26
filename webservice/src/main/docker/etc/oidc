@@ -1,0 +1,4 @@
+# Odisee OpenID Connect. The server reads this file on use.
+issuer http://keycloak:8080/realms/odisee
+audience odisee
+ui-client odisee-ui

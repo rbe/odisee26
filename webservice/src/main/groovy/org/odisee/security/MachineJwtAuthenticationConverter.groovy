@@ -14,13 +14,13 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 
 /**
- * The authentication name is the Odisee user from {@code etc/oidc}.
+ * The authentication name is the Odisee user for this token.
  */
 final class MachineJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
     @Override
     AbstractAuthenticationToken convert(Jwt jwt) {
-        new JwtAuthenticationToken(jwt, Collections.emptyList(), MachineToken.user(jwt))
+        new JwtAuthenticationToken(jwt, Collections.emptyList(), OidcToken.user(jwt))
     }
 
 }

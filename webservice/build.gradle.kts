@@ -69,28 +69,8 @@ tasks.named<BootRun>("bootRun") {
 
 val odiseeTestHome = layout.buildDirectory.dir("odisee-test-home")
 
-tasks.register<Jar>("odihashJar") {
-    group = "Odisee"
-    description = "Bcrypt helper invoked by odictl user. Not a second CLI."
-    archiveFileName.set("odihash.jar")
-    destinationDirectory.set(layout.buildDirectory.dir("odihash"))
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    from(sourceSets.main.get().output) {
-        include("org/odisee/security/BcryptCli.class")
-    }
-    val cryptoJar = configurations.runtimeClasspath.get().files.first {
-        it.name.startsWith("spring-security-crypto-") && it.name.endsWith(".jar")
-    }
-    from(zipTree(cryptoJar)) {
-        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/MANIFEST.MF")
-    }
-    manifest {
-        attributes("Main-Class" to "org.odisee.security.BcryptCli")
-    }
-}
-
 tasks.named<Test>("test") {
-    dependsOn(tasks.named("compileTestGroovy"), tasks.named("odihashJar"))
+    dependsOn(tasks.named("compileTestGroovy"))
     systemProperty("ODISEE_HOME", odiseeTestHome.get().asFile.absolutePath)
     // Talks to LibreOffice. Run it with libreOfficeTest.
     exclude("**/GenerationBasisTest.class")
@@ -247,6 +227,8 @@ tasks.register<Test>("keycloakTest") {
     systemProperty("ODISEE_HOME", odiseeTestHome.get().asFile.absolutePath)
     systemProperty("odisee.keycloak.issuer", "http://127.0.0.1:8180/realms/odisee")
     systemProperty("odisee.keycloak.tokenUrl", "http://127.0.0.1:8180/realms/odisee/protocol/openid-connect/token")
+    systemProperty("odisee.keycloak.admin", "admin")
+    systemProperty("odisee.keycloak.adminPassword", "admin")
     doFirst {
         odiseeTestHome.get().asFile.mkdirs()
     }
@@ -269,12 +251,9 @@ val dockerBuildDir = layout.buildDirectory.dir("docker/odisee")
 tasks.register<Copy>("prepareOdiseeDocker") {
     group = "Odisee"
     description = "Stage the service image context"
-    dependsOn(tasks.named("bootJar"), tasks.named("odihashJar"))
+    dependsOn(tasks.named("bootJar"))
     from("src/main/docker")
     from(tasks.named("bootJar"))
-    from(tasks.named("odihashJar")) {
-        into("bin")
-    }
     into(dockerBuildDir)
 }
 

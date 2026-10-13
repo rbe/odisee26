@@ -179,16 +179,16 @@ Management is `odictl` only.
 `odictl` stays bash.
 Bash is always installed in the Odisee service image.
 Product HTTP stays generate, jobs, templates, and `/ready`.
-`odictl user NAME PASSWORD` writes `$ODISEE_HOME/etc/users` and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`.
+`odictl user NAME` creates the Keycloak user, a confidential client whose id is `NAME`, and `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`.
+It prints the client id and secret.
 A bad name fails.
 An existing user fails.
-There is no default password.
+There is no password file.
 `odictl callback-host USER HOST` appends `username host` to `$ODISEE_HOME/etc/callback-hosts`.
 A host listed for one user does not allow another user's callback.
 `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`.
 The secret is the rest of the line and may contain spaces.
-`odictl machine CLIENT USER ISSUER AUDIENCE` writes `$ODISEE_HOME/etc/oidc`.
-The server reads those files on use.
+The server reads those files on use, including `$ODISEE_HOME/etc/oidc`.
 There is no second config channel.
 The person who can run `odictl` is the admin.
 
@@ -201,9 +201,8 @@ instance(s) and Odisee.
 `odictl -q start` starts both.
 Odisee runs as `java -jar`.
 Embedded Tomcat serves HTTP.
-Accounts are `$ODISEE_HOME/etc/users`.
-`java -jar` reads that file.
-It does not read `odisee-users.xml`.
+A caller sends `Authorization: Bearer`.
+`java -jar` does not read `odisee-users.xml`.
 `GET /ready` is anonymous.
 See <<multitenancy>>.
 
@@ -290,71 +289,68 @@ A bare-metal install passes that host's endpoint to `odictl bucket`.
 `./gradlew :webservice:test` does not start MinIO.
 
 [[machine-login]]
-=== Machine login
+=== OpenID Connect
 
-A machine uses one confidential Keycloak client and the client-credentials grant.
 The `keycloak` service runs next to `odisee` on the `odisee-backend` network.
-It is also on `odisee-outside`, so a machine on the host can request a token.
+It is also on `odisee-outside`, so a caller on the host can request a token.
 Its image is `quay.io/keycloak/keycloak:26.8.0`.
 The command is `start-dev --import-realm --hostname=http://keycloak:8080`.
 The realm file is `keycloak/odisee-realm.json`, mounted at `/opt/keycloak/data/import/odisee-realm.json`.
 Keycloak imports that file on start.
 The realm is `odisee`.
-The client id is `odisee-machine`.
-The client secret is `odisee-machine-secret`.
-The client is confidential.
-The authorization code, implicit, and password grants are off.
-The access token audience includes `odisee`.
 The published port is 8180.
 Inside the compose network the port is 8080.
 `KC_BOOTSTRAP_ADMIN_USERNAME` is `admin` and `KC_BOOTSTRAP_ADMIN_PASSWORD` is `admin`.
 
-The issuer Odisee checks is `http://keycloak:8080/realms/odisee`.
-The hostname on the service is that URL, so a token requested through the host port still carries that issuer.
+`$ODISEE_HOME/etc/oidc` holds the issuer, the audience, and the UI client id:
+
+[source]
+----
+issuer http://keycloak:8080/realms/odisee
+audience odisee
+ui-client odisee-ui
+----
+
+The server reads that file on use.
 Odisee reads the signing keys from `{issuer}/protocol/openid-connect/certs`.
 That URL comes from the configured issuer.
 It is not a claim in the token.
 
-Create the Odisee user first.
-Then map the client:
+`odictl user NAME` creates the Keycloak user, the directories, and one confidential client whose id is `NAME`.
+Set the admin environment before the command:
 
 [source,bash]
 ----
-odictl user press s3cret
-odictl machine odisee-machine press http://keycloak:8080/realms/odisee odisee
+export ODISEE_KEYCLOAK_ISSUER=http://keycloak:8080/realms/odisee
+export ODISEE_KEYCLOAK_ADMIN=admin
+export ODISEE_KEYCLOAK_ADMIN_PASSWORD=admin
+odictl user press
 ----
 
-`odictl machine CLIENT USER ISSUER AUDIENCE` writes one line in `$ODISEE_HOME/etc/oidc`:
-
-[source]
-----
-client username issuer audience
-----
-
-The server reads that file on use.
-The Odisee user is the username on that line.
-Templates, work, and output stay under `var/user/{username}/`.
-A claim in the token does not select a different user.
-`preferred_username` for this client is `service-account-odisee-machine`.
-That name is not the Odisee user.
-
-A machine requests a token with the client-credentials grant:
+The command prints `client_id` and `client_secret`.
+Odisee does not store the secret.
+An API client requests a token with the client-credentials grant:
 
 [source,bash]
 ----
 curl -s -X POST http://keycloak:8080/realms/odisee/protocol/openid-connect/token \
   -d grant_type=client_credentials \
-  -d client_id=odisee-machine \
-  -d client_secret=odisee-machine-secret
+  -d client_id=press \
+  -d client_secret=THE_SECRET
 ----
 
 From the host, use `http://127.0.0.1:8180/realms/odisee/protocol/openid-connect/token`.
+The hostname on the service is `http://keycloak:8080`, so the token issuer stays `http://keycloak:8080/realms/odisee`.
 Send the access token as `Authorization: Bearer` on `POST /odisee/document/generate` and `POST /odisee/document/jobs`.
-HTTP Basic stays for existing callers.
+The client id is the Odisee user, so the call uses `var/user/press/`.
+`preferred_username` on that token is `service-account-press`.
+That claim does not select a directory.
+A later browser login uses the public client `odisee-ui`.
+That token's username is the directory.
 `GET /odisee/ready` stays anonymous.
 There is no HTTP admin route.
 
-`./gradlew :webservice:keycloakTest` starts its own Keycloak container and requests one client-credentials token.
+`./gradlew :webservice:keycloakTest` starts its own Keycloak container, runs `odictl user`, and requests one client-credentials token.
 That task does not use this compose file.
 `./gradlew :webservice:test` does not start Keycloak.
 

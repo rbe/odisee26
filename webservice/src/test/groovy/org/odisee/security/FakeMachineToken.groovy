@@ -55,11 +55,13 @@ final class FakeMachineToken {
         new FakeMachineToken(key, server, issuer)
     }
 
-    void writeBinding(String clientId, String username, String audience) {
-        def file = MachineFile.location()
+    void writeBinding() {
+        def file = OidcFile.location()
         Files.createDirectories(file.parent)
-        String text = '# Odisee machine client. One line: client username issuer audience\n' +
-                "${clientId} ${username} ${issuer} ${audience}\n"
+        String text = '# Odisee OpenID Connect. The server reads this file on use.\n' +
+                "issuer ${issuer}\n" +
+                "audience odisee\n" +
+                "ui-client odisee-ui\n"
         Files.writeString(file, text)
     }
 

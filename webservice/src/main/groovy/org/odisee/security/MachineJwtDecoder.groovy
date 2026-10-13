@@ -37,26 +37,26 @@ final class MachineJwtDecoder implements JwtDecoder {
 
     @Override
     Jwt decode(String token) throws JwtException {
-        MachineFile.Record record
+        OidcFile.Record record
         try {
-            record = MachineFile.read(MachineFile.location())
+            record = OidcFile.read(OidcFile.location())
         } catch (OdiseeException ex) {
-            throw new BadJwtException('Machine client is not configured', ex)
+            throw new BadJwtException('OpenID Connect is not configured', ex)
         }
         if (record == null) {
-            throw new BadJwtException('Machine client is not configured')
+            throw new BadJwtException('OpenID Connect is not configured')
         }
         String key = record.issuer + ' ' + record.audience
         Jwt jwt = decoders.computeIfAbsent(key, { String ignored -> nimbus(record) }).decode(token)
-        MachineToken.user(jwt, record)
+        OidcToken.user(jwt, record)
         jwt
     }
 
-    private static JwtDecoder nimbus(MachineFile.Record record) {
+    private static JwtDecoder nimbus(OidcFile.Record record) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory()
         factory.setConnectTimeout(Duration.ofSeconds(3))
         factory.setReadTimeout(Duration.ofSeconds(3))
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(MachineFile.jwksUri(record.issuer))
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(OidcFile.jwksUri(record.issuer))
                 .jwsAlgorithm(SignatureAlgorithm.RS256)
                 .restOperations(new RestTemplate(factory))
                 .build()
