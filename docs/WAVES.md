@@ -89,12 +89,12 @@ Status: **landed**.
 The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`. The GitHub Actions job `java-client-office` has Docker and runs that task. `./gradlew build` stays free of Docker.
 
 - The task starts the same LibreOffice container as tests 1–3, on port 2002, with `ODISEE_HOME` mounted at the same path.
-- It starts the webservice against that home. `etc/users` has the caller. `Letter.ott` (user field `Hallo`) is in `var/user/odisee/template`.
-- `OdiseeClient` posts to `http://127.0.0.1:<port>/odisee/document/generate` with the username and password constructor. The request is template `Letter`, output format PDF, and user field `Hallo`.
+- It starts the webservice against that home. `etc/oidc` names the issuer. `Letter.ott` (user field `Hallo`) is in `var/user/odisee/template`.
+- `OdiseeClient.bearer` posts to `http://127.0.0.1:<port>/odisee/document/generate`. The request is template `Letter`, output format PDF, and user field `Hallo`. The token's client id is `odisee`.
 - The PDF text contains the value written.
 - The same request with a gzip body also returns a PDF whose text contains the value.
 - The same request with no credentials is HTTP 401, and that user's output directory does not gain a file.
-- The client sends HTTP Basic on that request. It does not call `Authenticator.setDefault`.
+- The client sends `Authorization: Bearer` on that request. It does not call `Authenticator.setDefault`.
 
 The proof found two failures and fixed them. A logged-in call had a null `request.userPrincipal`, so generate returned 401 (B31). Saving the active DOM request cast it to `GPathResult` and failed before LibreOffice (B32).
 
@@ -117,6 +117,8 @@ F8. The callback is a query parameter on `POST /document/jobs`, not on the synch
 F5. v2 `output/format/@type` is the extension. `format/options/option` carries PDF version, tagged PDF, and a watermark. The namespace stays `http://xmlns.odisee.de/v2/request`. A v3 namespace is still HTTP 400. `template/@outputFormat` applies when `output` is absent. When `output/format/@type` is present, that type is the format. The `.pdfa` suffix remains the PDF/A fallback. The Java client schema is regenerated from the v2 file.
 
 F6. One instruction set per application. Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`. Calc starts with `cell` (sheet and coordinate). Impress starts with `shape` (name). A set can grow on its own. There is no shared `named` tag. A Calc save with no instructions is not this feature.
+
+F9 login is OpenID Connect. SFTP stays not implemented. HTTP Basic and `etc/users` are gone. The compose service is `keycloak` on `odisee-backend`. `odictl user NAME` creates the Keycloak user, `var/user/NAME/`, and a confidential client whose id is `NAME`, and prints the client secret. `POST /document/generate` and `POST /document/jobs` accept `Authorization: Bearer`. Issuer and audience come from `$ODISEE_HOME/etc/oidc`. The client id is the Odisee user. A username claim on that token does not select another user. The UI client `odisee-ui` uses `preferred_username`. `GET /ready` stays anonymous. `./gradlew :webservice:keycloakTest` starts Keycloak, runs `odictl user`, and requests one client-credentials token. `./gradlew :webservice:test` does not start Keycloak.
 
 F7 is implemented. Each user has one bucket in `$ODISEE_HOME/etc/buckets`, read on each store. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes that file. The v2 field is `odisee/@delivery` (`stream`, `store`, or `both`; the default is `stream`). JSON uses `delivery`. A v3 namespace is still HTTP 400. Stream keeps the response body as the file, and `POST /document/generate` stays synchronous. Store writes to that user's bucket and the body is the bucket and the key. Both returns the file and stores a copy, identified in the `X-Odisee-Object` header. The request cannot name a bucket. The server chooses the key. Endpoint, region, bucket, access key, and secret come from that user's line. The store is S3-compatible. MinIO is the development server. Odisee does not expire, delete, or set a lifecycle on the object. Retention belongs to the bucket. `POST /document/jobs` uses the same choice, and `var/user/{name}/jobs.json` stores the bucket and the key. Jobs stay private to the user. A callback still goes only to a host listed for that user in `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous.
 

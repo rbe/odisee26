@@ -86,7 +86,6 @@ tasks.register<Zip>("packageDistribution") {
 
     into("bin") {
         from("webservice/src/main/docker/bin")
-        from(project(":webservice").tasks.named("odihashJar"))
         filePermissions {
             unix("rwxr-xr-x")
         }

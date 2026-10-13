@@ -80,6 +80,18 @@ public final class OdiseeClient {
     }
 
     /**
+     * The access token is the caller's Keycloak client-credentials token.
+     * The client id inside that token is the Odisee user.
+     */
+    public static OdiseeClient bearer(final String serviceURL, final String accessToken) {
+        final OdiseeClient client = new OdiseeClient();
+        client.serviceURL = Objects.requireNonNull(serviceURL);
+        Objects.requireNonNull(accessToken);
+        client.httpHelper = OdiseeHttpHelper.bearer(accessToken);
+        return client;
+    }
+
+    /**
      * Post the request as JSON. The service converts it back to the XML generator input.
      */
     public OdiseeClient useJson() {

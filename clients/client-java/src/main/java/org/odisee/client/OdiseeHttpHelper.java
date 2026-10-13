@@ -40,14 +40,28 @@ final class OdiseeHttpHelper {
 
     private final String password;
 
+    private final String accessToken;
+
     OdiseeHttpHelper() {
         this.username = "";
         this.password = "";
+        this.accessToken = "";
     }
 
     OdiseeHttpHelper(final String username, final String password) {
         this.username = username;
         this.password = password;
+        this.accessToken = "";
+    }
+
+    static OdiseeHttpHelper bearer(final String accessToken) {
+        return new OdiseeHttpHelper(accessToken);
+    }
+
+    private OdiseeHttpHelper(final String accessToken) {
+        this.username = "";
+        this.password = "";
+        this.accessToken = accessToken;
     }
 
     public byte[] post(final URL url, final String body, final String contentType) {
@@ -72,6 +86,10 @@ final class OdiseeHttpHelper {
      * is JVM-wide and would attach the same user to a later call that has none.
      */
     private void applyAuthorization(final HttpURLConnection connection) {
+        if (accessToken != null && !accessToken.isEmpty()) {
+            connection.setRequestProperty("Authorization", "Bearer " + accessToken);
+            return;
+        }
         if (username == null || username.isEmpty()) {
             return;
         }

@@ -13,44 +13,38 @@ There is no shared `var/template` fallback.
 Adding Odisee Users
 ^^^^^^^^^^^^^^^^^^^
 
-The server reads `$ODISEE_HOME/etc/users`.
+`odictl user NAME` creates the Keycloak user and a confidential client whose id is `NAME`.
+It also creates `template`, `work`, and `output` under `var/user/NAME/`.
+It prints the client id and secret.
+Odisee does not store the secret.
 `java -jar` does not read `odisee-users.xml`.
-
-A line is `username bcrypt-hash` or `username bcrypt-hash admin`.
-A line that starts with `#` is a comment.
-The hash is bcrypt.
-The file does not store the password.
-
-If `etc/users` is missing, the server creates the first admin only when both `ODISEE_BOOTSTRAP_USER` and `ODISEE_BOOTSTRAP_PASSWORD` are set.
-Otherwise it creates no users.
-There is no default password.
-
-The next user is `odictl user NAME PASSWORD`.
-The command appends a bcrypt line to `etc/users` and creates `template`, `work`, and `output` under `var/user/NAME/`.
-The new user is not an admin.
 A bad name fails.
 An existing user fails.
-There is no default password.
 The person who can run `odictl` is the admin.
 
 [[permissions]]
 Permissions
 ~~~~~~~~~~~
 
-`etc/users` is readable and writable by the server user only.
-`odictl user` writes that file.
+`etc/oidc` is readable by the server user.
+`odictl user` writes the issuer and audience there.
 This server does not configure SFTP.
 
 [[access-to-http-service]]
 Access to HTTP Service
 ^^^^^^^^^^^^^^^^^^^^^^
 
-`POST /odisee/document/generate` requires HTTP Basic.
+`POST /odisee/document/generate` and `POST /odisee/document/jobs` accept `Authorization: Bearer`.
+The token's issuer and audience must match `$ODISEE_HOME/etc/oidc`.
+An API client's id is the Odisee user.
+A username claim on that token does not select a different user.
+The UI client `odisee-ui` uses `preferred_username`.
 No login is HTTP 401 and does not generate a document.
 Any authenticated user may run macros.
 The macro name, library, and language must be plain names.
 A bad name is HTTP 400.
 `GET /odisee/ready` stays anonymous.
+The Keycloak compose service is in the administrators guide, <<machine-login>>.
 
 [[callback-hosts]]
 Callback hosts

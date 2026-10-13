@@ -6,7 +6,9 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockServletContext
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.odisee.document.PathTree
+import org.odisee.io.OdiseePath
+import org.odisee.io.TenantPaths
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -17,11 +19,13 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext
 import org.springframework.web.servlet.config.annotation.EnableWebMvc
 
+import org.springframework.security.core.context.SecurityContextHolder
+
 import java.nio.file.Files
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 class OdiseeSecurityConfigurationTest extends GroovyTestCase {
@@ -30,11 +34,24 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
 
     private MockMvc mvc
 
+    private FakeMachineToken fake
+
+    private String adaToken
+
     @Override
     protected void setUp() {
-        Files.deleteIfExists(PasswordFile.location())
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder()
-        PasswordFile.create(PasswordFile.location(), 'ada', 'ada-secret', false, encoder)
+        Files.deleteIfExists(OidcFile.location())
+        PathTree.delete(OdiseePath.ODISEE_VAR.resolve('user').resolve('ada'))
+        TenantPaths.createDirectories('ada')
+        fake = FakeMachineToken.start()
+        fake.writeBinding()
+        adaToken = fake.sign(
+                azp: 'ada',
+                client_id: 'ada',
+                preferred_username: 'bob',
+                sub: 'bob',
+                user: 'carol'
+        )
         context = new AnnotationConfigWebApplicationContext()
         context.setServletContext(new MockServletContext())
         context.register(SecurityProbeConfig)
@@ -45,11 +62,14 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
     @Override
     protected void tearDown() {
         context?.close()
-        Files.deleteIfExists(PasswordFile.location())
+        fake?.stop()
+        Files.deleteIfExists(OidcFile.location())
+        PathTree.delete(OdiseePath.ODISEE_VAR.resolve('user').resolve('ada'))
     }
 
     void testReadyStaysAnonymous() {
         mvc.perform(get('/ready')).andExpect(status().isOk())
+        mvc.perform(get('/ready').header('Authorization', 'Bearer not-a-token')).andExpect(status().isOk())
     }
 
     void testTemplateWithoutLoginIs401() {
@@ -57,15 +77,17 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
     }
 
     void testTemplateWithLoginIsAllowed() {
-        mvc.perform(get('/template/Letter').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
+        mvc.perform(get('/template/Letter').header('Authorization', "Bearer ${adaToken}")).andExpect(status().isOk())
     }
 
     void testGenerateWithoutLoginIs401() {
         mvc.perform(post('/document/generate')).andExpect(status().isUnauthorized())
     }
 
-    void testGenerateWithLoginIsAllowed() {
-        mvc.perform(post('/document/generate').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
+    void testGenerateWithLoginIsTheClientId() {
+        mvc.perform(post('/document/generate').header('Authorization', "Bearer ${adaToken}"))
+                .andExpect(status().isOk())
+                .andExpect(content().string('ada'))
     }
 
     void testJobWithoutLoginIs401() {
@@ -74,8 +96,23 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
     }
 
     void testJobWithLoginIsAllowed() {
-        mvc.perform(post('/document/jobs').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isAccepted())
-        mvc.perform(get('/document/jobs/abc').with(httpBasic('ada', 'ada-secret'))).andExpect(status().isOk())
+        mvc.perform(post('/document/jobs').header('Authorization', "Bearer ${adaToken}"))
+                .andExpect(status().isAccepted())
+                .andExpect(content().string('ada'))
+        mvc.perform(get('/document/jobs/abc').header('Authorization', "Bearer ${adaToken}")).andExpect(status().isOk())
+    }
+
+    void testUiClientUsesTheLoggedInUsername() {
+        String token = fake.sign(azp: 'odisee-ui', preferred_username: 'ada', sub: 'not-ada')
+        mvc.perform(post('/document/generate').header('Authorization', "Bearer ${token}"))
+                .andExpect(status().isOk())
+                .andExpect(content().string('ada'))
+    }
+
+    void testGenerateRejectsATokenForADifferentAudience() {
+        String token = fake.sign(azp: 'ada', aud: 'account', preferred_username: 'ada')
+        mvc.perform(post('/document/generate').header('Authorization', "Bearer ${token}"))
+                .andExpect(status().isUnauthorized())
     }
 
     @Configuration
@@ -100,15 +137,19 @@ class OdiseeSecurityConfigurationTest extends GroovyTestCase {
             'catalog'
         }
 
-        @PostMapping('/document/generate')
+        @PostMapping(path = '/document/generate', produces = 'text/plain')
         String generate() {
-            'ok'
+            caller()
         }
 
-        @PostMapping('/document/jobs')
+        @PostMapping(path = '/document/jobs', produces = 'text/plain')
         @ResponseStatus(HttpStatus.ACCEPTED)
         String submitJob() {
-            'accepted'
+            caller()
+        }
+
+        private static String caller() {
+            SecurityContextHolder.context?.authentication?.name
         }
 
         @GetMapping('/document/jobs/{id}')
