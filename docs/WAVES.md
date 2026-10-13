@@ -26,7 +26,7 @@ Build:
 
 - JDK 21, Gradle 8.14.5, Grails 7.2.4.
 - UNO classes come from Maven Central (`org.libreoffice:libreoffice` and `org.libreoffice:unoloader` at 26.2.2, the newest 26.2 still jars published there). The older `juh`, `jurt`, `ridl`, and `unoil` coordinates are empty stubs at that version. `compileJava` does not download a LibreOffice `.deb`.
-- `./gradlew build` compiles, runs the unit tests, and writes `build/distributions/odisee-2.6-linux-x86_64.zip`. GitHub Actions does the same on JDK 21 and publishes the zip on a `v*` tag.
+- `./gradlew build` compiles, runs the unit tests, and writes `build/distributions/odisee-2.6-linux-x86_64.zip`. GitHub Actions does the same on JDK 21 and publishes the zip on a `v*` tag. Job `java-client-office` runs `:clients:client-java:javaClientOfficeTest` with Docker.
 - `./gradlew :webservice:test` does not start Docker. `./gradlew :webservice:libreOfficeTest` builds `webservice/src/test/docker/libreoffice` (Ubuntu 26.04, headless LibreOffice Writer) and runs tests 1–3.
 - The service image is `./gradlew :webservice:buildOdiseeImage` (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). It is not part of `build`.
 - `oxt/buildExtension` downloads ant-contrib and xmltask, then runs the Ant `world-production` target. Configuration of the webservice does not import that Ant build. Gradle is started with `--add-exports` for `java.xml/com.sun.org.apache.xpath.internal` and `java.xml/com.sun.org.apache.xpath.internal.objects` because xmltask 1.16 calls those JDK-internal XPath classes.
@@ -86,18 +86,19 @@ That builds `webservice/src/test/docker/libreoffice`, starts the container, and 
 
 Status: **landed**.
 
-The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`.
+The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`. The GitHub Actions job `java-client-office` has Docker and runs that task. `./gradlew build` stays free of Docker.
 
 - The task starts the same LibreOffice container as tests 1–3, on port 2002, with `ODISEE_HOME` mounted at the same path.
-- It starts the webservice against that home. `etc/users` has the caller. `Letter.ott` (user field `Hallo`) is in `var/user/odisee/template`.
-- `OdiseeClient` posts to `http://127.0.0.1:<port>/odisee/document/generate` with the username and password constructor. The request is template `Letter`, output format PDF, and user field `Hallo`.
+- It starts the webservice against that home. `etc/oidc` names the issuer. `Letter.ott` (user field `Hallo`) is in `var/user/odisee/template`.
+- `OdiseeClient.bearer` posts to `http://127.0.0.1:<port>/odisee/document/generate`. The request is template `Letter`, output format PDF, and user field `Hallo`. The token's client id is `odisee`.
 - The PDF text contains the value written.
+- The same request with a gzip body also returns a PDF whose text contains the value.
 - The same request with no credentials is HTTP 401, and that user's output directory does not gain a file.
-- The client sends HTTP Basic on that request. It does not call `Authenticator.setDefault`.
+- The client sends `Authorization: Bearer` on that request. It does not call `Authenticator.setDefault`.
 
 The proof found two failures and fixed them. A logged-in call had a null `request.userPrincipal`, so generate returned 401 (B31). Saving the active DOM request cast it to `GPathResult` and failed before LibreOffice (B32).
 
-Calc and Impress stay out of this wave. Wave 6 adds their instruction sets (F6). The remote tests in `OdiseeClientTest` stay `@Ignore`. They still point at `service3.odisee.de`.
+Calc and Impress stay out of this wave. Wave 6 adds their instruction sets (F6). `OdiseeClientTest` is removed. The Hallo request, including a gzip body, runs in `OdiseeClientLocalTest`.
 
 ## Wave 6 — Features
 
