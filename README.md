@@ -18,7 +18,7 @@ export JAVA_HOME=/path/to/jdk-21
 
 The zip contains `application.jar`, `bin/odictl`, `etc/`, the Java client, the LibreOffice extension, and the HTML documentation.
 
-GitHub Actions uploads that zip on every push and pull request. A git tag `v*` also publishes it as a GitHub Release.
+GitHub Actions splits this into jobs `setup`, `build`, `test`, and `package`. `setup` checks out the sources, installs JDK 21, and fills the Gradle cache. `build` compiles and assembles, does not run tests, and uploads those outputs. `test` downloads the outputs and runs the unit tests that do not need Docker. `package` downloads the outputs, writes the zip, and uploads it. A git tag `v*` publishes that zip as a GitHub Release. Job `java-client-office` runs the LibreOffice proof.
 
 Docker tasks are not part of `build`. They need a local Docker daemon. `:webservice:startStack` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer) and starts `odisee`, `minio`, and `keycloak` from `webservice/src/main/docker/docker-compose.yml`. Odisee listens on port 8080, MinIO on 9000, and Keycloak on 8180. `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts a throwaway MinIO and stores one object. `:webservice:test` does not start Docker.
 
