@@ -1,0 +1,43 @@
+name: Prepare
+description: Check out the repository, set up Java, and optionally restore the build outputs.
+
+inputs:
+  java-version:
+    description: JDK version
+    required: true
+  java-distribution:
+    description: JDK distribution
+    required: true
+  build-outputs:
+    description: Build-output artifact to download. Empty skips the download.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Set up Java ${{ inputs.java-version }}
+      uses: actions/setup-java@v5
+      with:
+        distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+        cache: gradle
+
+    - name: Download build outputs
+      if: ${{ inputs.build-outputs != '' }}
+      uses: actions/download-artifact@v7
+      with:
+        name: ${{ inputs.build-outputs }}
+        path: .
+
+    - name: Restore empty output directories
+      if: ${{ inputs.build-outputs != '' }}
+      shell: bash
+      run: |
+        test -f build/ci-empty-dirs.txt
+        while IFS= read -r dir; do
+          [ -n "$dir" ] && mkdir -p "$dir"
+        done < build/ci-empty-dirs.txt

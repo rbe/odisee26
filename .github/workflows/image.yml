@@ -1,0 +1,92 @@
+name: Image
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: JDK version
+        required: true
+        type: string
+      java-distribution:
+        description: JDK distribution
+        required: true
+        type: string
+      odisee-build-number:
+        description: CI build number appended to the semantic version
+        required: true
+        type: string
+      build-outputs:
+        description: Artifact that holds the compiled outputs
+        required: true
+        type: string
+      distribution-zip:
+        description: Distribution zip path from the caller
+        required: true
+        type: string
+
+jobs:
+  image:
+    name: image
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    permissions:
+      actions: write
+      contents: read
+      packages: write
+    env:
+      JAVA_VERSION: ${{ inputs.java-version }}
+      JAVA_DISTRIBUTION: ${{ inputs.java-distribution }}
+      ODISEE_BUILD_NUMBER: ${{ inputs.odisee-build-number }}
+      BUILD_OUTPUTS: ${{ inputs.build-outputs }}
+      DISTRIBUTION_ZIP: ${{ inputs.distribution-zip }}
+    steps:
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          java-version: ${{ inputs.java-version }}
+          java-distribution: ${{ inputs.java-distribution }}
+          build-outputs: ${{ inputs.build-outputs }}
+
+      - name: Stage the image context
+        run: ./gradlew --no-daemon :printVersion :webservice:prepareOdiseeImage
+
+      - name: Install Podman
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y podman qemu-user-binfmt
+          mkdir -p "${HOME}/.config/containers"
+          printf '%s\n' '[engine]' 'cgroup_manager = "cgroupfs"' 'events_logger = "file"' > "${HOME}/.config/containers/containers.conf"
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push the service image
+        run: |
+          set -eu
+          version=$(tr -d '[:space:]' < build/odisee-version.txt)
+          repo=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          image="ghcr.io/${repo}"
+          cache_repo="ghcr.io/${repo}/cache"
+          build=(
+            podman build
+            --platform linux/amd64,linux/arm64
+            --manifest "${image}:${version}"
+            --layers
+            --cache-to "${cache_repo}"
+            --build-arg "projectVersion=${version}"
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+            --label "org.opencontainers.image.version=${version}"
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+          )
+          if ! "${build[@]}" --cache-from "${cache_repo}" webservice/build/container/odisee; then
+            podman manifest rm "${image}:${version}" >/dev/null 2>&1 || true
+            "${build[@]}" webservice/build/container/odisee
+          fi
+          podman manifest push --all "${image}:${version}"
+          podman manifest push --all "${image}:${version}" "${image}:latest"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            podman manifest push --all "${image}:${version}" "${image}:${GITHUB_REF_NAME}"
+          fi

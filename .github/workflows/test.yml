@@ -1,0 +1,55 @@
+name: Test
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: JDK version
+        required: true
+        type: string
+      java-distribution:
+        description: JDK distribution
+        required: true
+        type: string
+      odisee-build-number:
+        description: CI build number appended to the semantic version
+        required: true
+        type: string
+      build-outputs:
+        description: Artifact that holds the compiled outputs
+        required: true
+        type: string
+      distribution-zip:
+        description: Distribution zip path from the caller
+        required: true
+        type: string
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    env:
+      JAVA_VERSION: ${{ inputs.java-version }}
+      JAVA_DISTRIBUTION: ${{ inputs.java-distribution }}
+      ODISEE_BUILD_NUMBER: ${{ inputs.odisee-build-number }}
+      BUILD_OUTPUTS: ${{ inputs.build-outputs }}
+      DISTRIBUTION_ZIP: ${{ inputs.distribution-zip }}
+    steps:
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          java-version: ${{ inputs.java-version }}
+          java-distribution: ${{ inputs.java-distribution }}
+          build-outputs: ${{ inputs.build-outputs }}
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon :webservice:test :clients:client-java:test :webservice:integrationTest :test
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-reports
+          path: "**/build/test-results/**/*.xml"
+          if-no-files-found: ignore
