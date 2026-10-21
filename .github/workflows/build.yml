@@ -9,23 +9,102 @@ on:
 permissions:
   contents: write
 
+env:
+  JAVA_VERSION: "21"
+  JAVA_DISTRIBUTION: temurin
+  BUILD_OUTPUTS: build-outputs
+  DISTRIBUTION_ZIP: build/distributions/odisee-*-linux-x86_64.zip
+
 jobs:
-  package:
+  setup:
+    name: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Fill the Gradle cache
+        run: ./gradlew --no-daemon :dependencies :webservice:dependencies :clients:client-java:dependencies :documentation:dependencies
+
+  build:
+    name: build
+    needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
-      - name: Build, test, and package
-        run: ./gradlew --no-daemon build
+      - name: Compile and assemble
+        run: ./gradlew --no-daemon assemble testClasses integrationTestClasses
+
+      - name: Record empty output directories
+        run: |
+          find . \
+            \( -path './.git' -o -path './.git/*' \) -prune -o \
+            -type d -empty -print \
+            | sed 's|^\./||' \
+            | awk '$0 ~ /(^\.gradle($|\/))|(^|\/)build($|\/)|^oxt\/antlib($|\/)|^oxt\/Odisee\/dist($|\/)/' \
+            | sort -u > build/ci-empty-dirs.txt
+
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BUILD_OUTPUTS }}
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .gradle
+            **/build/
+            oxt/antlib/
+            oxt/Odisee/dist/
+
+  test:
+    name: test
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Download build outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_OUTPUTS }}
+          path: .
+
+      - name: Restore empty output directories
+        run: |
+          test -f build/ci-empty-dirs.txt
+          while IFS= read -r dir; do
+            [ -n "$dir" ] && mkdir -p "$dir"
+          done < build/ci-empty-dirs.txt
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon :webservice:test :clients:client-java:test :webservice:integrationTest :test
 
       - name: Upload test reports
         if: failure()
@@ -35,33 +114,79 @@ jobs:
           path: "**/build/test-results/**/*.xml"
           if-no-files-found: ignore
 
-      - name: Upload distribution
-        uses: actions/upload-artifact@v4
-        with:
-          name: odisee-linux-x86_64
-          path: build/distributions/odisee-*-linux-x86_64.zip
-          if-no-files-found: error
-
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/distributions/odisee-*-linux-x86_64.zip
-
-  java-client-office:
-    name: Java client office proof
+  package:
+    name: package
+    needs: [build, test]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
+
+      - name: Download build outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_OUTPUTS }}
+          path: .
+
+      - name: Restore empty output directories
+        run: |
+          test -f build/ci-empty-dirs.txt
+          while IFS= read -r dir; do
+            [ -n "$dir" ] && mkdir -p "$dir"
+          done < build/ci-empty-dirs.txt
+
+      - name: Package the distribution
+        run: ./gradlew --no-daemon packageDistribution
+
+      - name: Upload distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: odisee-linux-x86_64
+          path: ${{ env.DISTRIBUTION_ZIP }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.DISTRIBUTION_ZIP }}
+
+  java-client-office:
+    name: Java client office proof
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Download build outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_OUTPUTS }}
+          path: .
+
+      - name: Restore empty output directories
+        run: |
+          test -f build/ci-empty-dirs.txt
+          while IFS= read -r dir; do
+            [ -n "$dir" ] && mkdir -p "$dir"
+          done < build/ci-empty-dirs.txt
 
       - name: Java client office proof
         run: ./gradlew --no-daemon :clients:client-java:javaClientOfficeTest
