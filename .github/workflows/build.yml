@@ -255,7 +255,7 @@ jobs:
         run: |
           set -eu
           sudo apt-get update
-          sudo apt-get install -y podman qemu-user-static
+          sudo apt-get install -y podman qemu-user-binfmt
           mkdir -p "${HOME}/.config/containers"
           printf '%s\n' '[engine]' 'cgroup_manager = "cgroupfs"' 'events_logger = "file"' > "${HOME}/.config/containers/containers.conf"
 
