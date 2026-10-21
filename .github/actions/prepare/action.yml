@@ -1,5 +1,5 @@
 name: Prepare
-description: Check out the repository, set up Java, and optionally restore the build outputs.
+description: Set up Java and optionally restore the build outputs. The job checks out the repository first.
 
 inputs:
   java-version:
@@ -16,9 +16,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout
-      uses: actions/checkout@v5
-
     - name: Set up Java ${{ inputs.java-version }}
       uses: actions/setup-java@v5
       with:
