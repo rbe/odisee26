@@ -9,10 +9,12 @@ ENV TZ=Europe/Berlin \
 # Docs, package indexes, and Writer files that conversion does not read are
 # removed in this same layer so the runtime stage does not contain them.
 # entrypoint.sh uses a 1g heap, so the non-compressed CDS archive stays unused.
+# iproute2 provides ss for the office port checks in odilib and odiwatchdog.
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         openjdk-21-jre-headless \
         curl \
+        iproute2 \
         libreoffice-writer \
         fonts-liberation \
         ca-certificates \

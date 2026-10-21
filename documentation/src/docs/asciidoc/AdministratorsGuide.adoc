@@ -35,7 +35,7 @@
 
 bash 4
 java on `PATH`
-netstat
+ss from iproute2 on Linux; netstat on macOS
 sudo
 unzip
 awk
@@ -74,6 +74,8 @@ systemd passes `ODISEE_HOME` and the Keycloak variables in the service environme
 The `odisee` container does the same (`ODISEE_HOME=/home/odisee`).
 Its command is `/home/odisee/entrypoint.sh`.
 That script starts LibreOffice with `odictl -q start-inst` and then runs `java -jar` in the foreground.
+
+Set `ODISEE_SHELL=1` to start that JVM in the background and exec bash, so `docker run -it` has a prompt. Exit or SIGTERM stops the JVM and the LibreOffice processes. The default leaves `java -jar` in the foreground, and an admin shell is `docker exec`.
 
 . Download distribution as ZIP archive for your platform
 [source,bash,lineno]

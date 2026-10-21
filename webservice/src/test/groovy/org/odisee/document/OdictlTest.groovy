@@ -308,6 +308,247 @@ class OdictlTest extends GroovyTestCase {
         assertFalse(gradle.contains('.bash_profile'))
     }
 
+    void testLinuxOfficePortCheckUsesSs() {
+        Path tree = Files.createTempDirectory('odisee-ss')
+        try {
+            Path home = tree.resolve('odisee')
+            Path bin = tree.resolve('bin')
+            Files.createDirectories(home.resolve('etc'))
+            Files.createDirectories(bin)
+            Files.writeString(home.resolve('etc/odiinst'), 'odi1|127.0.0.1|2001|/usr/lib/libreoffice||nologo|true\n')
+            Path ssLog = tree.resolve('ss.log')
+            writeExe(bin.resolve('ss'), [
+                    '#!/bin/sh',
+                    'printf %s\\\\n "$*" >> \'' + ssLog + '\'',
+                    'printf %s\\\\n \'LISTEN 0 128 127.0.0.1:2001 0.0.0.0:*\'',
+                    '',
+            ].join('\n'))
+            String output = launch(true, ['/bin/bash', '-c', [
+                    '. "$ODILIB"',
+                    'get_inst_status odi1',
+                    'echo "numlist=${INSTSTAT[numlist]}"',
+                    'echo "numconn=${INSTSTAT[numconn]}"',
+            ].join('\n')], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: "${bin}:/usr/bin:/bin",
+                    ODILIB: new File('src/main/docker/bin/odilib').absolutePath,
+            ])
+
+            String list = output.readLines().find { it.startsWith('numlist=') }?.substring('numlist='.length())?.trim()
+            String conn = output.readLines().find { it.startsWith('numconn=') }?.substring('numconn='.length())?.trim()
+            assertEquals(output, '1', list)
+            assertEquals(output, '0', conn)
+            assertEquals(['-lnt', '-lnt'], Files.readAllLines(ssLog)*.trim())
+            String library = new File('src/main/docker/bin/odilib').getText('UTF-8')
+            String watchdog = new File('src/main/docker/bin/odiwatchdog').getText('UTF-8')
+            String docker = new File('src/main/docker/Dockerfile').getText('UTF-8')
+            assertTrue(library.contains('netstat -f inet -p tcp -an'))
+            assertTrue(watchdog.contains('ss -nlt'))
+            assertTrue(watchdog.contains('sockstat -46l'))
+            assertTrue(docker.contains('iproute2'))
+            assertFalse(docker.contains('net-tools'))
+            assertTrue(docker.contains('FROM ubuntu:26.04'))
+            assertTrue(docker.contains('CMD ["/home/odisee/entrypoint.sh"]'))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
+    void testEntrypointKeepsJavaInTheForeground() {
+        Path tree = Files.createTempDirectory('odisee-foreground')
+        EntrypointRun run = null
+        try {
+            run = entrypointRun(tree, [:])
+            boolean started = waitForFile(run.javaArgs, run.process)
+            assertTrue(started ? 'java started' : readUntil(run.process, 'NEVER', 200), started)
+            String cmd = commandLine(run.process.pid())
+            assertTrue(cmd, cmd.contains('entrypoint.sh'))
+            assertFalse(cmd, cmd.contains('--rcfile'))
+            assertFalse(cmd, cmd.contains('--login'))
+            String args = Files.readString(run.javaArgs)
+            assertTrue(args, args.contains('-jar'))
+            assertTrue(args, args.contains(run.home.resolve('application.jar').toString()))
+            assertEquals('-q start-inst', Files.readString(run.odictlArgs).trim())
+            String entry = new File('src/main/docker/entrypoint.sh').getText('UTF-8')
+            assertFalse(entry.contains('tail -f'))
+            assertFalse(entry.contains('--login'))
+        } finally {
+            stopRun(run)
+            PathTree.delete(tree)
+        }
+    }
+
+    void testDebugShellStopsTheJvmAndLibreOfficeOnExit() {
+        debugShell(false)
+    }
+
+    void testDebugShellStopsTheJvmAndLibreOfficeOnSigterm() {
+        debugShell(true)
+    }
+
+    private void debugShell(boolean sigterm) {
+        Path tree = Files.createTempDirectory(sigterm ? 'odisee-term' : 'odisee-exit')
+        EntrypointRun run = null
+        try {
+            run = entrypointRun(tree, [ODISEE_SHELL: '1'])
+            run.process.getOutputStream().write('echo SHELL_READY\n'.getBytes(StandardCharsets.UTF_8))
+            run.process.getOutputStream().flush()
+            String output = readUntil(run.process, 'SHELL_READY', 20000)
+            assertTrue(output, output.contains('SHELL_READY'))
+            String cmd = commandLine(run.process.pid())
+            assertTrue(cmd, cmd.contains('--rcfile'))
+            assertFalse(cmd, cmd.contains('--login'))
+            if (sigterm) {
+                run.process.destroy()
+            } else {
+                run.process.getOutputStream().write('exit\n'.getBytes(StandardCharsets.UTF_8))
+                run.process.getOutputStream().flush()
+            }
+            assertTrue(output, run.process.waitFor(15, TimeUnit.SECONDS))
+            assertTrue(output, died(run.javaPid))
+            assertTrue(output, died(run.sofficePid))
+        } finally {
+            stopRun(run)
+            PathTree.delete(tree)
+        }
+    }
+
+    private EntrypointRun entrypointRun(Path tree, Map<String, String> extra) {
+        EntrypointRun run = new EntrypointRun()
+        run.home = tree.resolve('odisee')
+        run.bin = tree.resolve('bin')
+        run.javaPid = tree.resolve('java.pid')
+        run.javaArgs = tree.resolve('java.args')
+        run.sofficePid = tree.resolve('soffice.pid')
+        run.odictlArgs = tree.resolve('odictl.args')
+        Files.createDirectories(run.home)
+        Files.createDirectories(run.bin)
+        writeExe(run.bin.resolve('java'), [
+                '#!/bin/bash',
+                'echo $$ > "$JAVA_PIDFILE"',
+                'printf %s\\\\n "$*" > "$JAVA_ARGS"',
+                'trap \'exit 0\' TERM',
+                'while true; do sleep 0.2; done',
+                '',
+        ].join('\n'))
+        writeExe(run.bin.resolve('soffice'), [
+                '#!/bin/bash',
+                'echo $$ > "$SOFFICE_PIDFILE"',
+                'trap \'exit 0\' TERM',
+                'while true; do sleep 0.2; done',
+                '',
+        ].join('\n'))
+        writeExe(run.bin.resolve('odictl'), [
+                '#!/bin/bash',
+                'printf %s\\\\n "$*" > "$ODICTL_ARGS"',
+                'if [ "$1" = "-q" ] && [ "$2" = "start-inst" ]; then',
+                '    "$SOFFICE_BIN" "$ODISEE_HOME" &',
+                'fi',
+                'exit 0',
+                '',
+        ].join('\n'))
+        ProcessBuilder builder = new ProcessBuilder(['/bin/bash', new File('src/main/docker/entrypoint.sh').absolutePath])
+        builder.environment().put('ODISEE_HOME', run.home.toString())
+        builder.environment().put('HOME', run.home.toString())
+        builder.environment().put('PATH', run.bin.toString() + ':/usr/bin:/bin')
+        builder.environment().put('JAVA_PIDFILE', run.javaPid.toString())
+        builder.environment().put('JAVA_ARGS', run.javaArgs.toString())
+        builder.environment().put('SOFFICE_PIDFILE', run.sofficePid.toString())
+        builder.environment().put('SOFFICE_BIN', run.bin.resolve('soffice').toString())
+        builder.environment().put('ODICTL_ARGS', run.odictlArgs.toString())
+        extra.each { String key, String value ->
+            builder.environment().put(key, value)
+        }
+        builder.redirectErrorStream(true)
+        run.process = builder.start()
+        run
+    }
+
+    private static void writeExe(Path path, String text) {
+        Files.writeString(path, text)
+        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString('rwxr-xr-x'))
+    }
+
+    private static boolean waitForFile(Path file, Process process) {
+        for (int i = 0; i < 300 && !Files.exists(file); i++) {
+            if (!process.isAlive()) {
+                return false
+            }
+            Thread.sleep(50)
+        }
+        Files.isRegularFile(file)
+    }
+
+    private static String readUntil(Process process, String token, long timeoutMs) {
+        StringBuilder out = new StringBuilder()
+        long deadline = System.currentTimeMillis() + timeoutMs
+        byte[] buf = new byte[512]
+        while (System.currentTimeMillis() < deadline && !out.toString().contains(token)) {
+            if (process.getInputStream().available() > 0) {
+                int n = process.getInputStream().read(buf)
+                if (n < 0) {
+                    break
+                }
+                out.append(new String(buf, 0, n, StandardCharsets.UTF_8))
+            } else if (!process.isAlive()) {
+                break
+            } else {
+                Thread.sleep(50)
+            }
+        }
+        out.toString()
+    }
+
+    private static String commandLine(long pid) {
+        Files.readString(Path.of('/proc/' + pid + '/cmdline'), StandardCharsets.ISO_8859_1).replace('\u0000', ' ')
+    }
+
+    private static boolean died(Path pidFile) {
+        long pid = Long.parseLong(Files.readString(pidFile).trim())
+        for (int i = 0; i < 50; i++) {
+            boolean alive = ProcessHandle.of(pid).map { ProcessHandle handle -> handle.isAlive() }.orElse(false)
+            if (!alive) {
+                return true
+            }
+            Thread.sleep(50)
+        }
+        false
+    }
+
+    private static void stopRun(EntrypointRun run) {
+        if (run == null) {
+            return
+        }
+        if (run.process != null && run.process.isAlive()) {
+            run.process.destroyForcibly()
+            run.process.waitFor(5, TimeUnit.SECONDS)
+        }
+        stopPid(run.javaPid)
+        stopPid(run.sofficePid)
+    }
+
+    private static void stopPid(Path file) {
+        if (file == null || !Files.exists(file)) {
+            return
+        }
+        try {
+            long pid = Long.parseLong(Files.readString(file).trim())
+            ProcessHandle.of(pid).ifPresent { ProcessHandle handle -> handle.destroyForcibly() }
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private static final class EntrypointRun {
+        Path home
+        Path bin
+        Path javaPid
+        Path javaArgs
+        Path sofficePid
+        Path odictlArgs
+        Process process
+    }
+
     private String succeed(String... args) {
         run(true, [:], args)
     }

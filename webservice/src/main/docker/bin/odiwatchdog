@@ -50,6 +50,9 @@ watch_instance() {
                 FreeBSD)
                     port_open=$(sockstat -46l | grep -c ${port}) # | grep LISTEN
                 ;;
+                Linux)
+                    port_open=$(ss -nlt | grep -c ${port}) # | grep LISTEN
+                ;;
                 *)
                     port_open=$(netstat -nlt | grep -c ${port}) # | grep LISTEN
                 ;;
