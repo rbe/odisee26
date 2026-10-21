@@ -307,6 +307,10 @@ class OdictlTest extends GroovyTestCase {
         assertFalse(docker.contains('shell_profile'))
         assertFalse(docker.contains('.bash_profile'))
         assertTrue(docker.contains('/home/odisee/.local/bin'))
+        assertTrue(docker.contains('COPY --chown=odisee:odisee --chmod=440 webservice*.jar application.jar'))
+        assertFalse(docker.contains('xargs'))
+        assertTrue(docker.lastIndexOf('COPY ') == docker.lastIndexOf('COPY --chown=odisee:odisee --chmod=440 webservice*.jar application.jar'))
+        assertTrue(docker.indexOf('libreoffice-writer') < docker.indexOf('COPY '))
         assertFalse(gradle.contains('shell_profile'))
         assertFalse(gradle.contains('.bash_profile'))
     }

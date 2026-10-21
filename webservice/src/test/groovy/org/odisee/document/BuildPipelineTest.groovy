@@ -37,12 +37,14 @@ class BuildPipelineTest extends GroovyTestCase {
         assertFalse(yaml.contains('name: odisee-linux-x86_64'))
         assertFalse(yaml.contains('java-version: "21"'))
         jobs.each { String name, String body ->
+            assertTrue(name, body.contains('runs-on: ubuntu-26.04'))
             assertTrue(name, body.contains('java-version: ${{ env.JAVA_VERSION }}'))
             assertTrue(name, body.contains('distribution: ${{ env.JAVA_DISTRIBUTION }}'))
         }
 
         String setup = jobs.setup
-        assertTrue(setup.contains('runs-on: ubuntu-latest'))
+        assertTrue(setup.contains('runs-on: ubuntu-26.04'))
+        assertFalse(yaml.contains('ubuntu-latest'))
         assertTrue(setup.contains('java-version: ${{ env.JAVA_VERSION }}'))
         assertTrue(setup.contains('distribution: ${{ env.JAVA_DISTRIBUTION }}'))
         assertTrue(setup.contains('cache: gradle'))
@@ -93,6 +95,8 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(image.contains('ghcr.io'))
         assertTrue(image.contains('docker buildx build'))
         assertTrue(image.contains('--platform linux/amd64,linux/arm64'))
+        assertTrue(image.contains('--cache-from type=gha'))
+        assertTrue(image.contains('--cache-to type=gha,mode=max'))
         assertTrue(image.contains('--push'))
         assertTrue(image.contains('-t "${image}:${version}"'))
         assertTrue(image.contains('-t "${image}:latest"'))
