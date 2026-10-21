@@ -3,7 +3,6 @@ import org.springframework.boot.gradle.tasks.run.BootRun
 
 plugins {
     id("org.apache.grails.gradle.grails-web") version "7.2.4"
-    id("org.apache.grails.gradle.grails-gsp") version "7.2.4"
 }
 
 apply(from = rootProject.file("gradle/podman-executable.gradle.kts"))
@@ -20,18 +19,25 @@ repositories {
     mavenCentral()
 }
 
+// No GSP views, no encodeAs calls, no database, and no respond().
+configurations.configureEach {
+    exclude(group = "org.apache.grails", module = "grails-gsp")
+    exclude(group = "org.apache.grails", module = "grails-layout")
+    exclude(group = "org.apache.grails", module = "grails-codecs")
+    exclude(group = "org.apache.grails", module = "grails-datasource")
+    exclude(group = "org.apache.grails", module = "grails-rest-transforms")
+}
+
 dependencies {
     implementation(platform("org.apache.grails:grails-bom:$grailsVersion"))
 
     implementation("org.apache.grails:grails-core")
-    implementation("org.apache.grails:grails-rest-transforms")
+    implementation("org.apache.grails:grails-converters")
     implementation("org.apache.grails:grails-databinding")
     implementation("org.apache.grails:grails-services")
     implementation("org.apache.grails:grails-url-mappings")
     implementation("org.apache.grails:grails-interceptors")
     implementation("org.apache.grails:grails-web-boot")
-    implementation("org.apache.grails:grails-gsp")
-    implementation("org.apache.grails:grails-layout")
     implementation("org.apache.grails:grails-logging")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-logging")
