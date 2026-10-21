@@ -7,10 +7,14 @@
 # Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
 #
 
-# Determine script directory
-SCRIPT_DIR=$(pushd $(dirname $0) >/dev/null ; pwd ; popd >/dev/null)
-# Read configuration
-. ${SCRIPT_DIR}/../etc/odienv
+# Resolve the real bin directory. A PATH install is a symlink.
+_self=$(readlink -f "$0" 2>/dev/null || true)
+if [ -z "${_self}" ]
+then
+    _self=$0
+fi
+SCRIPT_DIR=$(cd "$(dirname "${_self}")" && pwd)
+unset _self
 # Odisee library
 . ${SCRIPT_DIR}/odilib
 

@@ -3,7 +3,7 @@ FROM ubuntu:26.04 AS packages
 ENV TZ=Europe/Berlin \
     LANG=en_US.UTF-8 \
     ODISEE_HOME=/home/odisee \
-    JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+    PATH="/home/odisee/.local/bin:${PATH}"
 
 # Headless Writer and the service JRE. Calc and Impress are not installed.
 # Docs, package indexes, and Writer files that conversion does not read are
@@ -46,8 +46,9 @@ RUN mkdir -p var/deploy/fonts var/document var/image var/merge var/request var/t
 COPY LICENSE.txt .
 COPY bin/* bin/
 COPY etc/* etc/
-COPY shell_profile .bash_profile
 COPY entrypoint.sh .
+RUN mkdir -p .local/bin \
+    && ln -s ${ODISEE_HOME}/bin/odictl .local/bin/odictl
 
 RUN find ${ODISEE_HOME} -print0 | xargs -0 chown odisee:odisee \
     && find ${ODISEE_HOME} -type d -print0 | xargs -0 chmod 750 \

@@ -5,8 +5,10 @@
 
 ls -lR
 
-ODISEE_HOME=/home/odisee
-. ${ODISEE_HOME}/etc/odienv
+# ODISEE_HOME and the Keycloak variables come from the container environment.
+# odictl is on PATH. This process does not source a profile.
+: "${ODISEE_HOME:=/home/odisee}"
+export ODISEE_HOME
 # LibreOffice only. The JVM stays in the foreground below so the container
 # lifecycle follows the service. `odictl -q start` is the bare-metal command
 # and would launch application.jar a second time.

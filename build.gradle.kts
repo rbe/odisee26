@@ -93,9 +93,6 @@ tasks.register<Zip>("packageDistribution") {
     into("etc") {
         from("webservice/src/main/docker/etc")
     }
-    from("webservice/src/main/docker/shell_profile") {
-        rename { ".bash_profile" }
-    }
     from(packageLayout)
     from("webservice/build/libs/webservice-$version.jar") {
         rename { "application.jar" }

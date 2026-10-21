@@ -11,7 +11,9 @@ import org.odisee.security.OidcFile
 import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
 
 /**
@@ -154,6 +156,155 @@ class OdictlTest extends GroovyTestCase {
         assertFalse(Files.exists(BucketFile.location()))
     }
 
+    void testUnsetHomeUsesTheUserShareDirectory() {
+        Path tree = Files.createTempDirectory('odictl-home')
+        try {
+            Path home = tree.resolve('home')
+            Files.createDirectories(home)
+            String output = launch(true, [scriptPath(), 'callback-host', 'ctlpath', 'hooks.example'], [
+                    HOME: home.toString(),
+                    ODISEE_HOME: '',
+                    JAVA_HOME: '',
+                    PATH: '/usr/bin:/bin',
+            ])
+
+            assertTrue(output.contains("Callback host 'hooks.example' listed for 'ctlpath'."))
+            Path root = home.resolve('.local/share/odisee')
+            assertTrue(Files.readString(root.resolve('etc/callback-hosts')).contains('ctlpath hooks.example'))
+            assertFalse(Files.exists(root.resolve('.fonts')))
+            assertFalse(Files.exists(home.resolve('.bash_profile')))
+            assertFalse(Files.exists(root.resolve('etc/odienv')))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
+    void testSetHomeWinsAndDoesNotNeedJavaHome() {
+        Path tree = Files.createTempDirectory('odictl-set-home')
+        try {
+            Path home = tree.resolve('home')
+            Path install = tree.resolve('opt')
+            Path shim = tree.resolve('shim')
+            Files.createDirectories(home)
+            Files.createDirectories(install)
+            Files.createDirectories(shim)
+            Files.writeString(shim.resolve('java'), '#!/bin/sh\nexit 1\n')
+            Files.setPosixFilePermissions(shim.resolve('java'), PosixFilePermissions.fromString('rwxr-xr-x'))
+            String output = launch(true, [scriptPath(), 'callback-host', 'ctlhome', 'hooks.example'], [
+                    HOME: home.toString(),
+                    ODISEE_HOME: install.toString(),
+                    JAVA_HOME: '',
+                    PATH: "${shim}:/usr/bin:/bin",
+            ])
+
+            assertTrue(output.contains("Callback host 'hooks.example' listed for 'ctlhome'."))
+            assertTrue(Files.isRegularFile(install.resolve('etc/callback-hosts')))
+            assertFalse(Files.exists(home.resolve('.local/share/odisee')))
+            assertFalse(Files.exists(install.resolve('.fonts')))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
+    void testLinkedCommandUsesTheDefaultHome() {
+        Path tree = Files.createTempDirectory('odictl-link')
+        try {
+            Path home = tree.resolve('home')
+            Path bindir = tree.resolve('bin')
+            Files.createDirectories(home)
+            Files.createDirectories(bindir)
+            Files.createSymbolicLink(bindir.resolve('odictl'), Path.of(scriptPath()))
+            String output = launch(true, ['/usr/bin/env', 'odictl', 'callback-host', 'ctllink', 'hooks.example'], [
+                    HOME: home.toString(),
+                    ODISEE_HOME: '',
+                    JAVA_HOME: '',
+                    PATH: "${bindir}:/usr/bin:/bin",
+            ])
+
+            assertTrue(output, output.contains("Callback host 'hooks.example' listed for 'ctllink'."))
+            assertTrue(Files.readString(home.resolve('.local/share/odisee/etc/callback-hosts')).contains('ctllink hooks.example'))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
+    void testJavaFromPathIsNotExported() {
+        Path tree = Files.createTempDirectory('odictl-java')
+        Path install = tree.resolve('odisee')
+        try {
+            Path home = tree.resolve('home')
+            Path javaBin = tree.resolve('jdk/bin')
+            Files.createDirectories(home)
+            Files.createDirectories(install.resolve('etc'))
+            Files.createDirectories(javaBin)
+            Files.writeString(install.resolve('application.jar'), '')
+            Path argsFile = tree.resolve('args.txt')
+            Path envFile = tree.resolve('env.txt')
+            Files.writeString(javaBin.resolve('java'), "#!/bin/sh\nprintf '%s\\n' \"\$*\" > '${argsFile}'\nenv > '${envFile}'\n")
+            Files.setPosixFilePermissions(javaBin.resolve('java'), PosixFilePermissions.fromString('rwxr-xr-x'))
+            String output = launch(true, [scriptPath(), '-q', 'start'], [
+                    HOME: home.toString(),
+                    ODISEE_HOME: install.toString(),
+                    JAVA_HOME: '/decoy/jdk',
+                    PATH: "${javaBin}:/usr/bin:/bin",
+            ])
+
+            assertTrue(output, output.contains('Starting Odisee Service'))
+            for (int i = 0; i < 100 && !Files.exists(envFile); i++) {
+                Thread.sleep(50)
+            }
+            assertTrue(output, Files.isRegularFile(envFile))
+            List<String> env = Files.readAllLines(envFile)
+            assertFalse(env.any { it.startsWith('JAVA_HOME=') })
+            assertFalse(env.any { it.startsWith('ODISEE_ETC=') })
+            assertTrue(env.any { it == "ODISEE_HOME=${install}" })
+            String path = env.find { it.startsWith('PATH=') }
+            assertNotNull(path)
+            assertFalse(path.contains("${install}/bin"))
+            String args = Files.readString(argsFile)
+            assertTrue(args, args.contains('-jar'))
+            assertTrue(args, args.contains(install.resolve('application.jar').toString()))
+        } finally {
+            Path pidfile = install.resolve('var/odisee.pid')
+            if (Files.exists(pidfile)) {
+                try {
+                    long pid = Long.parseLong(Files.readString(pidfile).trim())
+                    ProcessHandle.of(pid).ifPresent { handle ->
+                        String command = handle.info().command().orElse('')
+                        String args = handle.info().arguments().map { it.join(' ') }.orElse('')
+                        if ((command + ' ' + args).contains(install.toString())) {
+                            handle.destroyForcibly()
+                        }
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            PathTree.delete(tree)
+        }
+    }
+
+    void testLoginProfileIsGone() {
+        assertFalse(new File('src/main/docker/shell_profile').exists())
+        assertFalse(new File('src/main/docker/etc/odienv').exists())
+        String odictl = new File('src/main/docker/bin/odictl').getText('UTF-8')
+        String odilib = new File('src/main/docker/bin/odilib').getText('UTF-8')
+        String entry = new File('src/main/docker/entrypoint.sh').getText('UTF-8')
+        String docker = new File('src/main/docker/Dockerfile').getText('UTF-8')
+        String gradle = new File('../build.gradle.kts').getText('UTF-8')
+        assertFalse(odictl.contains('odienv'))
+        assertFalse(odictl.contains('export PATH'))
+        assertFalse(odictl.contains('.fonts'))
+        assertFalse(odilib.contains('.fonts'))
+        assertFalse(odilib.contains('export PATH'))
+        assertTrue(odilib.contains('/.local/share/odisee'))
+        assertFalse(entry.contains('odienv'))
+        assertFalse(docker.contains('shell_profile'))
+        assertFalse(docker.contains('.bash_profile'))
+        assertTrue(docker.contains('/home/odisee/.local/bin'))
+        assertFalse(gradle.contains('shell_profile'))
+        assertFalse(gradle.contains('.bash_profile'))
+    }
+
     private String succeed(String... args) {
         run(true, [:], args)
     }
@@ -173,6 +324,37 @@ class OdictlTest extends GroovyTestCase {
         builder.environment().put('ODISEE_KEYCLOAK_ADMIN', 'admin')
         builder.environment().put('ODISEE_KEYCLOAK_ADMIN_PASSWORD', 'admin-secret')
         extra.each { String key, String value ->
+            if (value == null || value.isEmpty()) {
+                builder.environment().remove(key)
+            } else {
+                builder.environment().put(key, value)
+            }
+        }
+        builder.redirectErrorStream(true)
+        Process process = builder.start()
+        String output = process.inputStream.getText('UTF-8')
+        boolean finished = process.waitFor(60, TimeUnit.SECONDS)
+        if (!finished) {
+            process.destroyForcibly()
+        }
+        assertTrue(output, finished)
+        if (ok) {
+            assertEquals(output, 0, process.exitValue())
+        } else {
+            assertTrue(output, process.exitValue() != 0)
+        }
+        output
+    }
+
+    private static String scriptPath() {
+        File script = new File('src/main/docker/bin/odictl')
+        assertTrue(script.file)
+        script.absolutePath
+    }
+
+    private String launch(boolean ok, List<String> command, Map<String, String> env) {
+        ProcessBuilder builder = new ProcessBuilder(command)
+        env.each { String key, String value ->
             if (value == null || value.isEmpty()) {
                 builder.environment().remove(key)
             } else {

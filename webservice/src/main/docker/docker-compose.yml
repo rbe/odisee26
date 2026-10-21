@@ -6,6 +6,10 @@ services:
     environment:
       - TZ=Europe/Berlin
       - LANG=en_US.UTF-8
+      - ODISEE_HOME=/home/odisee
+      - ODISEE_KEYCLOAK_ISSUER=http://keycloak:8080/realms/odisee
+      - ODISEE_KEYCLOAK_ADMIN=admin
+      - ODISEE_KEYCLOAK_ADMIN_PASSWORD=admin
     ports:
       - "8080:8080"
     volumes:
