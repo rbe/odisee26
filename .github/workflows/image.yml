@@ -40,6 +40,9 @@ jobs:
       BUILD_OUTPUTS: ${{ inputs.build-outputs }}
       DISTRIBUTION_ZIP: ${{ inputs.distribution-zip }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Prepare
         uses: ./.github/actions/prepare
         with:

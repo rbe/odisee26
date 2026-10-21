@@ -23,6 +23,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Prepare
         uses: ./.github/actions/prepare
         with:
@@ -38,6 +41,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Prepare
         uses: ./.github/actions/prepare
         with:
@@ -107,6 +113,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Prepare
         uses: ./.github/actions/prepare
         with:
@@ -139,6 +148,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Prepare
         uses: ./.github/actions/prepare
         with:
