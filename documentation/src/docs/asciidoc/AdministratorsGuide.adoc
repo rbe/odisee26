@@ -72,6 +72,8 @@ sudo ln -s "$ODISEE_HOME/bin/odictl" /usr/local/bin/odictl
 
 systemd passes `ODISEE_HOME` and the Keycloak variables in the service environment.
 The `odisee` container does the same (`ODISEE_HOME=/home/odisee`).
+Its command is `/home/odisee/entrypoint.sh`.
+That script starts LibreOffice with `odictl -q start-inst` and then runs `java -jar` in the foreground.
 
 . Download distribution as ZIP archive for your platform
 [source,bash,lineno]

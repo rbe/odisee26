@@ -3,8 +3,6 @@
 #set -o nounset
 #set -o errexit
 
-ls -lR
-
 # ODISEE_HOME and the Keycloak variables come from the container environment.
 # odictl is on PATH. This process does not source a profile.
 : "${ODISEE_HOME:=/home/odisee}"

@@ -127,7 +127,7 @@ F7 is implemented. Each user has one bucket in `$ODISEE_HOME/etc/buckets`, read 
 
 Status: **landed**.
 
-`odictl` is one command on `PATH`. It computes its directories when it runs. `ODISEE_HOME` defaults to `$HOME/.local/share/odisee`. `/opt/odisee`, the container, and a systemd unit set `ODISEE_HOME` in the environment, and that value is the home. `JAVA_HOME` is derived inside `odictl` from `java` on `PATH`. Directory names stay inside `odilib`. A user install links `odictl` into `$HOME/.local/bin`. The service image adds `/home/odisee/.local/bin` to `PATH` in the image environment. Fonts are files in `$HOME/.local/share/fonts`. Docker and systemd pass `ODISEE_HOME` and the Keycloak variables in the environment. `etc/local.odienv` is not a login script. The distribution ships no login profile.
+`odictl` is one command on `PATH`. It computes its directories when it runs. `ODISEE_HOME` defaults to `$HOME/.local/share/odisee`. `/opt/odisee`, the container, and a systemd unit set `ODISEE_HOME` in the environment, and that value is the home. `JAVA_HOME` is derived inside `odictl` from `java` on `PATH`. Directory names stay inside `odilib`. A user install links `odictl` into `$HOME/.local/bin`. The service image adds `/home/odisee/.local/bin` to `PATH` in the image environment. Fonts are files in `$HOME/.local/share/fonts`. Docker and systemd pass `ODISEE_HOME` and the Keycloak variables in the environment. `etc/local.odienv` is not a login script. The distribution ships no login profile. The container command is `/home/odisee/entrypoint.sh`. It starts LibreOffice with `odictl -q start-inst` and then runs `java -jar` in the foreground.
 
 ## Refactorings
 
