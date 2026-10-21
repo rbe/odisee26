@@ -10,7 +10,23 @@ plugins {
 }
 
 group = "org.odisee"
-version = "2.6"
+
+// Semantic version. CI sets ODISEE_BUILD_NUMBER to the Actions run number: 2.6.0-42.
+val odiseeBaseVersion = "2.6.0"
+val odiseeBuildNumber = System.getenv("ODISEE_BUILD_NUMBER")?.trim()?.takeIf { it.isNotEmpty() }
+version = if (odiseeBuildNumber == null) odiseeBaseVersion else "$odiseeBaseVersion-$odiseeBuildNumber"
+
+tasks.register("printVersion") {
+    group = "Odisee"
+    description = "Write the project version to build/odisee-version.txt"
+    val resolved = version.toString()
+    val versionFile = layout.buildDirectory.file("odisee-version.txt")
+    inputs.property("version", resolved)
+    outputs.file(versionFile)
+    doLast {
+        versionFile.get().asFile.writeText(resolved)
+    }
+}
 
 java {
     toolchain {

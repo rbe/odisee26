@@ -76,10 +76,10 @@ The `odisee` container does the same (`ODISEE_HOME=/home/odisee`).
 . Download distribution as ZIP archive for your platform
 [source,bash,lineno]
 ----
-wget https://github.com/rbe/odisee26/releases/latest/download/odisee-2.6-linux-x86_64.zip
+wget https://github.com/rbe/odisee26/releases/latest/download/odisee-2.6.0-<build>-linux-x86_64.zip
 ----
 
-GitHub Actions also attaches the same zip to each successful build. Publishing a release happens when a `v*` tag is pushed.
+GitHub Actions also attaches the same zip to each successful build. The version is `2.6.0-<build>`. `<build>` is the Actions run number. Publishing a release happens when a `v*` tag is pushed.
 
 .Supported Platforms
 [source,bash,lineno]
@@ -263,14 +263,15 @@ username endpoint region bucket accessKey secret
 The service image ships with `docker-compose.yml`.
 `./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak`.
 GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag.
-The tags are `2.6` and `latest`.
+The tags are `2.6.0-<build>` and `latest`.
+`<build>` is the Actions run number.
 A `v*` tag also pushes that tag name.
 The first publish is private until the package is set public.
 
 [source,bash]
 ----
-docker pull ghcr.io/rbe/odisee26:2.6
-podman pull ghcr.io/rbe/odisee26:2.6
+docker pull ghcr.io/rbe/odisee26:2.6.0-<build>
+podman pull ghcr.io/rbe/odisee26:2.6.0-<build>
 ----
 
 The published image listens on port 8080.
