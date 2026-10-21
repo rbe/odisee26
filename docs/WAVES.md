@@ -122,6 +122,12 @@ F9 login is OpenID Connect. SFTP stays not implemented. HTTP Basic and `etc/user
 
 F7 is implemented. Each user has one bucket in `$ODISEE_HOME/etc/buckets`, read on each store. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes that file. The v2 field is `odisee/@delivery` (`stream`, `store`, or `both`; the default is `stream`). JSON uses `delivery`. A v3 namespace is still HTTP 400. Stream keeps the response body as the file, and `POST /document/generate` stays synchronous. Store writes to that user's bucket and the body is the bucket and the key. Both returns the file and stores a copy, identified in the `X-Odisee-Object` header. The request cannot name a bucket. The server chooses the key. Endpoint, region, bucket, access key, and secret come from that user's line. The store is S3-compatible. MinIO is the development server. Odisee does not expire, delete, or set a lifecycle on the object. Retention belongs to the bucket. `POST /document/jobs` uses the same choice, and `var/user/{name}/jobs.json` stores the bucket and the key. Jobs stay private to the user. A callback still goes only to a host listed for that user in `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous.
 
+## Command path
+
+Status: **landed**.
+
+`odictl` is one command on `PATH`. It computes its directories when it runs. `ODISEE_HOME` defaults to `$HOME/.local/share/odisee`. `/opt/odisee`, the container, and a systemd unit set `ODISEE_HOME` in the environment, and that value is the home. `JAVA_HOME` is derived inside `odictl` from `java` on `PATH`. Directory names stay inside `odilib`. A user install links `odictl` into `$HOME/.local/bin`. The service image adds `/home/odisee/.local/bin` to `PATH` in the image environment. Fonts are files in `$HOME/.local/share/fonts`. Docker and systemd pass `ODISEE_HOME` and the Keycloak variables in the environment. `etc/local.odienv` is not a login script. The distribution ships no login profile.
+
 ## Refactorings
 
 The request path was a singleton map, stringly-typed method names, and two copies of "where is the template". Wave 1 pulls the pure decisions into small types that unit tests can call without LibreOffice and without `ODISEE_HOME`.

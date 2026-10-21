@@ -7,18 +7,41 @@
 # Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
 #
 
-# Determine script directory
-SCRIPT_DIR=$(pushd $(dirname $0) >/dev/null ; pwd ; popd >/dev/null)
-# Read configuration
-. ${SCRIPT_DIR}/../etc/odienv
-# Odisee library
+# Resolve the real bin directory. A PATH install is a symlink.
+_self=$(readlink -f "$0" 2>/dev/null || true)
+if [ -z "${_self}" ]
+then
+    _self=$0
+fi
+SCRIPT_DIR=$(cd "$(dirname "${_self}")" && pwd)
+unset _self
+# Odisee library. Directory names are internal. The login shell is unchanged.
 . ${SCRIPT_DIR}/odilib
 
-if [[ -z "${JAVA_HOME}" ]]
-then
-    echo "Odisee: Please set JAVA_HOME"
-    exit 1
-fi
+# JAVA_HOME follows java on PATH. It stays in this process.
+odictl_java_home() {
+    local bin resolved home
+    unset JAVA_HOME
+    bin=$(command -v java || true)
+    [ -n "${bin}" ] || return 0
+    resolved=$(readlink -f "${bin}" 2>/dev/null || true)
+    [ -n "${resolved}" ] || resolved=${bin}
+    case "${resolved}" in
+        */bin/java)
+            home=${resolved%/bin/java}
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+    if [ -x "${home}/bin/java" ]
+    then
+        JAVA_HOME=${home}
+        export -n JAVA_HOME
+    fi
+}
+
+odictl_java_home
 
 #set -o nounset
 #set -o errexit

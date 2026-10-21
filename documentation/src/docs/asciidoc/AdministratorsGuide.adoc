@@ -14,28 +14,27 @@
 
     apt-get install libreoffice-l10n-de hunspell-de-de-frami mythes-de hyphen-de
 
-2. Create an user (`odisee`,  home = `$ODISEE_HOME`) and group (`odisee`)
+2. `java` is on `PATH`. `odictl` derives its Java home from that `java` when it runs.
 
-        sudo groupadd -n odisee -g 5000
-        sudo useradd -n odisee -u 5000 -g odisee -m -d ${ODISEE_HOME}
-        mkdir -p ${ODISEE_HOME}
+3. Unpack the zip. With `ODISEE_HOME` unset, the home is `$HOME/.local/share/odisee`.
 
-3. Unpack archive contents in `$ODISEE_HOME`
+        mkdir -p "${ODISEE_HOME:-$HOME/.local/share/odisee}"
+        unzip -q odisee-*.zip -d "${ODISEE_HOME:-$HOME/.local/share/odisee}"
 
-        unzip -q odisee-*.zip
+4. Link `odictl` onto `PATH`:
 
-4. Optional: login as `odisee`
+        mkdir -p "$HOME/.local/bin"
+        ln -s "${ODISEE_HOME:-$HOME/.local/share/odisee}/bin/odictl" "$HOME/.local/bin/odictl"
 
-        su - odisee
-
-5. Check `etc/odiinst` for correct path to OpenOffice/LibreOffice installation
-6. Start Odisee `odictl -q start`
+5. Check `etc/odiinst` for the LibreOffice installation
+6. Start Odisee: `odictl -q start`
 
 === Installation
 
 ==== Prerequisites
 
 bash 4
+java on `PATH`
 netstat
 sudo
 unzip
@@ -43,23 +42,36 @@ awk
 sed
 rsync
 
-TIP: Create a separate user for Odisee.
+`odictl` is one command on `PATH`.
+It computes its directories when it runs.
+A user install links it into `$HOME/.local/bin`.
+The service image puts that command on `PATH` as `/home/odisee/.local/bin` in the image environment.
+`ODISEE_HOME` defaults to `$HOME/.local/share/odisee`.
+`/opt/odisee`, the container, and a systemd unit set `ODISEE_HOME` in the environment, and that value is the home.
+Docker and systemd also pass `ODISEE_KEYCLOAK_ISSUER`, `ODISEE_KEYCLOAK_ADMIN`, and `ODISEE_KEYCLOAK_ADMIN_PASSWORD` in the environment.
+`etc/local.odienv` is not a login script.
+The distribution ships no login profile.
 
-.Create user
-[source,bash,lineno]
+.User install
+[source,bash]
 ----
-ODISEE_HOME=/home/odisee
-sudo groupadd -n odisee
-sudo useradd -n odisee -g odisee -m -d $ODISEE_HOME
-sudo mkdir -p $ODISEE_HOME
-sudo chown odisee:odisee $ODISEE_HOME
+mkdir -p "$HOME/.local/share/odisee" "$HOME/.local/bin"
+unzip -q odisee-*.zip -d "$HOME/.local/share/odisee"
+ln -s "$HOME/.local/share/odisee/bin/odictl" "$HOME/.local/bin/odictl"
+odictl -q start
 ----
 
-.Login as odisee
-[source,bash,lineno]
+.Service install
+[source,bash]
 ----
-sudo su - odisee
+export ODISEE_HOME=/opt/odisee
+sudo mkdir -p "$ODISEE_HOME"
+sudo unzip -q odisee-*.zip -d "$ODISEE_HOME"
+sudo ln -s "$ODISEE_HOME/bin/odictl" /usr/local/bin/odictl
 ----
+
+systemd passes `ODISEE_HOME` and the Keycloak variables in the service environment.
+The `odisee` container does the same (`ODISEE_HOME=/home/odisee`).
 
 . Download distribution as ZIP archive for your platform
 [source,bash,lineno]
@@ -73,12 +85,6 @@ GitHub Actions also attaches the same zip to each successful build. Publishing a
 [source,bash,lineno]
 ----
 linux-x86_64
-----
-
-.Unpack distribution in `$ODISEE_HOME`
-[source,bash,lineno]
-----
-unzip -q odisee-*.zip
 ----
 
 === Instance Configuration
@@ -191,6 +197,9 @@ The secret is the rest of the line and may contain spaces.
 The server reads those files on use, including `$ODISEE_HOME/etc/oidc`.
 There is no second config channel.
 The person who can run `odictl` is the admin.
+`odictl` is on `PATH`.
+It computes `$ODISEE_HOME` when it runs.
+The default is `$HOME/.local/share/odisee`.
 
 [[start]]
 Start
@@ -319,7 +328,8 @@ That URL comes from the configured issuer.
 It is not a claim in the token.
 
 `odictl user NAME` creates the Keycloak user, the directories, and one confidential client whose id is `NAME`.
-Set the admin environment before the command:
+The `odisee` service receives `ODISEE_HOME` and the Keycloak variables in its environment.
+On a host shell, set the same variables before the command:
 
 [source,bash]
 ----
@@ -379,7 +389,7 @@ a2enmod deflate headers proxy proxy_ajp ssl
 
 ==== Installing Fonts
 
-Put `.ttf` files in `$HOME/.fonts` and execute
+Put `.ttf` files in `$HOME/.local/share/fonts` and execute
 
     fc-cache -f -v
 

@@ -47,13 +47,15 @@ systemProp.https.nonProxyHosts=localhost|127.0.0.1|example.com
 
 ## Run the distribution
 
-LibreOffice must already be installed. `etc/odiinst` points at `/usr/lib/libreoffice` by default.
+LibreOffice must already be installed. `etc/odiinst` points at `/usr/lib/libreoffice` by default. `java` is on `PATH`. `odictl` derives its Java home from that `java` when it runs.
+
+`ODISEE_HOME` defaults to `$HOME/.local/share/odisee`. Set `ODISEE_HOME` when the install lives somewhere else (`/opt/odisee`, the container, a systemd unit). A user install links `odictl` into `$HOME/.local/bin`. The service image puts that command on `PATH` as `/home/odisee/.local/bin` in the image environment.
 
 ```bash
-export ODISEE_HOME=/opt/odisee
-export JAVA_HOME=/path/to/jdk-21
-unzip odisee-2.6-linux-x86_64.zip -d "$ODISEE_HOME"
-"$ODISEE_HOME/bin/odictl" -q start
+mkdir -p "${ODISEE_HOME:-$HOME/.local/share/odisee}" "$HOME/.local/bin"
+unzip odisee-2.6-linux-x86_64.zip -d "${ODISEE_HOME:-$HOME/.local/share/odisee}"
+ln -s "${ODISEE_HOME:-$HOME/.local/share/odisee}/bin/odictl" "$HOME/.local/bin/odictl"
+odictl -q start
 ```
 
 `odictl -q start` starts the configured LibreOffice instances and `application.jar`. The service listens on port 8080 with context path `/odisee`.

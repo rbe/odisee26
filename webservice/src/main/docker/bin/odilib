@@ -8,6 +8,45 @@
 # 
 
 #
+# Directories stay in this process. The login shell does not see them.
+# ODISEE_HOME is the value already in the environment, or $HOME/.local/share/odisee.
+#
+odisee_internal_paths() {
+    if [ -z "${ODISEE_HOME}" ]
+    then
+        if [ -z "${HOME}" ]
+        then
+            echo "Odisee: HOME is not set" >&2
+            exit 1
+        fi
+        ODISEE_HOME="${HOME}/.local/share/odisee"
+    fi
+    export ODISEE_HOME
+    ODISEE_LIBEXEC=${ODISEE_HOME}/libexec
+    ODISEE_ETC=${ODISEE_HOME}/etc
+    ODISEE_INST=${ODISEE_ETC}/odiinst
+    ODISEE_VAR=${ODISEE_HOME}/var
+    ODISEE_LOG=${ODISEE_VAR}/log
+    ODISEE_USER=${ODISEE_VAR}
+    ODISEE_USER_PROFILE=${ODISEE_VAR}/profile
+    ODISEE_TMP=${ODISEE_VAR}/tmp
+    ODISEE_BACKUP=${ODISEE_VAR}/backup
+    ODISEE_SRC=${ODISEE_HOME}/src
+    ODISEE_EXT=${ODISEE_SRC}/extension
+    ODISEE_FQHN=$(uname -n)
+    ODISEE_OS=$(uname -s)
+    ODISEE_ARCH=$(uname -m)
+    ODISEE_WD_TIMEOUT=5
+    ODISEE_EXT_VND="vnd.artofcoding.odisee.Odisee"
+    SED=${SED:-$(command -v sed || true)}
+    export -n ODISEE_LIBEXEC ODISEE_ETC ODISEE_INST ODISEE_VAR ODISEE_LOG \
+        ODISEE_USER ODISEE_USER_PROFILE ODISEE_TMP ODISEE_BACKUP \
+        ODISEE_SRC ODISEE_EXT
+}
+
+odisee_internal_paths
+
+#
 # DECLARATIONS
 #
 
@@ -812,7 +851,7 @@ start_appsrv() {
     fi
     if [ -z "${JAVA_HOME}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]
     then
-        echo "Odisee: JAVA_HOME is not set to a JDK or JRE"
+        echo "Odisee: java was not found on PATH"
         return 1
     fi
     mkdir -p "${ODISEE_LOG}"
