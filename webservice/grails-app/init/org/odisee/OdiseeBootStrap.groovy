@@ -9,6 +9,8 @@
 
 package org.odisee
 
+import grails.config.Config
+import groovy.transform.CompileStatic
 import org.odisee.io.OdiseePath
 
 class OdiseeBootStrap {
@@ -16,7 +18,7 @@ class OdiseeBootStrap {
     def grailsApplication
 
     def init = { servletContext ->
-        def version = grailsApplication.config.odisee.version
+        String version = serverVersion(grailsApplication.config)
         println """
            _ \\      |_)               
           |   |  _` | |  __|  _ \\  _ \\
@@ -29,7 +31,7 @@ class OdiseeBootStrap {
     }
 
     def destroy = {
-        def version = grailsApplication.config.odisee.version
+        String version = serverVersion(grailsApplication.config)
         println """
            ____      ___              
           / __ \\____/ (_)_______  ___ 
@@ -39,6 +41,11 @@ class OdiseeBootStrap {
          
          Server ${version} stopped.
 """
+    }
+
+    @CompileStatic
+    static String serverVersion(Config config) {
+        config.getProperty('odisee.version', String)
     }
 
 }
