@@ -252,6 +252,8 @@ username endpoint region bucket accessKey secret
 ----
 
 The service image ships with `docker-compose.yml`.
+`./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak`.
+Odisee is on port 8080.
 The `minio` service runs next to `odisee` on the `odisee-backend` network.
 Its image is `alpine/minio:RELEASE.2025-10-15T17-29-55Z`, the current MinIO community release.
 Upstream `minio/minio` is not published for an anonymous pull, so the compose file pins this image instead.
@@ -281,7 +283,7 @@ odisee http://minio:9000 us-east-1 odisee odisee odisee-secret
 Create the bucket `odisee` once, in the console or with `CreateBucket`.
 Do not add an expiration or a lifecycle rule.
 Odisee does not create that bucket and does not delete the object.
-The `odisee` volume is mounted read-only, so run `odictl bucket` against that volume from the host before the service starts.
+`var` is the `odiseevar` volume. The rest of the image stays in the container, so `odictl` runs inside it.
 A host outside this compose network uses that host's endpoint in the same command.
 A bare-metal install passes that host's endpoint to `odictl bucket`.
 
