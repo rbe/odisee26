@@ -68,16 +68,38 @@ jobs:
             oxt/antlib/
             oxt/Odisee/dist/
 
+  values:
+    name: values
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      java-version: ${{ steps.emit.outputs.java-version }}
+      java-distribution: ${{ steps.emit.outputs.java-distribution }}
+      odisee-build-number: ${{ steps.emit.outputs.odisee-build-number }}
+      build-outputs: ${{ steps.emit.outputs.build-outputs }}
+      distribution-zip: ${{ steps.emit.outputs.distribution-zip }}
+    steps:
+      - name: Expose the workflow env block
+        id: emit
+        run: |
+          {
+            echo "java-version=${JAVA_VERSION}"
+            echo "java-distribution=${JAVA_DISTRIBUTION}"
+            echo "odisee-build-number=${ODISEE_BUILD_NUMBER}"
+            echo "build-outputs=${BUILD_OUTPUTS}"
+            echo "distribution-zip=${DISTRIBUTION_ZIP}"
+          } >> "$GITHUB_OUTPUT"
+
   test:
     name: test
-    needs: build
+    needs: [build, values]
     uses: ./.github/workflows/test.yml
     with:
-      java-version: ${{ env.JAVA_VERSION }}
-      java-distribution: ${{ env.JAVA_DISTRIBUTION }}
-      odisee-build-number: ${{ env.ODISEE_BUILD_NUMBER }}
-      build-outputs: ${{ env.BUILD_OUTPUTS }}
-      distribution-zip: ${{ env.DISTRIBUTION_ZIP }}
+      java-version: ${{ needs.values.outputs.java-version }}
+      java-distribution: ${{ needs.values.outputs.java-distribution }}
+      odisee-build-number: ${{ needs.values.outputs.odisee-build-number }}
+      build-outputs: ${{ needs.values.outputs.build-outputs }}
+      distribution-zip: ${{ needs.values.outputs.distribution-zip }}
 
   package:
     name: package
@@ -148,7 +170,7 @@ jobs:
   image:
     name: image
     if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
-    needs: test
+    needs: [test, values]
     permissions:
       actions: write
       contents: read
@@ -156,8 +178,8 @@ jobs:
     secrets: inherit
     uses: ./.github/workflows/image.yml
     with:
-      java-version: ${{ env.JAVA_VERSION }}
-      java-distribution: ${{ env.JAVA_DISTRIBUTION }}
-      odisee-build-number: ${{ env.ODISEE_BUILD_NUMBER }}
-      build-outputs: ${{ env.BUILD_OUTPUTS }}
-      distribution-zip: ${{ env.DISTRIBUTION_ZIP }}
+      java-version: ${{ needs.values.outputs.java-version }}
+      java-distribution: ${{ needs.values.outputs.java-distribution }}
+      odisee-build-number: ${{ needs.values.outputs.odisee-build-number }}
+      build-outputs: ${{ needs.values.outputs.build-outputs }}
+      distribution-zip: ${{ needs.values.outputs.distribution-zip }}

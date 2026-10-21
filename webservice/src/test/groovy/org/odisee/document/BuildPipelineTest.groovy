@@ -11,7 +11,7 @@ class BuildPipelineTest extends GroovyTestCase {
     void testLinuxJobsPassBuildOutputs() {
         Map<String, String> jobs = jobs(workflow())
         assertEquals(
-                ['setup', 'build', 'test', 'package', 'java-client-office', 'image'] as Set,
+                ['setup', 'build', 'values', 'test', 'package', 'java-client-office', 'image'] as Set,
                 jobs.keySet() as Set,
         )
 
@@ -77,13 +77,22 @@ class BuildPipelineTest extends GroovyTestCase {
         assertFalse(build.contains(':webservice:test'))
         assertFalse(build.contains('javaClientOfficeTest'))
 
+        String values = jobs.values
+        assertTrue(values.contains('java-version: ${{ steps.emit.outputs.java-version }}'))
+        assertTrue(values.contains('distribution-zip: ${{ steps.emit.outputs.distribution-zip }}'))
+        assertTrue(values.contains('echo "java-version=${JAVA_VERSION}"'))
+        assertTrue(values.contains('echo "odisee-build-number=${ODISEE_BUILD_NUMBER}"'))
+        assertFalse(values.contains('uses: ./.github/workflows/'))
+
         String test = jobs.test
-        assertTrue(test.contains('needs: build'))
+        assertTrue(test.contains('needs: [build, values]'))
         assertTrue(test.contains('uses: ./.github/workflows/test.yml'))
-        assertTrue(test.contains('java-version: ${{ env.JAVA_VERSION }}'))
-        assertTrue(test.contains('odisee-build-number: ${{ env.ODISEE_BUILD_NUMBER }}'))
-        assertTrue(test.contains('build-outputs: ${{ env.BUILD_OUTPUTS }}'))
-        assertTrue(test.contains('distribution-zip: ${{ env.DISTRIBUTION_ZIP }}'))
+        assertTrue(test.contains('java-version: ${{ needs.values.outputs.java-version }}'))
+        assertTrue(test.contains('java-distribution: ${{ needs.values.outputs.java-distribution }}'))
+        assertTrue(test.contains('odisee-build-number: ${{ needs.values.outputs.odisee-build-number }}'))
+        assertTrue(test.contains('build-outputs: ${{ needs.values.outputs.build-outputs }}'))
+        assertTrue(test.contains('distribution-zip: ${{ needs.values.outputs.distribution-zip }}'))
+        assertFalse(test.contains('env.JAVA_VERSION'))
         assertTrue(testWorkflow.contains('build-outputs: ${{ inputs.build-outputs }}'))
         assertTrue(testWorkflow.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :webservice:integrationTest :test'))
         assertFalse(testWorkflow.contains('javaClientOfficeTest'))
@@ -102,7 +111,10 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(packaged.contains("startsWith(github.ref, 'refs/tags/v')"))
 
         String image = jobs['image']
-        assertTrue(image.contains('needs: test'))
+        assertTrue(image.contains('needs: [test, values]'))
+        assertTrue(image.contains('java-version: ${{ needs.values.outputs.java-version }}'))
+        assertTrue(image.contains('distribution-zip: ${{ needs.values.outputs.distribution-zip }}'))
+        assertFalse(image.contains('env.JAVA_VERSION'))
         assertTrue(image.contains("github.ref == 'refs/heads/master'"))
         assertTrue(image.contains("startsWith(github.ref, 'refs/tags/v')"))
         assertTrue(image.contains('packages: write'))
