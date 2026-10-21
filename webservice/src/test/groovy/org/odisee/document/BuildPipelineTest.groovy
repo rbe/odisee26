@@ -11,7 +11,7 @@ class BuildPipelineTest extends GroovyTestCase {
     void testLinuxJobsPassBuildOutputs() {
         Map<String, String> jobs = jobs(workflow())
         assertEquals(
-                ['setup', 'build', 'test', 'package', 'java-client-office'] as Set,
+                ['setup', 'build', 'test', 'package', 'java-client-office', 'image'] as Set,
                 jobs.keySet() as Set,
         )
 
@@ -81,6 +81,17 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(packaged.contains('name: odisee-${{ env.ODISEE_VERSION }}-linux-x86_64'))
         assertTrue(packaged.contains('${{ env.DISTRIBUTION_ZIP }}'))
         assertTrue(packaged.contains("startsWith(github.ref, 'refs/tags/v')"))
+
+        String image = jobs['image']
+        assertTrue(image.contains('needs: test'))
+        assertTrue(image.contains("github.ref == 'refs/heads/master'"))
+        assertTrue(image.contains("startsWith(github.ref, 'refs/tags/v')"))
+        assertTrue(image.contains('packages: write'))
+        assertTrue(image.contains('./gradlew --no-daemon :webservice:prepareOdiseeDocker'))
+        assertTrue(image.contains('ghcr.io'))
+        assertTrue(image.contains('docker push "${image}:${ODISEE_VERSION}"'))
+        assertFalse(image.contains('startStack'))
+        assertFalse(image.contains('buildOdiseeImage'))
 
         String office = jobs['java-client-office']
         assertTrue(office.contains('needs: build'))
