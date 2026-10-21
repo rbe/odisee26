@@ -8,6 +8,10 @@
         </encoder>
     </appender>
     <logger name="org.odisee" level="DEBUG"/>
+    <!-- Grails replaces Boot beans. The override stays on. This hides the INFO notice. -->
+    <springProfile name="production">
+        <logger name="org.springframework.beans.factory.support.DefaultListableBeanFactory" level="WARN"/>
+    </springProfile>
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
     </root>

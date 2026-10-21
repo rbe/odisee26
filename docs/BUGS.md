@@ -68,6 +68,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B31 | major | fixed in wave 5 | A successful HTTP Basic login still left `request.userPrincipal` null. Grails captured the request before Spring Security wrapped it, so `POST /document/generate` returned 401. The caller is read from the security context. |
 | B32 | major | fixed in wave 5 | `RequestService` cast the active DOM request to `GPathResult`. A DOM body failed before LibreOffice opened the template. A DOM node is serialized as XML. |
 | B33 | minor | fixed | `OdiseeBootStrap` read `grailsApplication.config.odisee.version` by dot notation. Startup logged NavigableMap warnings for `[odisee]` and `[odisee, version]`. The banner reads `config.getProperty('odisee.version', String)`. A set value is unchanged. An absent value is null. |
+| B34 | minor | fixed | Production startup logged `DefaultListableBeanFactory` INFO when Grails replaced `localeResolver`, `dispatcherServlet`, `dispatcherServletRegistration`, and `codecLookup`. The production profile sets that logger to WARN. Bean overriding stays on. |
 
 ## Tests added in wave 1
 
