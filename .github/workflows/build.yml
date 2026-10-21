@@ -270,17 +270,22 @@ jobs:
           version=$(tr -d '[:space:]' < build/odisee-version.txt)
           repo=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           image="ghcr.io/${repo}"
-          podman build \
-            --platform linux/amd64,linux/arm64 \
-            --manifest "${image}:${version}" \
-            --layers \
-            --cache-from "${image}:cache" \
-            --cache-to "${image}:cache" \
-            --build-arg "projectVersion=${version}" \
-            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.version=${version}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            webservice/build/docker/odisee
+          cache_repo="ghcr.io/${repo}/cache"
+          build=(
+            podman build
+            --platform linux/amd64,linux/arm64
+            --manifest "${image}:${version}"
+            --layers
+            --cache-to "${cache_repo}"
+            --build-arg "projectVersion=${version}"
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+            --label "org.opencontainers.image.version=${version}"
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+          )
+          if ! "${build[@]}" --cache-from "${cache_repo}" webservice/build/docker/odisee; then
+            podman manifest rm "${image}:${version}" >/dev/null 2>&1 || true
+            "${build[@]}" webservice/build/docker/odisee
+          fi
           podman manifest push --all "${image}:${version}" "docker://${image}:${version}"
           podman manifest push --all "${image}:${version}" "docker://${image}:latest"
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
