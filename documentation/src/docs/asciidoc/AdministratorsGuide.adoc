@@ -262,6 +262,19 @@ username endpoint region bucket accessKey secret
 
 The service image ships with `docker-compose.yml`.
 `./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak`.
+GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag.
+The tags are `2.6` and `latest`.
+A `v*` tag also pushes that tag name.
+The first publish is private until the package is set public.
+
+[source,bash]
+----
+docker pull ghcr.io/rbe/odisee26:2.6
+podman pull ghcr.io/rbe/odisee26:2.6
+----
+
+The published image listens on port 8080.
+`etc/oidc` names `http://keycloak:8080/realms/odisee`, which is the Keycloak service in this compose file.
 Odisee is on port 8080.
 The `minio` service runs next to `odisee` on the `odisee-backend` network.
 Its image is `alpine/minio:RELEASE.2025-10-15T17-29-55Z`, the current MinIO community release.

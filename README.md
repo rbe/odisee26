@@ -22,6 +22,13 @@ GitHub Actions splits this into jobs `setup`, `build`, `test`, and `package`. `s
 
 Docker tasks are not part of `build`. They need a local Docker daemon. `:webservice:startStack` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer) and starts `odisee`, `minio`, and `keycloak` from `webservice/src/main/docker/docker-compose.yml`. Odisee listens on port 8080, MinIO on 9000, and Keycloak on 8180. `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts a throwaway MinIO and stores one object. `:webservice:test` does not start Docker.
 
+GitHub Actions job `image` publishes that service image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag. The tags are `2.6` and `latest`. A `v*` tag also pushes that tag name. Pull requests do not publish. The first publish is private until the package is set public.
+
+```bash
+docker pull ghcr.io/rbe/odisee26:2.6
+podman pull ghcr.io/rbe/odisee26:2.6
+```
+
 ## Proxy
 
 An HTTP proxy is optional.

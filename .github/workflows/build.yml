@@ -202,3 +202,64 @@ jobs:
             clients/client-java/build/test-results/**/*.xml
             clients/client-java/build/java-client-server.log
           if-no-files-found: ignore
+
+  image:
+    name: image
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Download build outputs
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ env.BUILD_OUTPUTS }}
+          path: .
+
+      - name: Restore empty output directories
+        run: |
+          test -f build/ci-empty-dirs.txt
+          while IFS= read -r dir; do
+            [ -n "$dir" ] && mkdir -p "$dir"
+          done < build/ci-empty-dirs.txt
+
+      - name: Stage the image context
+        run: ./gradlew --no-daemon :webservice:prepareOdiseeDocker
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push the service image
+        run: |
+          set -eu
+          repo=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          image="ghcr.io/${repo}"
+          docker build \
+            --build-arg "projectVersion=${ODISEE_VERSION}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.version=${ODISEE_VERSION}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "${image}:${ODISEE_VERSION}" \
+            -t "${image}:latest" \
+            webservice/build/docker/odisee
+          docker push "${image}:${ODISEE_VERSION}"
+          docker push "${image}:latest"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            docker tag "${image}:${ODISEE_VERSION}" "${image}:${GITHUB_REF_NAME}"
+            docker push "${image}:${GITHUB_REF_NAME}"
+          fi

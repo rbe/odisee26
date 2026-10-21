@@ -63,6 +63,8 @@ LABEL vendor="Art of Coding UG"
 LABEL project="Odisee"
 
 ARG projectVersion=LocalBuild
+LABEL org.opencontainers.image.source="https://github.com/rbe/odisee26"
+LABEL org.opencontainers.image.version="${projectVersion}"
 
 USER odisee:odisee
 
