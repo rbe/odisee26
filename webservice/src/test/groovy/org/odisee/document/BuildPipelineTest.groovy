@@ -16,6 +16,9 @@ class BuildPipelineTest extends GroovyTestCase {
         )
 
         String yaml = workflow()
+        assertTrue(yaml.contains('workflow_dispatch:'))
+        assertTrue(yaml.contains('pull_request:'))
+        assertTrue(yaml.contains('branches: [master]'))
         assertTrue(yaml.contains('JAVA_VERSION: "21"'))
         assertTrue(yaml.contains('JAVA_DISTRIBUTION: temurin'))
         assertTrue(yaml.contains('BUILD_OUTPUTS: build-outputs'))
