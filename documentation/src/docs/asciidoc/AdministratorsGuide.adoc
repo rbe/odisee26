@@ -264,7 +264,7 @@ The default delivery is still `stream`.
 username endpoint region bucket accessKey secret
 ----
 
-The service image ships with `docker-compose.yml`.
+The service image ships with `compose.yaml`.
 `./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak` with `podman compose`.
 GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag.
 One manifest lists `linux/amd64` and `linux/arm64`.

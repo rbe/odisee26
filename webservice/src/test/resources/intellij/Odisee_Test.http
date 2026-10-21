@@ -1,7 +1,7 @@
 POST http://localhost:8080/odisee/document/generate
 Accept: */*
 
-< ../../../main/docker/var/request/test_1_HalloOdisee_single_odt.xml
+< ../../../main/container/var/request/test_1_HalloOdisee_single_odt.xml
 
 ###
 
@@ -22,20 +22,20 @@ Accept: */*
 POST http://localhost:8080/odisee/document/generate
 Accept: */*
 
-< ../../../main/docker/var/request/test_4_HalloOdisee_multiple_merge_pdf.xml
+< ../../../main/container/var/request/test_4_HalloOdisee_multiple_merge_pdf.xml
 
 ###
 
 POST http://localhost:8080/odisee/document/generate
 Accept: */*
 
-< ../../../main/docker/var/request/test_5_HalloOdisee_single_imagebase64_pdf.xml
+< ../../../main/container/var/request/test_5_HalloOdisee_single_imagebase64_pdf.xml
 
 ###
 
 POST http://localhost:8080/odisee/document/generate
 Accept: */*
 
-< ../../../main/docker/var/request/test_7_ImageTest_pdf.xml
+< ../../../main/container/var/request/test_7_ImageTest_pdf.xml
 
 ###

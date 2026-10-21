@@ -64,7 +64,7 @@ tasks.named<BootRun>("bootRun") {
     sourceResources(sourceSets.getByName("main"))
     val springProfilesActive = "spring.profiles.active"
     systemProperty(springProfilesActive, System.getProperty(springProfilesActive))
-    systemProperty("ODISEE_HOME", file("src/main/docker").absolutePath)
+    systemProperty("ODISEE_HOME", file("src/main/container").absolutePath)
 }
 
 val odiseeTestHome = layout.buildDirectory.dir("odisee-test-home")
@@ -86,7 +86,7 @@ tasks.named<Test>("test") {
 tasks.register<Exec>("buildLibreOfficeImage") {
     group = "Odisee"
     description = "Build the headless LibreOffice image used by libreOfficeTest"
-    workingDir(file("src/test/docker/libreoffice"))
+    workingDir(file("src/test/container/libreoffice"))
     commandLine(podmanExecutable, "build", "-t", "odisee-libreoffice-test:local", ".")
 }
 
@@ -179,7 +179,7 @@ tasks.register<Test>("minioTest") {
     }
 }
 
-// Same tag as src/main/docker/docker-compose.yml.
+// Same tag as src/main/container/compose.yaml.
 val keycloakImage = "quay.io/keycloak/keycloak:26.8.0"
 
 tasks.register<Exec>("startKeycloak") {
@@ -187,7 +187,7 @@ tasks.register<Exec>("startKeycloak") {
     description = "Run Keycloak in Podman on 127.0.0.1:8180 for keycloakTest"
     val podmanBin = "'" + podmanExecutable.replace("'", "'\\''") + "'"
     val image = keycloakImage
-    val realm = file("src/main/docker/keycloak/odisee-realm.json").absolutePath.replace("'", "'\\''")
+    val realm = file("src/main/container/keycloak/odisee-realm.json").absolutePath.replace("'", "'\\''")
     commandLine(
         "bash",
         "-lc",
@@ -246,22 +246,22 @@ tasks.register<Test>("libreOfficeTest") {
     systemProperty("odisee.libreoffice.port", "2002")
 }
 
-val dockerBuildDir = layout.buildDirectory.dir("docker/odisee")
+val imageBuildDir = layout.buildDirectory.dir("container/odisee")
 
-tasks.register<Copy>("prepareOdiseeDocker") {
+tasks.register<Copy>("prepareOdiseeImage") {
     group = "Odisee"
     description = "Stage the service image context"
     dependsOn(tasks.named("bootJar"))
-    from("src/main/docker")
+    from("src/main/container")
     from(tasks.named("bootJar"))
-    into(dockerBuildDir)
+    into(imageBuildDir)
 }
 
 tasks.register<Exec>("buildOdiseeImage") {
     group = "Odisee"
     description = "Build the Odisee service image. Requires Podman. Not part of the default build."
-    dependsOn("prepareOdiseeDocker")
-    workingDir(dockerBuildDir)
+    dependsOn("prepareOdiseeImage")
+    workingDir(imageBuildDir)
     commandLine(
         podmanExecutable,
         "build",
@@ -276,7 +276,7 @@ tasks.register<Exec>("startStack") {
     description = "Build the Odisee image and start odisee, minio, and keycloak. Not part of the default build."
     dependsOn("buildOdiseeImage")
     val podmanBin = "'" + podmanExecutable.replace("'", "'\\''") + "'"
-    val composeDir = file("src/main/docker").absolutePath.replace("'", "'\\''")
+    val composeDir = file("src/main/container").absolutePath.replace("'", "'\\''")
     val imageVersion = version.toString().replace("'", "'\\''")
     commandLine(
         "bash",
@@ -284,7 +284,7 @@ tasks.register<Exec>("startStack") {
         """
         set -eu
         export VERSION='$imageVersion'
-        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' up -d
+        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/compose.yaml' up -d
         for i in ${'$'}(seq 1 180); do
             minio=0
             keycloak=0
@@ -305,8 +305,8 @@ tasks.register<Exec>("startStack") {
             sleep 1
         done
         echo 'odisee, minio, or keycloak did not become ready' >&2
-        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' ps >&2 || true
-        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' logs --tail 80 >&2 || true
+        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/compose.yaml' ps >&2 || true
+        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/compose.yaml' logs --tail 80 >&2 || true
         exit 1
         """.trimIndent(),
     )

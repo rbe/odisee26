@@ -249,7 +249,7 @@ jobs:
           done < build/ci-empty-dirs.txt
 
       - name: Stage the image context
-        run: ./gradlew --no-daemon :printVersion :webservice:prepareOdiseeDocker
+        run: ./gradlew --no-daemon :printVersion :webservice:prepareOdiseeImage
 
       - name: Install Podman
         run: |
@@ -282,12 +282,12 @@ jobs:
             --label "org.opencontainers.image.version=${version}"
             --label "org.opencontainers.image.revision=${GITHUB_SHA}"
           )
-          if ! "${build[@]}" --cache-from "${cache_repo}" webservice/build/docker/odisee; then
+          if ! "${build[@]}" --cache-from "${cache_repo}" webservice/build/container/odisee; then
             podman manifest rm "${image}:${version}" >/dev/null 2>&1 || true
-            "${build[@]}" webservice/build/docker/odisee
+            "${build[@]}" webservice/build/container/odisee
           fi
-          podman manifest push --all "${image}:${version}" "docker://${image}:${version}"
-          podman manifest push --all "${image}:${version}" "docker://${image}:latest"
+          podman manifest push --all "${image}:${version}"
+          podman manifest push --all "${image}:${version}" "${image}:latest"
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            podman manifest push --all "${image}:${version}" "docker://${image}:${GITHUB_REF_NAME}"
+            podman manifest push --all "${image}:${version}" "${image}:${GITHUB_REF_NAME}"
           fi

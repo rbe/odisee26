@@ -70,7 +70,7 @@ class KeycloakClientCredentialsTest extends GroovyTestCase {
     }
 
     private static String odictl(String issuer, String admin, String adminPassword, String... args) {
-        File script = new File('src/main/docker/bin/odictl')
+        File script = new File('src/main/container/bin/odictl')
         String home = System.getProperty('ODISEE_HOME')
         ProcessBuilder builder = new ProcessBuilder([script.absolutePath, *args])
         builder.environment().put('ODISEE_HOME', home)

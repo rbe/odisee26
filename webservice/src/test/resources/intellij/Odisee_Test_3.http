@@ -1,6 +1,6 @@
 POST http://localhost:8080/odisee/document/generate
 Accept: */*
 
-< ../../../main/docker/var/request/test_3_HalloOdisee_multiple_pdf.xml
+< ../../../main/container/var/request/test_3_HalloOdisee_multiple_pdf.xml
 
 ###
