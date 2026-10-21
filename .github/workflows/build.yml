@@ -13,7 +13,7 @@ permissions:
 env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: temurin
-  ODISEE_VERSION: "2.6"
+  ODISEE_BUILD_NUMBER: ${{ github.run_number }}
   BUILD_OUTPUTS: build-outputs
   DISTRIBUTION_ZIP: build/distributions/odisee-*-linux-x86_64.zip
 
@@ -146,7 +146,10 @@ jobs:
           done < build/ci-empty-dirs.txt
 
       - name: Package the distribution
-        run: ./gradlew --no-daemon packageDistribution
+        run: ./gradlew --no-daemon :printVersion packageDistribution
+
+      - name: Record version
+        run: echo "ODISEE_VERSION=$(tr -d '[:space:]' < build/odisee-version.txt)" >> "$GITHUB_ENV"
 
       - name: Upload distribution
         uses: actions/upload-artifact@v6
@@ -237,7 +240,7 @@ jobs:
           done < build/ci-empty-dirs.txt
 
       - name: Stage the image context
-        run: ./gradlew --no-daemon :webservice:prepareOdiseeDocker
+        run: ./gradlew --no-daemon :printVersion :webservice:prepareOdiseeDocker
 
       - name: Log in to GitHub Container Registry
         env:
@@ -247,19 +250,20 @@ jobs:
       - name: Build and push the service image
         run: |
           set -eu
+          version=$(tr -d '[:space:]' < build/odisee-version.txt)
           repo=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           image="ghcr.io/${repo}"
           docker build \
-            --build-arg "projectVersion=${ODISEE_VERSION}" \
+            --build-arg "projectVersion=${version}" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.version=${ODISEE_VERSION}" \
+            --label "org.opencontainers.image.version=${version}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            -t "${image}:${ODISEE_VERSION}" \
+            -t "${image}:${version}" \
             -t "${image}:latest" \
             webservice/build/docker/odisee
-          docker push "${image}:${ODISEE_VERSION}"
+          docker push "${image}:${version}"
           docker push "${image}:latest"
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            docker tag "${image}:${ODISEE_VERSION}" "${image}:${GITHUB_REF_NAME}"
+            docker tag "${image}:${version}" "${image}:${GITHUB_REF_NAME}"
             docker push "${image}:${GITHUB_REF_NAME}"
           fi
