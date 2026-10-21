@@ -89,7 +89,11 @@ jobs:
             "${build[@]}" webservice/build/container/odisee
           fi
           podman manifest push --all "${image}:${version}"
-          podman manifest push --all "${image}:${version}" "${image}:latest"
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            podman manifest push --all "${image}:${version}" "${image}:${GITHUB_REF_NAME}"
-          fi
+          case "$GITHUB_REF" in
+            refs/heads/master|refs/tags/v*)
+              podman manifest push --all "${image}:${version}" "${image}:latest"
+              if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+                podman manifest push --all "${image}:${version}" "${image}:${GITHUB_REF_NAME}"
+              fi
+              ;;
+          esac
