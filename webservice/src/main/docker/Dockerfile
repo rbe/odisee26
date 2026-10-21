@@ -9,6 +9,7 @@ ENV TZ=Europe/Berlin \
 # Docs, package indexes, and Writer files that conversion does not read are
 # removed in this same layer so the runtime stage does not contain them.
 # entrypoint.sh uses a 1g heap, so the non-compressed CDS archive stays unused.
+# This layer stays cached. Files that change are copied below it.
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         openjdk-21-jre-headless \
@@ -37,24 +38,37 @@ RUN apt-get update \
     && rm -f /usr/share/libreoffice/share/config/images_*.zip \
     && rm -rf /tmp/* /var/tmp/* \
     && groupadd odisee \
-    && useradd -g odisee -m -d ${ODISEE_HOME} -s /bin/bash odisee
-
-COPY webservice*.jar ${ODISEE_HOME}/application.jar
+    && useradd -g odisee -m -d ${ODISEE_HOME} -s /bin/bash odisee \
+    && chmod 750 ${ODISEE_HOME} \
+    && mkdir -p -m 750 \
+        ${ODISEE_HOME}/bin \
+        ${ODISEE_HOME}/etc \
+        ${ODISEE_HOME}/var/deploy/fonts \
+        ${ODISEE_HOME}/var/document \
+        ${ODISEE_HOME}/var/image \
+        ${ODISEE_HOME}/var/merge \
+        ${ODISEE_HOME}/var/request \
+        ${ODISEE_HOME}/var/template \
+        ${ODISEE_HOME}/var/tmp \
+        ${ODISEE_HOME}/.local/bin \
+    && chmod 750 \
+        ${ODISEE_HOME}/var \
+        ${ODISEE_HOME}/var/deploy \
+        ${ODISEE_HOME}/.local \
+    && chown -R odisee:odisee \
+        ${ODISEE_HOME}/bin \
+        ${ODISEE_HOME}/etc \
+        ${ODISEE_HOME}/var \
+        ${ODISEE_HOME}/.local \
+    && ln -s ${ODISEE_HOME}/bin/odictl ${ODISEE_HOME}/.local/bin/odictl \
+    && chown -h odisee:odisee ${ODISEE_HOME}/.local/bin/odictl
 
 WORKDIR ${ODISEE_HOME}
-RUN mkdir -p var/deploy/fonts var/document var/image var/merge var/request var/template var/tmp
-COPY LICENSE.txt .
-COPY bin/* bin/
-COPY etc/* etc/
-COPY entrypoint.sh .
-RUN mkdir -p .local/bin \
-    && ln -s ${ODISEE_HOME}/bin/odictl .local/bin/odictl
-
-RUN find ${ODISEE_HOME} -print0 | xargs -0 chown odisee:odisee \
-    && find ${ODISEE_HOME} -type d -print0 | xargs -0 chmod 750 \
-    && find ${ODISEE_HOME} -type f -print0 | xargs -0 chmod 440 \
-    && find ${ODISEE_HOME} -type f -name \*.sh -print0 | xargs -0 chmod 550 \
-    && find ${ODISEE_HOME}/bin -type f -print0 | xargs -0 chmod 550
+COPY --chown=odisee:odisee --chmod=440 LICENSE.txt .
+COPY --chown=odisee:odisee --chmod=550 bin/* bin/
+COPY --chown=odisee:odisee --chmod=440 etc/* etc/
+COPY --chown=odisee:odisee --chmod=550 entrypoint.sh .
+COPY --chown=odisee:odisee --chmod=440 webservice*.jar application.jar
 
 FROM packages
 
