@@ -15,9 +15,21 @@ class BuildPipelineTest extends GroovyTestCase {
                 jobs.keySet() as Set,
         )
 
+        String yaml = workflow()
+        assertTrue(yaml.contains('JAVA_VERSION: "21"'))
+        assertTrue(yaml.contains('JAVA_DISTRIBUTION: temurin'))
+        assertTrue(yaml.contains('BUILD_OUTPUTS: build-outputs'))
+        assertTrue(yaml.contains('DISTRIBUTION_ZIP: build/distributions/odisee-*-linux-x86_64.zip'))
+        assertFalse(yaml.contains('java-version: "21"'))
+        jobs.each { String name, String body ->
+            assertTrue(name, body.contains('java-version: ${{ env.JAVA_VERSION }}'))
+            assertTrue(name, body.contains('distribution: ${{ env.JAVA_DISTRIBUTION }}'))
+        }
+
         String setup = jobs.setup
         assertTrue(setup.contains('runs-on: ubuntu-latest'))
-        assertTrue(setup.contains('java-version: "21"'))
+        assertTrue(setup.contains('java-version: ${{ env.JAVA_VERSION }}'))
+        assertTrue(setup.contains('distribution: ${{ env.JAVA_DISTRIBUTION }}'))
         assertTrue(setup.contains('cache: gradle'))
         assertTrue(setup.contains('./gradlew --no-daemon :dependencies :webservice:dependencies :clients:client-java:dependencies :documentation:dependencies'))
         assertFalse(setup.contains('assemble'))
@@ -27,7 +39,7 @@ class BuildPipelineTest extends GroovyTestCase {
         String build = jobs.build
         assertTrue(build.contains('needs: setup'))
         assertTrue(build.contains('./gradlew --no-daemon assemble testClasses integrationTestClasses'))
-        assertTrue(build.contains('name: build-outputs'))
+        assertTrue(build.contains('name: ${{ env.BUILD_OUTPUTS }}'))
         assertTrue(build.contains('include-hidden-files: true'))
         assertTrue(build.contains('build/ci-empty-dirs.txt'))
         assertFalse(build.contains('packageDistribution'))
@@ -37,7 +49,7 @@ class BuildPipelineTest extends GroovyTestCase {
         String test = jobs.test
         assertTrue(test.contains('needs: build'))
         assertTrue(test.contains('actions/download-artifact@v4'))
-        assertTrue(test.contains('name: build-outputs'))
+        assertTrue(test.contains('name: ${{ env.BUILD_OUTPUTS }}'))
         assertTrue(test.contains('mkdir -p "$dir"'))
         assertTrue(test.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :webservice:integrationTest :test'))
         assertFalse(test.contains('javaClientOfficeTest'))
@@ -51,7 +63,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(packaged.contains('actions/download-artifact@v4'))
         assertTrue(packaged.contains('mkdir -p "$dir"'))
         assertTrue(packaged.contains('./gradlew --no-daemon packageDistribution'))
-        assertTrue(packaged.contains('build/distributions/odisee-*-linux-x86_64.zip'))
+        assertTrue(packaged.contains('${{ env.DISTRIBUTION_ZIP }}'))
         assertTrue(packaged.contains("startsWith(github.ref, 'refs/tags/v')"))
 
         String office = jobs['java-client-office']

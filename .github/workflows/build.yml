@@ -9,6 +9,12 @@ on:
 permissions:
   contents: write
 
+env:
+  JAVA_VERSION: "21"
+  JAVA_DISTRIBUTION: temurin
+  BUILD_OUTPUTS: build-outputs
+  DISTRIBUTION_ZIP: build/distributions/odisee-*-linux-x86_64.zip
+
 jobs:
   setup:
     name: setup
@@ -18,11 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
       - name: Fill the Gradle cache
@@ -37,11 +43,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
       - name: Compile and assemble
@@ -59,7 +65,7 @@ jobs:
       - name: Upload build outputs
         uses: actions/upload-artifact@v4
         with:
-          name: build-outputs
+          name: ${{ env.BUILD_OUTPUTS }}
           include-hidden-files: true
           if-no-files-found: error
           path: |
@@ -77,17 +83,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
       - name: Download build outputs
         uses: actions/download-artifact@v4
         with:
-          name: build-outputs
+          name: ${{ env.BUILD_OUTPUTS }}
           path: .
 
       - name: Restore empty output directories
@@ -117,17 +123,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
       - name: Download build outputs
         uses: actions/download-artifact@v4
         with:
-          name: build-outputs
+          name: ${{ env.BUILD_OUTPUTS }}
           path: .
 
       - name: Restore empty output directories
@@ -144,14 +150,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: odisee-linux-x86_64
-          path: build/distributions/odisee-*-linux-x86_64.zip
+          path: ${{ env.DISTRIBUTION_ZIP }}
           if-no-files-found: error
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/distributions/odisee-*-linux-x86_64.zip
+          files: ${{ env.DISTRIBUTION_ZIP }}
 
   java-client-office:
     name: Java client office proof
@@ -162,17 +168,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
       - name: Download build outputs
         uses: actions/download-artifact@v4
         with:
-          name: build-outputs
+          name: ${{ env.BUILD_OUTPUTS }}
           path: .
 
       - name: Restore empty output directories
