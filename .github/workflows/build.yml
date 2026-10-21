@@ -193,6 +193,14 @@ jobs:
             [ -n "$dir" ] && mkdir -p "$dir"
           done < build/ci-empty-dirs.txt
 
+      - name: Install Podman
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y podman
+          mkdir -p "${HOME}/.config/containers"
+          printf '%s\n' '[engine]' 'cgroup_manager = "cgroupfs"' 'events_logger = "file"' > "${HOME}/.config/containers/containers.conf"
+
       - name: Java client office proof
         run: ./gradlew --no-daemon :clients:client-java:javaClientOfficeTest
 
@@ -243,17 +251,18 @@ jobs:
       - name: Stage the image context
         run: ./gradlew --no-daemon :printVersion :webservice:prepareOdiseeDocker
 
+      - name: Install Podman
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y podman qemu-user-static
+          mkdir -p "${HOME}/.config/containers"
+          printf '%s\n' '[engine]' 'cgroup_manager = "cgroupfs"' 'events_logger = "file"' > "${HOME}/.config/containers/containers.conf"
+
       - name: Log in to GitHub Container Registry
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Register QEMU and Buildx
-        run: |
-          set -eu
-          docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
-          docker buildx create --name odisee --driver docker-container --use
-          docker buildx inspect --bootstrap
+        run: printf '%s' "$GHCR_TOKEN" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build and push the service image
         run: |
@@ -261,23 +270,19 @@ jobs:
           version=$(tr -d '[:space:]' < build/odisee-version.txt)
           repo=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           image="ghcr.io/${repo}"
-          tags=(
-            -t "${image}:${version}"
-            -t "${image}:latest"
-          )
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            tags+=(-t "${image}:${GITHUB_REF_NAME}")
-          fi
-          docker buildx build \
+          podman build \
             --platform linux/amd64,linux/arm64 \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --provenance=false \
-            --sbom=false \
-            --push \
+            --manifest "${image}:${version}" \
+            --layers \
+            --cache-from "${image}:cache" \
+            --cache-to "${image}:cache" \
             --build-arg "projectVersion=${version}" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.version=${version}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            "${tags[@]}" \
             webservice/build/docker/odisee
+          podman manifest push --all "${image}:${version}" "docker://${image}:${version}"
+          podman manifest push --all "${image}:${version}" "docker://${image}:latest"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            podman manifest push --all "${image}:${version}" "docker://${image}:${GITHUB_REF_NAME}"
+          fi

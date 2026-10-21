@@ -14,7 +14,7 @@ import java.util.zip.ZipInputStream
 
 /**
  * Tests 1-3 against LibreOffice listening on 127.0.0.1:2002.
- * {@code ./gradlew libreOfficeTest} starts that process in Docker and mounts
+ * {@code ./gradlew libreOfficeTest} starts that process in Podman and mounts
  * {@code ODISEE_HOME} at the same path inside the container.
  */
 class GenerationBasisTest extends GroovyTestCase {

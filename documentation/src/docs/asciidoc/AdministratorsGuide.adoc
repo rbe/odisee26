@@ -48,7 +48,7 @@ A user install links it into `$HOME/.local/bin`.
 The service image puts that command on `PATH` as `/home/odisee/.local/bin` in the image environment.
 `ODISEE_HOME` defaults to `$HOME/.local/share/odisee`.
 `/opt/odisee`, the container, and a systemd unit set `ODISEE_HOME` in the environment, and that value is the home.
-Docker and systemd also pass `ODISEE_KEYCLOAK_ISSUER`, `ODISEE_KEYCLOAK_ADMIN`, and `ODISEE_KEYCLOAK_ADMIN_PASSWORD` in the environment.
+Podman and systemd also pass `ODISEE_KEYCLOAK_ISSUER`, `ODISEE_KEYCLOAK_ADMIN`, and `ODISEE_KEYCLOAK_ADMIN_PASSWORD` in the environment.
 `etc/local.odienv` is not a login script.
 The distribution ships no login profile.
 
@@ -75,7 +75,7 @@ The `odisee` container does the same (`ODISEE_HOME=/home/odisee`).
 Its command is `/home/odisee/entrypoint.sh`.
 That script starts LibreOffice with `odictl -q start-inst` and then runs `java -jar` in the foreground.
 
-Set `ODISEE_SHELL=1` to start that JVM in the background and exec bash, so `docker run -it` has a prompt. Exit or SIGTERM stops the JVM and the LibreOffice processes. The default leaves `java -jar` in the foreground, and an admin shell is `docker exec`.
+Set `ODISEE_SHELL=1` to start that JVM in the background and exec bash, so `podman run -it` has a prompt. Exit or SIGTERM stops the JVM and the LibreOffice processes. The default leaves `java -jar` in the foreground, and an admin shell is `podman exec`.
 
 . Download distribution as ZIP archive for your platform
 [source,bash,lineno]
@@ -265,7 +265,7 @@ username endpoint region bucket accessKey secret
 ----
 
 The service image ships with `docker-compose.yml`.
-`./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak`.
+`./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak` with `podman compose`.
 GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag.
 One manifest lists `linux/amd64` and `linux/arm64`.
 There is no `darwin` image.
@@ -276,7 +276,6 @@ The first publish is private until the package is set public.
 
 [source,bash]
 ----
-docker pull ghcr.io/rbe/odisee26:2.6.0-<build>
 podman pull ghcr.io/rbe/odisee26:2.6.0-<build>
 ----
 
@@ -292,7 +291,7 @@ The console is port 9001.
 The command is `minio server /data`.
 Objects stay on the `miniodata` volume.
 The service does not expire objects, delete them, or set a lifecycle.
-The image runs as user `minio`, which cannot write a fresh Docker volume, so the service starts as root.
+The image runs as user `minio`, which cannot write a fresh volume, so the service starts as root.
 
 From the Odisee container the endpoint is `http://minio:9000`.
 Write the `odisee` user's line with:

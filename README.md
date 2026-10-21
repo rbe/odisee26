@@ -18,16 +18,15 @@ export JAVA_HOME=/path/to/jdk-21
 
 The zip contains `application.jar`, `bin/odictl`, `etc/`, the Java client, the LibreOffice extension, and the HTML documentation.
 
-GitHub Actions splits this into jobs `setup`, `build`, `test`, and `package`. `setup` checks out the sources, installs JDK 21, and fills the Gradle cache. `build` compiles and assembles, does not run tests, and uploads those outputs. `test` downloads the outputs and runs the unit tests that do not need Docker. `package` downloads the outputs, writes the zip, and uploads it. A git tag `v*` publishes that zip as a GitHub Release. Job `java-client-office` runs the LibreOffice proof.
+GitHub Actions splits this into jobs `setup`, `build`, `test`, and `package`. `setup` checks out the sources, installs JDK 21, and fills the Gradle cache. `build` compiles and assembles, does not run tests, and uploads those outputs. `test` downloads the outputs and runs the unit tests that do not start a container. `package` downloads the outputs, writes the zip, and uploads it. A git tag `v*` publishes that zip as a GitHub Release. Job `java-client-office` runs the LibreOffice proof.
 
-Docker tasks are not part of `build`. They need a local Docker daemon. `:webservice:startStack` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer) and starts `odisee`, `minio`, and `keycloak` from `webservice/src/main/docker/docker-compose.yml`. Odisee listens on port 8080, MinIO on 9000, and Keycloak on 8180. `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts a throwaway MinIO and stores one object. `:webservice:test` does not start Docker.
+Podman tasks are not part of `build`. They need a local Podman service. `:webservice:startStack` builds the service image (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer) and starts `odisee`, `minio`, and `keycloak` with `podman compose` from `webservice/src/main/docker/docker-compose.yml`. Odisee listens on port 8080, MinIO on 9000, and Keycloak on 8180. `:webservice:libreOfficeTest` builds the test image at `webservice/src/test/docker/libreoffice`. `:webservice:minioTest` starts a throwaway MinIO and stores one object. `:webservice:test` does not start a container.
 
 The version is semantic. A local build is `2.6.0`. GitHub Actions sets `ODISEE_BUILD_NUMBER` to the workflow run number, so that build is `2.6.0-<run>`, for example `2.6.0-42`. The zip, the uploaded artifact, and the image tag use that version.
 
 GitHub Actions runs on `ubuntu-26.04`. Job `image` publishes that service image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag. One manifest lists `linux/amd64` and `linux/arm64`. There is no `darwin` image. The LibreOffice layer stays cached; `application.jar` is copied after it. The tags are `2.6.0-<run>` and `latest`. A `v*` tag also pushes that tag name. Pull requests do not publish. The first publish is private until the package is set public.
 
 ```bash
-docker pull ghcr.io/rbe/odisee26:2.6.0-<run>
 podman pull ghcr.io/rbe/odisee26:2.6.0-<run>
 ```
 
@@ -35,12 +34,12 @@ podman pull ghcr.io/rbe/odisee26:2.6.0-<run>
 
 An HTTP proxy is optional.
 
-Docker reads `/.env`:
+Podman reads the environment:
 
 ```text
 HTTP_PROXY=http://proxy.example.com:8888
 HTTPS_PROXY=http://proxy.example.com:8888
-NON_PROXY=localhost,example.com
+NO_PROXY=localhost,example.com
 ```
 
 Gradle reads `$HOME/.gradle/gradle.properties`:

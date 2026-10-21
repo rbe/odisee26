@@ -6,9 +6,9 @@ plugins {
     id("org.apache.grails.gradle.grails-gsp") version "7.2.4"
 }
 
-apply(from = rootProject.file("gradle/docker-executable.gradle.kts"))
+apply(from = rootProject.file("gradle/podman-executable.gradle.kts"))
 
-val dockerExecutable = extra["dockerExecutable"] as String
+val podmanExecutable = extra["podmanExecutable"] as String
 
 val grailsVersion: String by project
 val libreOfficeVersion: String by project
@@ -87,19 +87,19 @@ tasks.register<Exec>("buildLibreOfficeImage") {
     group = "Odisee"
     description = "Build the headless LibreOffice image used by libreOfficeTest"
     workingDir(file("src/test/docker/libreoffice"))
-    commandLine(dockerExecutable, "build", "-t", "odisee-libreoffice-test:local", ".")
+    commandLine(podmanExecutable, "build", "-t", "odisee-libreoffice-test:local", ".")
 }
 
 tasks.register<Exec>("startLibreOffice") {
     group = "Odisee"
-    description = "Run LibreOffice in Docker on port 2002, with ODISEE_HOME mounted at the same path"
+    description = "Run LibreOffice in Podman on port 2002, with ODISEE_HOME mounted at the same path"
     dependsOn("buildLibreOfficeImage")
     val homeProvider = odiseeTestHome
     doFirst {
         homeProvider.get().asFile.mkdirs()
     }
     val homePath = odiseeTestHome.get().asFile.absolutePath
-    val dockerBin = "'" + dockerExecutable.replace("'", "'\\''") + "'"
+    val podmanBin = "'" + podmanExecutable.replace("'", "'\\''") + "'"
     commandLine(
         "bash",
         "-lc",
@@ -107,8 +107,8 @@ tasks.register<Exec>("startLibreOffice") {
         set -eu
         home='$homePath'
         mkdir -p "${'$'}home"
-        $dockerBin rm -f odisee-lo-test >/dev/null 2>&1 || true
-        $dockerBin run -d --name odisee-lo-test --network host \
+        $podmanBin rm -f odisee-lo-test >/dev/null 2>&1 || true
+        $podmanBin run -d --name odisee-lo-test --network host \
             -v "${'$'}home:${'$'}home" \
             odisee-libreoffice-test:local
         for i in ${'$'}(seq 1 90); do
@@ -118,7 +118,7 @@ tasks.register<Exec>("startLibreOffice") {
             sleep 1
         done
         echo 'LibreOffice did not open port 2002' >&2
-        $dockerBin logs odisee-lo-test >&2 || true
+        $podmanBin logs odisee-lo-test >&2 || true
         exit 1
         """.trimIndent(),
     )
@@ -128,16 +128,16 @@ val minioImage = "alpine/minio:RELEASE.2025-10-15T17-29-55Z"
 
 tasks.register<Exec>("startMinio") {
     group = "Odisee"
-    description = "Run MinIO in Docker on 127.0.0.1:9000 for minioTest"
-    val dockerBin = "'" + dockerExecutable.replace("'", "'\\''") + "'"
+    description = "Run MinIO in Podman on 127.0.0.1:9000 for minioTest"
+    val podmanBin = "'" + podmanExecutable.replace("'", "'\\''") + "'"
     val image = minioImage
     commandLine(
         "bash",
         "-lc",
         """
         set -eu
-        $dockerBin rm -f odisee-minio-test >/dev/null 2>&1 || true
-        $dockerBin run -d --name odisee-minio-test \
+        $podmanBin rm -f odisee-minio-test >/dev/null 2>&1 || true
+        $podmanBin run -d --name odisee-minio-test \
             -p 127.0.0.1:9000:9000 \
             -e MINIO_ROOT_USER=odisee \
             -e MINIO_ROOT_PASSWORD=odisee-secret \
@@ -154,7 +154,7 @@ tasks.register<Exec>("startMinio") {
             sleep 1
         done
         echo 'MinIO did not open http://127.0.0.1:9000/minio/health/live' >&2
-        $dockerBin logs odisee-minio-test >&2 || true
+        $podmanBin logs odisee-minio-test >&2 || true
         exit 1
         """.trimIndent(),
     )
@@ -184,8 +184,8 @@ val keycloakImage = "quay.io/keycloak/keycloak:26.8.0"
 
 tasks.register<Exec>("startKeycloak") {
     group = "Odisee"
-    description = "Run Keycloak in Docker on 127.0.0.1:8180 for keycloakTest"
-    val dockerBin = "'" + dockerExecutable.replace("'", "'\\''") + "'"
+    description = "Run Keycloak in Podman on 127.0.0.1:8180 for keycloakTest"
+    val podmanBin = "'" + podmanExecutable.replace("'", "'\\''") + "'"
     val image = keycloakImage
     val realm = file("src/main/docker/keycloak/odisee-realm.json").absolutePath.replace("'", "'\\''")
     commandLine(
@@ -193,8 +193,8 @@ tasks.register<Exec>("startKeycloak") {
         "-lc",
         """
         set -eu
-        $dockerBin rm -f odisee-keycloak-test >/dev/null 2>&1 || true
-        $dockerBin run -d --name odisee-keycloak-test \
+        $podmanBin rm -f odisee-keycloak-test >/dev/null 2>&1 || true
+        $podmanBin run -d --name odisee-keycloak-test \
             -p 127.0.0.1:8180:8080 \
             -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
             -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
@@ -210,7 +210,7 @@ tasks.register<Exec>("startKeycloak") {
             sleep 1
         done
         echo 'Keycloak did not open the odisee realm' >&2
-        $dockerBin logs odisee-keycloak-test >&2 || true
+        $podmanBin logs odisee-keycloak-test >&2 || true
         exit 1
         """.trimIndent(),
     )
@@ -236,7 +236,7 @@ tasks.register<Test>("keycloakTest") {
 
 tasks.register<Test>("libreOfficeTest") {
     group = "Odisee"
-    description = "Tests 1-3 against LibreOffice in Docker"
+    description = "Tests 1-3 against LibreOffice in Podman"
     dependsOn("startLibreOffice", "testClasses")
     val testSourceSet = sourceSets.getByName("test")
     testClassesDirs = testSourceSet.output.classesDirs
@@ -259,11 +259,11 @@ tasks.register<Copy>("prepareOdiseeDocker") {
 
 tasks.register<Exec>("buildOdiseeImage") {
     group = "Odisee"
-    description = "Build the Odisee service image. Requires Docker. Not part of the default build."
+    description = "Build the Odisee service image. Requires Podman. Not part of the default build."
     dependsOn("prepareOdiseeDocker")
     workingDir(dockerBuildDir)
     commandLine(
-        dockerExecutable,
+        podmanExecutable,
         "build",
         "-t", "odisee/odisee:$version",
         "-t", "odisee/webservice:$version",
@@ -275,7 +275,7 @@ tasks.register<Exec>("startStack") {
     group = "Odisee"
     description = "Build the Odisee image and start odisee, minio, and keycloak. Not part of the default build."
     dependsOn("buildOdiseeImage")
-    val dockerBin = "'" + dockerExecutable.replace("'", "'\\''") + "'"
+    val podmanBin = "'" + podmanExecutable.replace("'", "'\\''") + "'"
     val composeDir = file("src/main/docker").absolutePath.replace("'", "'\\''")
     val imageVersion = version.toString().replace("'", "'\\''")
     commandLine(
@@ -284,15 +284,7 @@ tasks.register<Exec>("startStack") {
         """
         set -eu
         export VERSION='$imageVersion'
-        if $dockerBin compose version >/dev/null 2>&1; then
-            compose=( $dockerBin compose )
-        elif command -v docker-compose >/dev/null 2>&1; then
-            compose=( docker-compose )
-        else
-            echo 'docker compose is required' >&2
-            exit 1
-        fi
-        "${'$'}{compose[@]}" -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' up -d
+        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' up -d
         for i in ${'$'}(seq 1 180); do
             minio=0
             keycloak=0
@@ -313,8 +305,8 @@ tasks.register<Exec>("startStack") {
             sleep 1
         done
         echo 'odisee, minio, or keycloak did not become ready' >&2
-        "${'$'}{compose[@]}" -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' ps >&2 || true
-        "${'$'}{compose[@]}" -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' logs --tail 80 >&2 || true
+        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' ps >&2 || true
+        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/docker-compose.yml' logs --tail 80 >&2 || true
         exit 1
         """.trimIndent(),
     )

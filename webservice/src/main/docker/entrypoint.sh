@@ -10,7 +10,7 @@ export ODISEE_HOME
 # LibreOffice only. The JVM stays in the foreground below so the container
 # lifecycle follows the service. `odictl -q start` is the bare-metal command
 # and would launch application.jar a second time.
-# ODISEE_SHELL=1 backgrounds that same JVM and execs bash for `docker run -it`.
+# ODISEE_SHELL=1 backgrounds that same JVM and execs bash for `podman run -it`.
 odictl -q start-inst
 sleep 5
 echo
@@ -27,7 +27,7 @@ if [ "${ODISEE_SHELL:-}" = "1" ]; then
     ODISEE_JVM_PID=$!
     export ODISEE_JVM_PID
     # --rcfile installs the EXIT and TERM traps in the shell that becomes PID 1.
-    # A login shell is not used. docker exec is the shell when this variable is unset.
+    # A login shell is not used. podman exec is the shell when this variable is unset.
     rc=$(mktemp)
     cat > "${rc}" << 'EOF'
 stop_odisee_shell() {

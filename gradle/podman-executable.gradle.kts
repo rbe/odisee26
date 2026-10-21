@@ -1,14 +1,14 @@
 import java.io.File
 
-fun resolveDockerExecutable(): String {
-    findProperty("docker.executable")?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-    System.getenv("DOCKER_EXECUTABLE")?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+fun resolvePodmanExecutable(): String {
+    findProperty("podman.executable")?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    System.getenv("PODMAN_EXECUTABLE")?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
 
     val path = System.getenv("PATH").orEmpty()
     val names = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
-        listOf("docker.exe", "docker.cmd", "docker")
+        listOf("podman.exe", "podman.cmd", "podman")
     } else {
-        listOf("docker")
+        listOf("podman")
     }
     path.split(File.pathSeparator)
         .asSequence()
@@ -18,11 +18,11 @@ fun resolveDockerExecutable(): String {
         .firstOrNull { it.isFile && it.canExecute() }
         ?.let { return it.absolutePath }
 
-    listOf("/usr/local/bin/docker", "/opt/homebrew/bin/docker")
+    listOf("/opt/homebrew/bin/podman", "/usr/local/bin/podman")
         .firstOrNull { File(it).isFile && File(it).canExecute() }
         ?.let { return it }
 
-    return "docker"
+    return "podman"
 }
 
-extra["dockerExecutable"] = resolveDockerExecutable()
+extra["podmanExecutable"] = resolvePodmanExecutable()

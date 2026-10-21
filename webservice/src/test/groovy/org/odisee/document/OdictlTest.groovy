@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * {@code odictl} writes the files the server reads.
- * The script runs from the source tree. It does not need Docker.
+ * The script runs from the source tree. It does not start a container.
  */
 class OdictlTest extends GroovyTestCase {
 

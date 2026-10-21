@@ -26,10 +26,10 @@ Build:
 
 - JDK 21, Gradle 8.14.5, Grails 7.2.4.
 - UNO classes come from Maven Central (`org.libreoffice:libreoffice` and `org.libreoffice:unoloader` at 26.2.2, the newest 26.2 still jars published there). The older `juh`, `jurt`, `ridl`, and `unoil` coordinates are empty stubs at that version. `compileJava` does not download a LibreOffice `.deb`.
-- `./gradlew build` compiles, runs the unit tests, and writes `build/distributions/odisee-2.6.0-linux-x86_64.zip`. The version is semantic. GitHub Actions appends the workflow run number, so a CI build is `2.6.0-<run>`. It does not start Docker. GitHub Actions on JDK 21 runs jobs `setup`, `build`, `test`, and `package`. `setup` fills the Gradle cache. `build` compiles and assembles and uploads those outputs. `test` runs the unit tests that do not need Docker. `package` writes the zip, and a `v*` tag publishes it. Job `java-client-office` runs `:clients:client-java:javaClientOfficeTest` with Docker.
+- `./gradlew build` compiles, runs the unit tests, and writes `build/distributions/odisee-2.6.0-linux-x86_64.zip`. The version is semantic. GitHub Actions appends the workflow run number, so a CI build is `2.6.0-<run>`. It does not start a container. GitHub Actions on JDK 21 runs jobs `setup`, `build`, `test`, and `package`. `setup` fills the Gradle cache. `build` compiles and assembles and uploads those outputs. `test` runs the unit tests that do not start a container. `package` writes the zip, and a `v*` tag publishes it. Job `java-client-office` runs `:clients:client-java:javaClientOfficeTest` with Podman.
 - The VB.NET client is not a CI job. `Odisee.vbproj` targets .NET Framework 4.6.1, and `windows-latest` (Windows Server 2025, Visual Studio 2026) has no 4.6.1 reference assemblies. ClickOnce signing is on, and `Odisee_TemporaryKey.pfx` expired on 2013-10-16. `buildSolution` does not invoke MSBuild. The `msbuild` task points at Mono 6 on macOS.
-- `./gradlew :webservice:test` does not start Docker. `./gradlew :webservice:libreOfficeTest` builds `webservice/src/test/docker/libreoffice` (Ubuntu 26.04, headless LibreOffice Writer) and runs tests 1–3.
-- The service image is `./gradlew :webservice:buildOdiseeImage` (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). It is not part of `build`. GitHub Actions job `image` publishes it to `ghcr.io/rbe/odisee26` with tags `2.6.0-<run>` and `latest` on `master` and on a `v*` tag. One manifest lists `linux/amd64` and `linux/arm64`. The workflow runs on `ubuntu-26.04`. `application.jar` is copied after the LibreOffice layer, and Buildx caches that layer with `type=gha,mode=max`. A `v*` tag also pushes that tag name.
+- `./gradlew :webservice:test` does not start a container. `./gradlew :webservice:libreOfficeTest` builds `webservice/src/test/docker/libreoffice` (Ubuntu 26.04, headless LibreOffice Writer) and runs tests 1–3.
+- The service image is `./gradlew :webservice:buildOdiseeImage` (Ubuntu 26.04, OpenJDK 21, headless LibreOffice Writer). It is not part of `build`. GitHub Actions job `image` publishes it to `ghcr.io/rbe/odisee26` with tags `2.6.0-<run>` and `latest` on `master` and on a `v*` tag. One manifest lists `linux/amd64` and `linux/arm64`. The workflow runs on `ubuntu-26.04`. `application.jar` is copied after the LibreOffice layer. Podman builds `linux/amd64` and `linux/arm64` and caches those layers at `ghcr.io/rbe/odisee26:cache`. A `v*` tag also pushes that tag name.
 - `oxt/buildExtension` downloads ant-contrib and xmltask, then runs the Ant `world-production` target. Configuration of the webservice does not import that Ant build. Gradle is started with `--add-exports` for `java.xml/com.sun.org.apache.xpath.internal` and `java.xml/com.sun.org.apache.xpath.internal.objects` because xmltask 1.16 calls those JDK-internal XPath classes.
 
 ## Wave 2 — One request contract
@@ -77,17 +77,17 @@ Tests 1–5 from the basis list:
 | 4 Status 404 / 400 / 503, body is the message | `HttpStatusTest` | no |
 | 5 The pool skips a dead slot | `OfficeConnectionPoolTest` | no |
 
-Tests 1–3 use a Writer template with the user field `Hallo` and read the text back out of the PDF. LibreOffice runs in Docker, headless, on port 2002. The test home is mounted into the container at the same path, so the file URL the server sends is the file LibreOffice opens.
+Tests 1–3 use a Writer template with the user field `Hallo` and read the text back out of the PDF. LibreOffice runs in Podman, headless, on port 2002. The test home is mounted into the container at the same path, so the file URL the server sends is the file LibreOffice opens.
 
 ```
 ./gradlew :webservice:libreOfficeTest
 ```
 
-That builds `webservice/src/test/docker/libreoffice`, starts the container, and runs tests 1–3. `./gradlew :webservice:test` runs tests 4 and 5 with the other unit tests and does not start Docker.
+That builds `webservice/src/test/docker/libreoffice`, starts the container, and runs tests 1–3. `./gradlew :webservice:test` runs tests 4 and 5 with the other unit tests and does not start a container.
 
 Status: **landed**.
 
-The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`. The GitHub Actions job `java-client-office` has Docker and runs that task. `./gradlew build` stays free of Docker.
+The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`. The GitHub Actions job `java-client-office` has Podman and runs that task. `./gradlew build` does not start a container.
 
 - The task starts the same LibreOffice container as tests 1–3, on port 2002, with `ODISEE_HOME` mounted at the same path.
 - It starts the webservice against that home. `etc/oidc` names the issuer. `Letter.ott` (user field `Hallo`) is in `var/user/odisee/template`.
@@ -127,7 +127,7 @@ F7 is implemented. Each user has one bucket in `$ODISEE_HOME/etc/buckets`, read 
 
 Status: **landed**.
 
-`odictl` is one command on `PATH`. It computes its directories when it runs. `ODISEE_HOME` defaults to `$HOME/.local/share/odisee`. `/opt/odisee`, the container, and a systemd unit set `ODISEE_HOME` in the environment, and that value is the home. `JAVA_HOME` is derived inside `odictl` from `java` on `PATH`. Directory names stay inside `odilib`. A user install links `odictl` into `$HOME/.local/bin`. The service image adds `/home/odisee/.local/bin` to `PATH` in the image environment. Fonts are files in `$HOME/.local/share/fonts`. Docker and systemd pass `ODISEE_HOME` and the Keycloak variables in the environment. `etc/local.odienv` is not a login script. The distribution ships no login profile. The container command is `/home/odisee/entrypoint.sh`. It starts LibreOffice with `odictl -q start-inst` and then runs `java -jar` in the foreground. `ODISEE_SHELL=1` starts that JVM in the background and execs bash; exit or SIGTERM stops the JVM and LibreOffice. An admin shell is `docker exec` when the variable is unset. Linux office port checks read `/proc/net/tcp` and `/proc/net/tcp6` and count LISTEN (`0A`) and ESTABLISHED (`01`).
+`odictl` is one command on `PATH`. It computes its directories when it runs. `ODISEE_HOME` defaults to `$HOME/.local/share/odisee`. `/opt/odisee`, the container, and a systemd unit set `ODISEE_HOME` in the environment, and that value is the home. `JAVA_HOME` is derived inside `odictl` from `java` on `PATH`. Directory names stay inside `odilib`. A user install links `odictl` into `$HOME/.local/bin`. The service image adds `/home/odisee/.local/bin` to `PATH` in the image environment. Fonts are files in `$HOME/.local/share/fonts`. Podman and systemd pass `ODISEE_HOME` and the Keycloak variables in the environment. `etc/local.odienv` is not a login script. The distribution ships no login profile. The container command is `/home/odisee/entrypoint.sh`. It starts LibreOffice with `odictl -q start-inst` and then runs `java -jar` in the foreground. `ODISEE_SHELL=1` starts that JVM in the background and execs bash; exit or SIGTERM stops the JVM and LibreOffice. An admin shell is `podman exec` when the variable is unset. Linux office port checks read `/proc/net/tcp` and `/proc/net/tcp6` and count LISTEN (`0A`) and ESTABLISHED (`01`).
 
 ## Refactorings
 
