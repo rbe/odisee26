@@ -35,7 +35,7 @@
 
 bash 4
 java on `PATH`
-ss from iproute2 on Linux; netstat on macOS
+Linux reads /proc/net/tcp and /proc/net/tcp6; macOS uses netstat
 sudo
 unzip
 awk

@@ -8,7 +8,10 @@ import org.odisee.io.OdiseePath
 import org.odisee.io.TenantPaths
 import org.odisee.security.OidcFile
 
+import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -308,49 +311,88 @@ class OdictlTest extends GroovyTestCase {
         assertFalse(gradle.contains('.bash_profile'))
     }
 
-    void testLinuxOfficePortCheckUsesSs() {
-        Path tree = Files.createTempDirectory('odisee-ss')
+    void testLinuxOfficePortCheckReadsProcNet() {
+        Path tree = Files.createTempDirectory('odisee-proc')
+        ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        Socket client = null
+        Socket accepted = null
         try {
+            int port = server.localPort
+            client = new Socket(InetAddress.getLoopbackAddress(), port)
+            accepted = server.accept()
             Path home = tree.resolve('odisee')
-            Path bin = tree.resolve('bin')
             Files.createDirectories(home.resolve('etc'))
-            Files.createDirectories(bin)
-            Files.writeString(home.resolve('etc/odiinst'), 'odi1|127.0.0.1|2001|/usr/lib/libreoffice||nologo|true\n')
-            Path ssLog = tree.resolve('ss.log')
-            writeExe(bin.resolve('ss'), [
-                    '#!/bin/sh',
-                    'printf %s\\\\n "$*" >> \'' + ssLog + '\'',
-                    'printf %s\\\\n \'LISTEN 0 128 127.0.0.1:2001 0.0.0.0:*\'',
+            Files.writeString(home.resolve('etc/odiinst'), "odi1|127.0.0.1|${port}|/usr/lib/libreoffice||nologo|true\n")
+            Path tcp = tree.resolve('tcp')
+            Path tcp6 = tree.resolve('tcp6')
+            Path missing = tree.resolve('missing-tcp')
+            Path err = tree.resolve('err.txt')
+            // 2001 is 07D1. One LISTEN and one ESTABLISHED on that local port, plus decoys.
+            Files.writeString(tcp, [
+                    '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode',
+                    '   0: 0100007F:07D1 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1 1 0 100 0 0 10 0',
+                    '   1: 0100007F:07d1 0100007F:1234 01 00000000:00000000 00:00000000 00000000     0        0 2 1 0 100 0 0 10 0',
+                    '   2: 0100007F:07D2 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 3 1 0 100 0 0 10 0',
+                    '   3: 0100007F:C001 0100007F:07D1 01 00000000:00000000 00:00000000 00000000     0        0 4 1 0 100 0 0 10 0',
+                    '   4: 0100007F:07D1 00000000:0000 06 00000000:00000000 00:00000000 00000000     0        0 5 1 0 100 0 0 10 0',
+                    '',
+            ].join('\n'))
+            Files.writeString(tcp6, [
+                    '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode',
+                    '   0: 00000000000000000000000000000000:07D1 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 1 1 0 100 0 0 10 0',
+                    '   1: 00000000000000000000000000000000:07D1 0000000000000000FFFF00000100007F:1234 01 00000000:00000000 00:00000000 00000000 0 0 2 1 0 100 0 0 10 0',
                     '',
             ].join('\n'))
             String output = launch(true, ['/bin/bash', '-c', [
                     '. "$ODILIB"',
+                    'listen=$(proc_tcp_count 2001 0A "$TCP" "$TCP6")',
+                    'echo "listen=$listen"',
+                    'estab=$(proc_tcp_count 2001 01 "$TCP" "$TCP6")',
+                    'echo "estab=$estab"',
+                    'missing=$(proc_tcp_count 2001 0A "$MISSING" "$MISSING" 2>"$ERR")',
+                    'echo "missing=$missing"',
+                    'errbytes=$(wc -c < "$ERR" | tr -d " ")',
+                    'echo "errbytes=$errbytes"',
                     'get_inst_status odi1',
                     'echo "numlist=${INSTSTAT[numlist]}"',
                     'echo "numconn=${INSTSTAT[numconn]}"',
             ].join('\n')], [
                     ODISEE_HOME: home.toString(),
                     HOME: home.toString(),
-                    PATH: "${bin}:/usr/bin:/bin",
+                    PATH: '/usr/bin:/bin',
                     ODILIB: new File('src/main/docker/bin/odilib').absolutePath,
+                    TCP: tcp.toString(),
+                    TCP6: tcp6.toString(),
+                    MISSING: missing.toString(),
+                    ERR: err.toString(),
             ])
 
-            String list = output.readLines().find { it.startsWith('numlist=') }?.substring('numlist='.length())?.trim()
-            String conn = output.readLines().find { it.startsWith('numconn=') }?.substring('numconn='.length())?.trim()
-            assertEquals(output, '1', list)
-            assertEquals(output, '0', conn)
-            assertEquals(['-lnt', '-lnt'], Files.readAllLines(ssLog)*.trim())
+            assertEquals(output, '2', value(output, 'listen'))
+            assertEquals(output, '2', value(output, 'estab'))
+            assertEquals(output, '0', value(output, 'missing'))
+            assertEquals(output, '0', value(output, 'errbytes'))
+            assertTrue(output, Integer.parseInt(value(output, 'numlist')) >= 1)
+            assertTrue(output, Integer.parseInt(value(output, 'numconn')) >= 1)
             String library = new File('src/main/docker/bin/odilib').getText('UTF-8')
             String watchdog = new File('src/main/docker/bin/odiwatchdog').getText('UTF-8')
             String docker = new File('src/main/docker/Dockerfile').getText('UTF-8')
             assertTrue(library.contains('netstat -f inet -p tcp -an'))
-            assertTrue(watchdog.contains('ss -nlt'))
+            assertFalse(library.contains('ss -lnt'))
+            assertTrue(watchdog.contains('proc_tcp_count'))
+            assertFalse(watchdog.contains('ss -nlt'))
             assertTrue(watchdog.contains('sockstat -46l'))
-            assertTrue(docker.contains('iproute2'))
+            assertFalse(docker.contains('iproute2'))
             assertFalse(docker.contains('net-tools'))
             assertTrue(docker.contains('FROM ubuntu:26.04'))
             assertTrue(docker.contains('CMD ["/home/odisee/entrypoint.sh"]'))
         } finally {
+            if (accepted != null) {
+                accepted.close()
+            }
+            if (client != null) {
+                client.close()
+            }
+            server.close()
             PathTree.delete(tree)
         }
     }
@@ -463,6 +505,10 @@ class OdictlTest extends GroovyTestCase {
         builder.redirectErrorStream(true)
         run.process = builder.start()
         run
+    }
+
+    private static String value(String output, String key) {
+        output.readLines().find { it.startsWith(key + '=') }?.substring(key.length() + 1)?.trim()
     }
 
     private static void writeExe(Path path, String text) {

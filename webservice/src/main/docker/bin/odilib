@@ -392,6 +392,56 @@ get_inst_cfg() {
 }
 
 #
+# Matching lines from /proc/net/tcp and /proc/net/tcp6.
+# state 0A is LISTEN and 01 is ESTABLISHED. A missing file adds nothing.
+#
+proc_tcp_matches() {
+    local port_hex=$1
+    local state=$2
+    shift 2
+    local file
+    if [ $# -eq 0 ]
+    then
+        set -- /proc/net/tcp /proc/net/tcp6
+    fi
+    for file in "$@"
+    do
+        if [ -r "${file}" ]
+        then
+            awk -v port="${port_hex}" -v state="${state}" '
+                NR > 1 {
+                    split($2, local, ":")
+                    if (toupper(local[2]) == port && toupper($4) == state) print
+                }
+            ' "${file}"
+        fi
+    done
+}
+
+#
+# Decimal port, then state. Extra arguments replace the two proc files.
+#
+proc_tcp_count() {
+    local decimal=$1
+    local state=$2
+    shift 2
+    local port_hex matches
+    port_hex=$(printf '%04X' "${decimal}")
+    if [ $# -eq 0 ]
+    then
+        matches=$(proc_tcp_matches "${port_hex}" "${state}")
+    else
+        matches=$(proc_tcp_matches "${port_hex}" "${state}" "$@")
+    fi
+    if [ -z "${matches}" ]
+    then
+        echo 0
+    else
+        printf '%s\n' "${matches}" | wc -l | tr -d ' '
+    fi
+}
+
+#
 # Get information about instance's status.
 #
 get_inst_status() {
@@ -408,24 +458,33 @@ get_inst_status() {
             INSTSTAT[numconn]=$(sockstat -46c -p ${INSTCFG[port]} | grep -v USER)
         ;;
         Linux)
-            # ss -lnt is IPv4 and IPv6. ss -46lnt drops the IPv4 listeners.
-            INSTSTAT[numlist]=$(ss -lnt | grep ${INSTCFG[port]} | grep LIST)
-            INSTSTAT[numconn]=$(ss -lnt | grep ${INSTCFG[port]} | grep EST)
+            INSTSTAT[numlist]=$(proc_tcp_matches "$(printf '%04X' "${INSTCFG[port]}")" 0A)
+            INSTSTAT[numconn]=$(proc_tcp_matches "$(printf '%04X' "${INSTCFG[port]}")" 01)
         ;;
         *)
             INSTSTAT[numlist]=$(netstat -46lnt | grep ${INSTCFG[port]} | grep LIST)
             INSTSTAT[numconn]=$(netstat -46lnt | grep ${INSTCFG[port]} | grep EST)
         ;;
     esac
-    [ -n "${INSTSTAT[numlist]}" ] && INSTSTAT[numlist]=$(echo ${INSTSTAT[numlist]} | wc -l) || INSTSTAT[numlist]=0
-    [ -n "${INSTSTAT[numconn]}" ] && INSTSTAT[numconn]=$(echo ${INSTSTAT[numconn]} | wc -l) || INSTSTAT[numconn]=0
+    if [ -n "${INSTSTAT[numlist]}" ]
+    then
+        INSTSTAT[numlist]=$(printf '%s\n' "${INSTSTAT[numlist]}" | wc -l | tr -d ' ')
+    else
+        INSTSTAT[numlist]=0
+    fi
+    if [ -n "${INSTSTAT[numconn]}" ]
+    then
+        INSTSTAT[numconn]=$(printf '%s\n' "${INSTSTAT[numconn]}" | wc -l | tr -d ' ')
+    else
+        INSTSTAT[numconn]=0
+    fi
     # PID
     INSTSTAT[pid]=$(get_pid_by_port ${INSTCFG[port]})
     # Status
-    if [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -eq 1 -a ${INSTSTAT[numconn]} -gt 0 ]
+    if [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -ge 1 -a ${INSTSTAT[numconn]} -gt 0 ]
     then
         INSTSTAT[status]="ONLINE, WORKING"
-    elif [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -eq 1 -a ${INSTSTAT[numconn]} -eq 0 ]
+    elif [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -ge 1 -a ${INSTSTAT[numconn]} -eq 0 ]
     then
         INSTSTAT[status]="ONLINE, READY"
     elif [ -n "${INSTSTAT[pid]}" -a ${INSTSTAT[numlist]} -eq 0 ]
