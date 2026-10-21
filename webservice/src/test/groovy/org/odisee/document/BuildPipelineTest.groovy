@@ -19,6 +19,16 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(yaml.contains('workflow_dispatch:'))
         assertTrue(yaml.contains('pull_request:'))
         assertTrue(yaml.contains('branches: [master]'))
+        assertTrue(yaml.contains('actions/checkout@v5'))
+        assertTrue(yaml.contains('actions/setup-java@v5'))
+        assertTrue(yaml.contains('actions/upload-artifact@v6'))
+        assertTrue(yaml.contains('actions/download-artifact@v7'))
+        assertTrue(yaml.contains('softprops/action-gh-release@v3'))
+        assertFalse(yaml.contains('actions/checkout@v4'))
+        assertFalse(yaml.contains('actions/setup-java@v4'))
+        assertFalse(yaml.contains('actions/upload-artifact@v4'))
+        assertFalse(yaml.contains('actions/download-artifact@v4'))
+        assertFalse(yaml.contains('action-gh-release@v2'))
         assertTrue(yaml.contains('JAVA_VERSION: "21"'))
         assertTrue(yaml.contains('JAVA_DISTRIBUTION: temurin'))
         assertTrue(yaml.contains('BUILD_OUTPUTS: build-outputs'))
@@ -51,7 +61,7 @@ class BuildPipelineTest extends GroovyTestCase {
 
         String test = jobs.test
         assertTrue(test.contains('needs: build'))
-        assertTrue(test.contains('actions/download-artifact@v4'))
+        assertTrue(test.contains('actions/download-artifact@v7'))
         assertTrue(test.contains('name: ${{ env.BUILD_OUTPUTS }}'))
         assertTrue(test.contains('mkdir -p "$dir"'))
         assertTrue(test.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :webservice:integrationTest :test'))
@@ -63,7 +73,7 @@ class BuildPipelineTest extends GroovyTestCase {
 
         String packaged = jobs['package']
         assertTrue(packaged.contains('needs: [build, test]'))
-        assertTrue(packaged.contains('actions/download-artifact@v4'))
+        assertTrue(packaged.contains('actions/download-artifact@v7'))
         assertTrue(packaged.contains('mkdir -p "$dir"'))
         assertTrue(packaged.contains('./gradlew --no-daemon packageDistribution'))
         assertTrue(packaged.contains('${{ env.DISTRIBUTION_ZIP }}'))
@@ -71,7 +81,7 @@ class BuildPipelineTest extends GroovyTestCase {
 
         String office = jobs['java-client-office']
         assertTrue(office.contains('needs: build'))
-        assertTrue(office.contains('actions/download-artifact@v4'))
+        assertTrue(office.contains('actions/download-artifact@v7'))
         assertTrue(office.contains('mkdir -p "$dir"'))
         assertTrue(office.contains('./gradlew --no-daemon :clients:client-java:javaClientOfficeTest'))
     }
