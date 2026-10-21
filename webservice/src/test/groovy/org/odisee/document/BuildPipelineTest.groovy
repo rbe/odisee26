@@ -63,7 +63,7 @@ class BuildPipelineTest extends GroovyTestCase {
         }
 
         String setup = jobs.setup
-        assertTrue(setup.contains('./gradlew --no-daemon :dependencies :webservice:dependencies :clients:client-java:dependencies :documentation:dependencies'))
+        assertTrue(setup.contains('./gradlew --no-daemon :dependencies :webservice:dependencies :clients:client-java:dependencies :clients:client-javafx:dependencies :documentation:dependencies'))
         assertFalse(setup.contains('build-outputs:'))
         assertFalse(setup.contains('assemble'))
         assertFalse(setup.contains('testClasses'))
@@ -98,7 +98,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(testWorkflow.contains('uses: actions/checkout@v5'))
         assertTrue(testWorkflow.indexOf('uses: actions/checkout@v5') < testWorkflow.indexOf('uses: ./.github/actions/prepare'))
         assertTrue(testWorkflow.contains('build-outputs: ${{ inputs.build-outputs }}'))
-        assertTrue(testWorkflow.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :webservice:integrationTest :test'))
+        assertTrue(testWorkflow.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :clients:client-javafx:test :webservice:integrationTest :test'))
         assertFalse(testWorkflow.contains('javaClientOfficeTest'))
         assertFalse(testWorkflow.contains('libreOfficeTest'))
         assertFalse(testWorkflow.contains('minioTest'))
@@ -192,6 +192,10 @@ class BuildPipelineTest extends GroovyTestCase {
 
         String client = new File(root, 'clients/client-java/build.gradle.kts').text
         assertTrue(client.contains('exclude("**/OdiseeClientLocalTest.class")'))
+
+        String settings = new File(root, 'settings.gradle.kts').text
+        assertTrue(settings.contains('include(":clients:client-javafx")'))
+        assertFalse(gradle.contains('client-javafx'))
     }
 
     private static String workflow() {

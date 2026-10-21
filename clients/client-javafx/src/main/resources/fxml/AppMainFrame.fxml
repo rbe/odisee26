@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.paint.*?>
+
+<AnchorPane id="AnchorPane" fx:id="appMainFrame" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="600.0" prefWidth="1024.0" xmlns:fx="http://javafx.com/fxml" fx:controller="eu.artofcoding.odisee.client.javafx.AppMainFrameController">
+  <children>
+    <VBox id="mainVbox" prefHeight="600.0" prefWidth="1024.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+      <children>
+        <MenuBar id="mainMenuBar">
+          <menus>
+            <Menu mnemonicParsing="false" text="File">
+              <items>
+                <MenuItem mnemonicParsing="false" text="Close" />
+              </items>
+            </Menu>
+            <Menu mnemonicParsing="false" text="Edit">
+              <items>
+                <MenuItem mnemonicParsing="false" text="Delete" />
+              </items>
+            </Menu>
+            <Menu mnemonicParsing="false" text="Help">
+              <items>
+                <MenuItem mnemonicParsing="false" text="About" />
+              </items>
+            </Menu>
+          </menus>
+        </MenuBar>
+        <ToolBar id="mainToolBar">
+          <items>
+            <Button mnemonicParsing="false" onAction="#myAction" text="Button" />
+          </items>
+        </ToolBar>
+        <ScrollPane id="mainScrollPane" fx:id="mainFrameScrollPane" fitToHeight="true" fitToWidth="true" prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS">
+          <content>
+            <AnchorPane id="Content" minHeight="0.0" minWidth="0.0" prefHeight="200.0" prefWidth="200.0" />
+          </content>
+        </ScrollPane>
+        <Pane id="statusPane" prefHeight="25.0" prefWidth="200.0" VBox.vgrow="NEVER">
+          <children>
+            <ProgressBar id="statusPaneProgressBar" layoutX="14.0" layoutY="7.0" prefWidth="200.0" progress="0.0" />
+            <Label id="statusPaneLabel" layoutX="254.0" layoutY="5.0" prefWidth="756.0" text="Label" />
+            <Separator layoutX="214.0" layoutY="11.0" opacity="0.01" prefWidth="40.0" />
+          </children>
+        </Pane>
+      </children>
+    </VBox>
+  </children>
+</AnchorPane>

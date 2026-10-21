@@ -33,7 +33,7 @@ jobs:
           java-distribution: ${{ env.JAVA_DISTRIBUTION }}
 
       - name: Fill the Gradle cache
-        run: ./gradlew --no-daemon :dependencies :webservice:dependencies :clients:client-java:dependencies :documentation:dependencies
+        run: ./gradlew --no-daemon :dependencies :webservice:dependencies :clients:client-java:dependencies :clients:client-javafx:dependencies :documentation:dependencies
 
   build:
     name: build

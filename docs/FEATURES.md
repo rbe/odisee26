@@ -100,6 +100,8 @@ A failed health check drops a remote host from the pool and does not signal a lo
 
 Done in wave 2. The server and the Java client use v2. Wave 6 adds `output/format` to that same namespace. The schema is `webservice/src/main/resources/xml/v2/request.xsd`, copied to `clients/client-java/src/main/schema/request.xsd`. The v3 and v2.6 request schemas stay deleted. A v3 namespace is still HTTP 400. PHP, VB.NET, and the Oracle package still build the v2 shape; their examples under `webservice/src/main/container/var/request` are unchanged.
 
+The JavaFX client is `clients/client-javafx`. It keeps the login pane, the main frame, and the FXML. It depends on `:clients:client-java` (`org.odisee.client`). `DesktopClient.open` is `new OdiseeClient(serviceUrl, username, password)`. `DesktopClient.preparePdf` calls `createRequest(template, OutputFormat.PDF)` and `setUserfield`. The screens leave `archive` off the request. `packageDistribution` packs the service, the Java client jar, the extension, and the docs.
+
 ### F12. Integration suite with a headless LibreOffice
 
 One fixture `.ott`, one XML request, one assertion on the PDF text (PDFBox is already a dependency). Run it in CI against the Podman image. Wave 1 tests the helpers without starting office; they do not prove a document was filled in.

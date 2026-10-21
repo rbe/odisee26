@@ -47,7 +47,7 @@ jobs:
           build-outputs: ${{ inputs.build-outputs }}
 
       - name: Unit tests
-        run: ./gradlew --no-daemon :webservice:test :clients:client-java:test :webservice:integrationTest :test
+        run: ./gradlew --no-daemon :webservice:test :clients:client-java:test :clients:client-javafx:test :webservice:integrationTest :test
 
       - name: Upload test reports
         if: failure()
