@@ -101,13 +101,13 @@ tasks.register<Zip>("packageDistribution") {
     }
 
     into("bin") {
-        from("webservice/src/main/docker/bin")
+        from("webservice/src/main/container/bin")
         filePermissions {
             unix("rwxr-xr-x")
         }
     }
     into("etc") {
-        from("webservice/src/main/docker/etc")
+        from("webservice/src/main/container/etc")
     }
     from(packageLayout)
     from("webservice/build/libs/webservice-$version.jar") {

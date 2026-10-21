@@ -98,7 +98,7 @@ A failed health check drops a remote host from the pool and does not signal a lo
 
 ### F11. One request schema, published for the clients
 
-Done in wave 2. The server and the Java client use v2. Wave 6 adds `output/format` to that same namespace. The schema is `webservice/src/main/resources/xml/v2/request.xsd`, copied to `clients/client-java/src/main/schema/request.xsd`. The v3 and v2.6 request schemas stay deleted. A v3 namespace is still HTTP 400. PHP, VB.NET, and the Oracle package still build the v2 shape; their examples under `webservice/src/main/docker/var/request` are unchanged.
+Done in wave 2. The server and the Java client use v2. Wave 6 adds `output/format` to that same namespace. The schema is `webservice/src/main/resources/xml/v2/request.xsd`, copied to `clients/client-java/src/main/schema/request.xsd`. The v3 and v2.6 request schemas stay deleted. A v3 namespace is still HTTP 400. PHP, VB.NET, and the Oracle package still build the v2 shape; their examples under `webservice/src/main/container/var/request` are unchanged.
 
 ### F12. Integration suite with a headless LibreOffice
 

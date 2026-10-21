@@ -2,6 +2,6 @@ POST http://localhost:8080/document/generate
 Content-Type: application/json; charset=UTF-8
 Accept: */*
 
-< ../../../main/docker/var/request/test_1_HalloOdisee_single_odt.json
+< ../../../main/container/var/request/test_1_HalloOdisee_single_odt.json
 
 ###

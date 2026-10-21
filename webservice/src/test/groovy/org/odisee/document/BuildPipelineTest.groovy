@@ -90,7 +90,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(image.contains("github.ref == 'refs/heads/master'"))
         assertTrue(image.contains("startsWith(github.ref, 'refs/tags/v')"))
         assertTrue(image.contains('packages: write'))
-        assertTrue(image.contains('./gradlew --no-daemon :printVersion :webservice:prepareOdiseeDocker'))
+        assertTrue(image.contains('./gradlew --no-daemon :printVersion :webservice:prepareOdiseeImage'))
         assertTrue(image.contains('build/odisee-version.txt'))
         assertTrue(image.contains('ghcr.io'))
         assertTrue(image.contains('apt-get install -y podman qemu-user-binfmt'))
@@ -104,9 +104,9 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(image.contains('--cache-to "${cache_repo}"'))
         assertFalse(image.contains('${image}:cache'))
         assertTrue(image.contains('podman manifest rm "${image}:${version}"'))
-        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "docker://${image}:${version}"'))
-        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "docker://${image}:latest"'))
-        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "docker://${image}:${GITHUB_REF_NAME}"'))
+        assertTrue(image.contains('podman manifest push --all "${image}:${version}"'))
+        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "${image}:latest"'))
+        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "${image}:${GITHUB_REF_NAME}"'))
         assertFalse(image.contains('buildx'))
         assertFalse(image.contains('tonistiigi/binfmt'))
         assertFalse(image.contains('qemu-user-static'))
@@ -128,7 +128,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertFalse(yaml.contains('buildSolution'))
     }
 
-    void testLocalBuildPackagesAndDoesNotStartDocker() {
+    void testLocalBuildPackagesAndDoesNotStartAContainer() {
         File root = repoRoot()
         String gradle = new File(root, 'build.gradle.kts').text
         assertTrue(gradle.contains('val odiseeBaseVersion = "2.6.0"'))
@@ -145,13 +145,11 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(podman.contains('PODMAN_EXECUTABLE'))
         assertTrue(podman.contains('/opt/homebrew/bin/podman'))
         assertTrue(podman.contains('/usr/local/bin/podman'))
-        assertFalse(podman.contains('docker'))
-        assertFalse(new File(root, 'gradle/docker-executable.gradle.kts').exists())
+        assertTrue(podman.contains('return "podman"'))
 
         String web = new File(root, 'webservice/build.gradle.kts').text
         assertTrue(web.contains('$podmanBin compose'))
-        assertFalse(web.contains('command -v docker-compose'))
-        assertFalse(web.contains('dockerExecutable'))
+        assertTrue(web.contains('compose.yaml'))
         assertTrue(web.contains('exclude("**/GenerationBasisTest.class")'))
         assertTrue(web.contains('exclude("**/MinioStoreTest.class")'))
         assertTrue(web.contains('exclude("**/KeycloakClientCredentialsTest.class")'))

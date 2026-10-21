@@ -287,12 +287,12 @@ class OdictlTest extends GroovyTestCase {
     }
 
     void testLoginProfileIsGone() {
-        assertFalse(new File('src/main/docker/shell_profile').exists())
-        assertFalse(new File('src/main/docker/etc/odienv').exists())
-        String odictl = new File('src/main/docker/bin/odictl').getText('UTF-8')
-        String odilib = new File('src/main/docker/bin/odilib').getText('UTF-8')
-        String entry = new File('src/main/docker/entrypoint.sh').getText('UTF-8')
-        String docker = new File('src/main/docker/Dockerfile').getText('UTF-8')
+        assertFalse(new File('src/main/container/shell_profile').exists())
+        assertFalse(new File('src/main/container/etc/odienv').exists())
+        String odictl = new File('src/main/container/bin/odictl').getText('UTF-8')
+        String odilib = new File('src/main/container/bin/odilib').getText('UTF-8')
+        String entry = new File('src/main/container/entrypoint.sh').getText('UTF-8')
+        String containerfile = new File('src/main/container/Containerfile').getText('UTF-8')
         String gradle = new File('../build.gradle.kts').getText('UTF-8')
         assertFalse(odictl.contains('odienv'))
         assertFalse(odictl.contains('export PATH'))
@@ -304,13 +304,13 @@ class OdictlTest extends GroovyTestCase {
         assertFalse(entry.contains('ls -lR'))
         assertTrue(entry.contains('odictl -q start-inst'))
         assertTrue(entry.contains('-jar ${ODISEE_HOME}/application.jar'))
-        assertFalse(docker.contains('shell_profile'))
-        assertFalse(docker.contains('.bash_profile'))
-        assertTrue(docker.contains('/home/odisee/.local/bin'))
-        assertTrue(docker.contains('COPY --chown=odisee:odisee --chmod=440 webservice*.jar application.jar'))
-        assertFalse(docker.contains('xargs'))
-        assertTrue(docker.lastIndexOf('COPY ') == docker.lastIndexOf('COPY --chown=odisee:odisee --chmod=440 webservice*.jar application.jar'))
-        assertTrue(docker.indexOf('libreoffice-writer') < docker.indexOf('COPY '))
+        assertFalse(containerfile.contains('shell_profile'))
+        assertFalse(containerfile.contains('.bash_profile'))
+        assertTrue(containerfile.contains('/home/odisee/.local/bin'))
+        assertTrue(containerfile.contains('COPY --chown=odisee:odisee --chmod=440 webservice*.jar application.jar'))
+        assertFalse(containerfile.contains('xargs'))
+        assertTrue(containerfile.lastIndexOf('COPY ') == containerfile.lastIndexOf('COPY --chown=odisee:odisee --chmod=440 webservice*.jar application.jar'))
+        assertTrue(containerfile.indexOf('libreoffice-writer') < containerfile.indexOf('COPY '))
         assertFalse(gradle.contains('shell_profile'))
         assertFalse(gradle.contains('.bash_profile'))
     }
@@ -364,7 +364,7 @@ class OdictlTest extends GroovyTestCase {
                     ODISEE_HOME: home.toString(),
                     HOME: home.toString(),
                     PATH: '/usr/bin:/bin',
-                    ODILIB: new File('src/main/docker/bin/odilib').absolutePath,
+                    ODILIB: new File('src/main/container/bin/odilib').absolutePath,
                     TCP: tcp.toString(),
                     TCP6: tcp6.toString(),
                     MISSING: missing.toString(),
@@ -377,18 +377,18 @@ class OdictlTest extends GroovyTestCase {
             assertEquals(output, '0', value(output, 'errbytes'))
             assertTrue(output, Integer.parseInt(value(output, 'numlist')) >= 1)
             assertTrue(output, Integer.parseInt(value(output, 'numconn')) >= 1)
-            String library = new File('src/main/docker/bin/odilib').getText('UTF-8')
-            String watchdog = new File('src/main/docker/bin/odiwatchdog').getText('UTF-8')
-            String docker = new File('src/main/docker/Dockerfile').getText('UTF-8')
+            String library = new File('src/main/container/bin/odilib').getText('UTF-8')
+            String watchdog = new File('src/main/container/bin/odiwatchdog').getText('UTF-8')
+            String containerfile = new File('src/main/container/Containerfile').getText('UTF-8')
             assertTrue(library.contains('netstat -f inet -p tcp -an'))
             assertFalse(library.contains('ss -lnt'))
             assertTrue(watchdog.contains('proc_tcp_count'))
             assertFalse(watchdog.contains('ss -nlt'))
             assertTrue(watchdog.contains('sockstat -46l'))
-            assertFalse(docker.contains('iproute2'))
-            assertFalse(docker.contains('net-tools'))
-            assertTrue(docker.contains('FROM ubuntu:26.04'))
-            assertTrue(docker.contains('CMD ["/home/odisee/entrypoint.sh"]'))
+            assertFalse(containerfile.contains('iproute2'))
+            assertFalse(containerfile.contains('net-tools'))
+            assertTrue(containerfile.contains('FROM ubuntu:26.04'))
+            assertTrue(containerfile.contains('CMD ["/home/odisee/entrypoint.sh"]'))
         } finally {
             if (accepted != null) {
                 accepted.close()
@@ -416,7 +416,7 @@ class OdictlTest extends GroovyTestCase {
             assertTrue(args, args.contains('-jar'))
             assertTrue(args, args.contains(run.home.resolve('application.jar').toString()))
             assertEquals('-q start-inst', Files.readString(run.odictlArgs).trim())
-            String entry = new File('src/main/docker/entrypoint.sh').getText('UTF-8')
+            String entry = new File('src/main/container/entrypoint.sh').getText('UTF-8')
             assertFalse(entry.contains('tail -f'))
             assertFalse(entry.contains('--login'))
         } finally {
@@ -494,7 +494,7 @@ class OdictlTest extends GroovyTestCase {
                 'exit 0',
                 '',
         ].join('\n'))
-        ProcessBuilder builder = new ProcessBuilder(['/bin/bash', new File('src/main/docker/entrypoint.sh').absolutePath])
+        ProcessBuilder builder = new ProcessBuilder(['/bin/bash', new File('src/main/container/entrypoint.sh').absolutePath])
         builder.environment().put('ODISEE_HOME', run.home.toString())
         builder.environment().put('HOME', run.home.toString())
         builder.environment().put('PATH', run.bin.toString() + ':/usr/bin:/bin')
@@ -608,7 +608,7 @@ class OdictlTest extends GroovyTestCase {
     }
 
     private String run(boolean ok, Map<String, String> extra, String... args) {
-        File script = new File('src/main/docker/bin/odictl')
+        File script = new File('src/main/container/bin/odictl')
         assertTrue(script.file)
         String home = System.getProperty('ODISEE_HOME')
         assertNotNull(home)
@@ -641,7 +641,7 @@ class OdictlTest extends GroovyTestCase {
     }
 
     private static String scriptPath() {
-        File script = new File('src/main/docker/bin/odictl')
+        File script = new File('src/main/container/bin/odictl')
         assertTrue(script.file)
         script.absolutePath
     }

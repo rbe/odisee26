@@ -1,7 +1,7 @@
 # Odisee
-webservice/src/main/docker/var/deploy/**
-webservice/src/main/docker/var/document/**
-webservice/src/main/docker/var/tmp/
+webservice/src/main/container/var/deploy/**
+webservice/src/main/container/var/document/**
+webservice/src/main/container/var/tmp/
 oxt/antlib/
 oxt/Odisee/build/
 oxt/Odisee/dist/
@@ -10,7 +10,7 @@ clients/client-vbnet/src/vb/OdiseeClient/bin/
 clients/client-vbnet/src/vb/OdiseeClient/obj/
 clients/client-vbnet/src/vb/OdiseeClient/publish/
 
-# Docker
+# Environment
 .env
 
 # Gradle
