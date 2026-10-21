@@ -211,7 +211,7 @@ jobs:
     if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
     needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       contents: read
       packages: write
@@ -247,23 +247,34 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+      - name: Register QEMU and Buildx
+        run: |
+          set -eu
+          docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
+          docker buildx create --name odisee --driver docker-container --use
+          docker buildx inspect --bootstrap
+
       - name: Build and push the service image
         run: |
           set -eu
           version=$(tr -d '[:space:]' < build/odisee-version.txt)
           repo=$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           image="ghcr.io/${repo}"
-          docker build \
+          tags=(
+            -t "${image}:${version}"
+            -t "${image}:latest"
+          )
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tags+=(-t "${image}:${GITHUB_REF_NAME}")
+          fi
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=false \
+            --sbom=false \
+            --push \
             --build-arg "projectVersion=${version}" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.version=${version}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            -t "${image}:${version}" \
-            -t "${image}:latest" \
+            "${tags[@]}" \
             webservice/build/docker/odisee
-          docker push "${image}:${version}"
-          docker push "${image}:latest"
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            docker tag "${image}:${version}" "${image}:${GITHUB_REF_NAME}"
-            docker push "${image}:${GITHUB_REF_NAME}"
-          fi

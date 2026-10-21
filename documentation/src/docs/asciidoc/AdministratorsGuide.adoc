@@ -267,6 +267,8 @@ username endpoint region bucket accessKey secret
 The service image ships with `docker-compose.yml`.
 `./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak`.
 GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag.
+One manifest lists `linux/amd64` and `linux/arm64`.
+There is no `darwin` image.
 The tags are `2.6.0-<build>` and `latest`.
 `<build>` is the Actions run number.
 A `v*` tag also pushes that tag name.
