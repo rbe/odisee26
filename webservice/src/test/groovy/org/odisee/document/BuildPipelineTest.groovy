@@ -4,7 +4,7 @@ import groovy.test.GroovyTestCase
 
 /**
  * GitHub Actions splits the Linux build into jobs that pass the compiled outputs.
- * {@code ./gradlew build} stays one command and does not start Docker.
+ * {@code ./gradlew build} stays one command and does not start a container.
  */
 class BuildPipelineTest extends GroovyTestCase {
 
@@ -93,14 +93,18 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(image.contains('./gradlew --no-daemon :printVersion :webservice:prepareOdiseeDocker'))
         assertTrue(image.contains('build/odisee-version.txt'))
         assertTrue(image.contains('ghcr.io'))
-        assertTrue(image.contains('docker buildx build'))
+        assertTrue(image.contains('apt-get install -y podman qemu-user-static'))
+        assertTrue(image.contains('podman build'))
         assertTrue(image.contains('--platform linux/amd64,linux/arm64'))
-        assertTrue(image.contains('--cache-from type=gha'))
-        assertTrue(image.contains('--cache-to type=gha,mode=max'))
-        assertTrue(image.contains('--push'))
-        assertTrue(image.contains('-t "${image}:${version}"'))
-        assertTrue(image.contains('-t "${image}:latest"'))
-        assertTrue(image.contains('-t "${image}:${GITHUB_REF_NAME}"'))
+        assertTrue(image.contains('--manifest "${image}:${version}"'))
+        assertTrue(image.contains('--layers'))
+        assertTrue(image.contains('--cache-from "${image}:cache"'))
+        assertTrue(image.contains('--cache-to "${image}:cache"'))
+        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "docker://${image}:${version}"'))
+        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "docker://${image}:latest"'))
+        assertTrue(image.contains('podman manifest push --all "${image}:${version}" "docker://${image}:${GITHUB_REF_NAME}"'))
+        assertFalse(image.contains('buildx'))
+        assertFalse(image.contains('binfmt'))
         assertFalse(image.contains('darwin'))
         assertFalse(image.contains('startStack'))
         assertFalse(image.contains('buildOdiseeImage'))
@@ -109,6 +113,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(office.contains('needs: build'))
         assertTrue(office.contains('actions/download-artifact@v7'))
         assertTrue(office.contains('mkdir -p "$dir"'))
+        assertTrue(office.contains('apt-get install -y podman'))
         assertTrue(office.contains('./gradlew --no-daemon :clients:client-java:javaClientOfficeTest'))
     }
 
@@ -130,7 +135,18 @@ class BuildPipelineTest extends GroovyTestCase {
         assertFalse(gradle.contains('startStack'))
         assertFalse(gradle.contains('javaClientOfficeTest'))
 
+        String podman = new File(root, 'gradle/podman-executable.gradle.kts').text
+        assertTrue(podman.contains('podman.executable'))
+        assertTrue(podman.contains('PODMAN_EXECUTABLE'))
+        assertTrue(podman.contains('/opt/homebrew/bin/podman'))
+        assertTrue(podman.contains('/usr/local/bin/podman'))
+        assertFalse(podman.contains('docker'))
+        assertFalse(new File(root, 'gradle/docker-executable.gradle.kts').exists())
+
         String web = new File(root, 'webservice/build.gradle.kts').text
+        assertTrue(web.contains('$podmanBin compose'))
+        assertFalse(web.contains('command -v docker-compose'))
+        assertFalse(web.contains('dockerExecutable'))
         assertTrue(web.contains('exclude("**/GenerationBasisTest.class")'))
         assertTrue(web.contains('exclude("**/MinioStoreTest.class")'))
         assertTrue(web.contains('exclude("**/KeycloakClientCredentialsTest.class")'))
