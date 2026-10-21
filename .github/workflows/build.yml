@@ -13,6 +13,7 @@ permissions:
 env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: temurin
+  ODISEE_VERSION: "2.6"
   BUILD_OUTPUTS: build-outputs
   DISTRIBUTION_ZIP: build/distributions/odisee-*-linux-x86_64.zip
 
@@ -150,7 +151,7 @@ jobs:
       - name: Upload distribution
         uses: actions/upload-artifact@v6
         with:
-          name: odisee-linux-x86_64
+          name: odisee-${{ env.ODISEE_VERSION }}-linux-x86_64
           path: ${{ env.DISTRIBUTION_ZIP }}
           if-no-files-found: error
 
