@@ -407,8 +407,12 @@ get_inst_status() {
             INSTSTAT[numlist]=$(sockstat -46l -p ${INSTCFG[port]} | grep -v USER)
             INSTSTAT[numconn]=$(sockstat -46c -p ${INSTCFG[port]} | grep -v USER)
         ;;
+        Linux)
+            # ss -lnt is IPv4 and IPv6. ss -46lnt drops the IPv4 listeners.
+            INSTSTAT[numlist]=$(ss -lnt | grep ${INSTCFG[port]} | grep LIST)
+            INSTSTAT[numconn]=$(ss -lnt | grep ${INSTCFG[port]} | grep EST)
+        ;;
         *)
-            # sudo needed for netstat -p
             INSTSTAT[numlist]=$(netstat -46lnt | grep ${INSTCFG[port]} | grep LIST)
             INSTSTAT[numconn]=$(netstat -46lnt | grep ${INSTCFG[port]} | grep EST)
         ;;
