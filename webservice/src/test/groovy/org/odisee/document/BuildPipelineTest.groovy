@@ -31,8 +31,10 @@ class BuildPipelineTest extends GroovyTestCase {
         assertFalse(yaml.contains('action-gh-release@v2'))
         assertTrue(yaml.contains('JAVA_VERSION: "21"'))
         assertTrue(yaml.contains('JAVA_DISTRIBUTION: temurin'))
+        assertTrue(yaml.contains('ODISEE_VERSION: "2.6"'))
         assertTrue(yaml.contains('BUILD_OUTPUTS: build-outputs'))
         assertTrue(yaml.contains('DISTRIBUTION_ZIP: build/distributions/odisee-*-linux-x86_64.zip'))
+        assertFalse(yaml.contains('name: odisee-linux-x86_64'))
         assertFalse(yaml.contains('java-version: "21"'))
         jobs.each { String name, String body ->
             assertTrue(name, body.contains('java-version: ${{ env.JAVA_VERSION }}'))
@@ -76,6 +78,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(packaged.contains('actions/download-artifact@v7'))
         assertTrue(packaged.contains('mkdir -p "$dir"'))
         assertTrue(packaged.contains('./gradlew --no-daemon packageDistribution'))
+        assertTrue(packaged.contains('name: odisee-${{ env.ODISEE_VERSION }}-linux-x86_64'))
         assertTrue(packaged.contains('${{ env.DISTRIBUTION_ZIP }}'))
         assertTrue(packaged.contains("startsWith(github.ref, 'refs/tags/v')"))
 
