@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.paint.*?>
+<?import javafx.scene.text.*?>
+
+<AnchorPane id="AnchorPane" fx:id="loginPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="510.0" prefWidth="1015.0" xmlns:fx="http://javafx.com/fxml" fx:controller="eu.artofcoding.odisee.client.javafx.LoginController">
+  <children>
+    <ImageView fitHeight="509.8053894042969" fitWidth="380.95672196737644" layoutX="63.0" opacity="0.1" pickOnBounds="true" preserveRatio="true">
+      <image>
+        <Image url="@../images/Odisee_Signet.png" preserveRatio="false" smooth="false" />
+      </image>
+    </ImageView>
+    <ImageView fx:id="odiseeMaskottchenNegativ" fitHeight="393.2142333984375" fitWidth="232.83984857903238" layoutX="755.0" layoutY="41.0" pickOnBounds="true" preserveRatio="true" visible="false">
+      <image>
+        <Image url="@../images/Odisee_Maskottchen_negativ.png" preserveRatio="false" smooth="false" />
+      </image>
+    </ImageView>
+    <ImageView id="loginImageView" fx:id="odiseeMaskottchenPositiv" fitHeight="358.0" fitWidth="266.0" layoutX="738.0" layoutY="76.0" pickOnBounds="true" preserveRatio="true" visible="false">
+      <image>
+        <Image url="@../images/Odisee_Maskottchen_positiv.png" preserveRatio="false" smooth="false" />
+      </image>
+    </ImageView>
+    <Label layoutX="377.0" layoutY="149.0" text="Willkommen">
+      <font>
+        <Font name="Arial" size="48.0" />
+      </font>
+    </Label>
+    <Label layoutX="377.0" layoutY="222.0" text="Benutzer">
+      <font>
+        <Font name="System Bold" size="13.0" fx:id="x1" />
+      </font>
+      <labelFor>
+        <TextField fx:id="loginUsername" layoutX="443.0" layoutY="219.0" prefWidth="200.0" promptText="John Doe" />
+      </labelFor>
+    </Label>
+    <Label font="$x1" layoutX="377.0" layoutY="247.0" text="Passwort">
+      <labelFor>
+        <PasswordField fx:id="loginPassword" layoutX="443.0" layoutY="244.0" prefWidth="200.0" promptText="Abrakadabra" />
+      </labelFor>
+    </Label>
+    <fx:reference source="loginUsername" />
+    <fx:reference source="loginPassword" />
+    <Button fx:id="loginButton" layoutX="443.0" layoutY="276.0" mnemonicParsing="false" onAction="#loginButtonPressed" text="Anmelden" />
+  </children>
+</AnchorPane>
