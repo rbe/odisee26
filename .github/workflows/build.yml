@@ -59,7 +59,7 @@ jobs:
             \( -path './.git' -o -path './.git/*' \) -prune -o \
             -type d -empty -print \
             | sed 's|^\./||' \
-            | awk '$0 ~ /(^\.gradle($|\/))|(^|\/)build($|\/)|^oxt\/antlib($|\/)|^oxt\/Odisee\/dist($|\/)/' \
+            | awk '$0 ~ /(^\.gradle($|\/))|(^|\/)build($|\/)|^oxt\/Odisee\/dist($|\/)/' \
             | sort -u > build/ci-empty-dirs.txt
 
       - name: Upload build outputs
@@ -71,7 +71,6 @@ jobs:
           path: |
             .gradle
             **/build/
-            oxt/antlib/
             oxt/Odisee/dist/
 
   values:
