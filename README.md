@@ -24,7 +24,7 @@ Podman tasks are not part of `build`. They need a local Podman service. `:webser
 
 The version is semantic. A local build is `2.6.0`. GitHub Actions sets `ODISEE_BUILD_NUMBER` to the workflow run number, so that build is `2.6.0-<run>`, for example `2.6.0-42`. The zip, the uploaded artifact, and the image tag use that version.
 
-GitHub Actions runs on `ubuntu-26.04`. Job `image` publishes that service image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag. One manifest lists `linux/amd64` and `linux/arm64`. There is no `darwin` image. The LibreOffice layer stays cached; `application.jar` is copied after it. The tags are `2.6.0-<run>` and `latest`. A `v*` tag also pushes that tag name. Pull requests do not publish. The first publish is private until the package is set public.
+GitHub Actions runs on `ubuntu-26.04`. Job `image` publishes that service image to `ghcr.io/rbe/odisee26` on `master`, on a `v*` tag, and when someone runs the workflow by hand. One manifest lists `linux/amd64` and `linux/arm64`. There is no `darwin` image. The LibreOffice layer stays cached; `application.jar` is copied after it. `master` and a `v*` tag push `2.6.0-<run>` and `latest`. A `v*` tag also pushes that tag name. A manual run of another branch pushes only `2.6.0-<run>`. Pull requests do not publish. The first publish is private until the package is set public.
 
 ```bash
 podman pull ghcr.io/rbe/odisee26:2.6.0-<run>

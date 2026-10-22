@@ -266,12 +266,14 @@ username endpoint region bucket accessKey secret
 
 The service image ships with `compose.yaml`.
 `./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak` with `podman compose`.
-GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master` and on a `v*` tag.
+GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master`, on a `v*` tag, and on a manual run.
 One manifest lists `linux/amd64` and `linux/arm64`.
 There is no `darwin` image.
-The tags are `2.6.0-<build>` and `latest`.
+`master` and a `v*` tag push `2.6.0-<build>` and `latest`.
 `<build>` is the Actions run number.
 A `v*` tag also pushes that tag name.
+A manual run of another branch pushes only `2.6.0-<build>`.
+Pull requests do not publish.
 The first publish is private until the package is set public.
 
 [source,bash]
