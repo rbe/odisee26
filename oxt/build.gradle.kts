@@ -1,7 +1,10 @@
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.bundling.Zip
 import org.gradle.api.tasks.testing.Test
+import java.util.Properties
 
 plugins {
     java
@@ -22,116 +25,136 @@ tasks.named<Jar>("jar") {
     enabled = false
 }
 
-// Semantic project version. CI appends -run to the artifact version only.
-val extensionVersion = version.toString().substringBefore('-')
+val fallbackVersion = rootProject.extra["odiseeBaseVersion"] as String
+val overrideAddons = providers.gradleProperty("odisee.override.addonsxcu").isPresent
+val gitTag = providers.exec {
+    commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*")
+    workingDir(rootProject.projectDir)
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim() }
 
-val extensionMetadataDir = layout.buildDirectory.dir("extension-metadata")
-val updateDescriptor = layout.projectDirectory.file("Odisee/dist/Odisee-update.xml")
+fun extensionName(dir: File): String {
+    val props = Properties()
+    val file = dir.resolve("extension.properties")
+    if (file.isFile) {
+        file.reader(Charsets.UTF_8).use { props.load(it) }
+    }
+    val raw = props.getProperty("ext.name")?.takeIf { it.isNotBlank() } ?: dir.name
+    return raw.replace(" ", "").replace("-", "")
+}
 
-val extensionMetadata = tasks.register("extensionMetadata") {
-    inputs.property("version", extensionVersion)
-    outputs.dir(extensionMetadataDir)
-    outputs.file(updateDescriptor)
-    doLast {
-        val root = extensionMetadataDir.get().asFile
-        root.deleteRecursively()
-        root.resolve("META-INF").mkdirs()
-        root.resolve("META-INF/manifest.xml").writeText(manifestXml())
-        root.resolve("description.xml").writeText(descriptionXml(extensionVersion))
-        val update = updateDescriptor.asFile
-        update.parentFile.mkdirs()
-        update.writeText(updateXml(extensionVersion))
+fun taskName(name: String, dev: Boolean): String {
+    val base = name.replaceFirstChar { it.lowercaseChar() } + "Oxt"
+    return if (dev) "${base}Dev" else base
+}
+
+fun registerMetadata(dir: File, name: String): TaskProvider<JavaExec> {
+    val metadataDir = layout.buildDirectory.dir("extension-metadata/$name")
+    val updateFile = layout.projectDirectory.file("${dir.name}/dist/${name}-update.xml")
+    return tasks.register<JavaExec>("${name.replaceFirstChar { it.lowercaseChar() }}ExtensionMetadata") {
+        group = "Odisee"
+        description = "Write $name LibreOffice extension descriptors"
+        classpath = sourceSets.named("main").get().runtimeClasspath
+        mainClass.set("org.odisee.oxt.ExtensionDescriptors")
+        inputs.dir(dir.resolve("ext"))
+        val props = dir.resolve("extension.properties")
+        if (props.isFile) {
+            inputs.file(props)
+        }
+        inputs.property("gitTag", gitTag)
+        inputs.property("fallbackVersion", fallbackVersion)
+        inputs.property("overrideAddons", overrideAddons)
+        outputs.dir(metadataDir)
+        outputs.file(updateFile)
+        args(
+            dir.absolutePath,
+            metadataDir.get().asFile.absolutePath,
+            updateFile.asFile.absolutePath,
+            gitTag.get(),
+            fallbackVersion,
+            overrideAddons.toString(),
+        )
     }
 }
 
-tasks.register<Zip>("buildExtension") {
-    group = "Odisee"
-    description = "Build the LibreOffice extension (Odisee.oxt)"
-    archiveFileName.set("Odisee.oxt")
-    destinationDirectory.set(layout.projectDirectory.dir("Odisee/dist"))
-    includeEmptyDirs = false
-    isReproducibleFileOrder = true
-    isPreserveFileTimestamps = false
-    dependsOn(extensionMetadata)
-    from(layout.projectDirectory.dir("Odisee/ext"))
-    from(extensionMetadataDir) {
-        include("META-INF/manifest.xml", "description.xml")
+fun registerZip(dir: File, name: String, dev: Boolean, metadata: TaskProvider<JavaExec>): TaskProvider<Zip> {
+    val metadataDir = layout.buildDirectory.dir("extension-metadata/$name")
+    val archive = if (dev) "${name}_dev.oxt" else "${name}.oxt"
+    return tasks.register<Zip>(taskName(name, dev)) {
+        group = "Odisee"
+        description = "Build the ${if (dev) "development" else "production"} LibreOffice extension ($archive)"
+        archiveFileName.set(archive)
+        destinationDirectory.set(layout.projectDirectory.dir("${dir.name}/dist"))
+        includeEmptyDirs = false
+        isReproducibleFileOrder = true
+        isPreserveFileTimestamps = false
+        duplicatesStrategy = DuplicatesStrategy.FAIL
+        dependsOn(metadata)
+        from(dir.resolve("ext")) {
+            if (overrideAddons) {
+                exclude("etc/Addons.xcu")
+            }
+        }
+        from(metadataDir) {
+            include("META-INF/manifest.xml", "description.xml", "etc/Addons.xcu")
+        }
+        filesMatching("bin/**") {
+            permissions {
+                unix("r-xr-xr-x")
+            }
+        }
     }
+}
+
+val extensionDirs = layout.projectDirectory.asFile.listFiles { file ->
+    file.isDirectory && file.resolve("ext").isDirectory
+}?.sortedBy { it.name } ?: emptyList()
+
+val production = mutableListOf<TaskProvider<Zip>>()
+val development = mutableListOf<TaskProvider<Zip>>()
+extensionDirs.forEach { dir ->
+    val name = extensionName(dir)
+    val metadata = registerMetadata(dir, name)
+    production.add(registerZip(dir, name, false, metadata))
+    development.add(registerZip(dir, name, true, metadata))
+}
+
+tasks.register("buildExtension") {
+    group = "Odisee"
+    description = "Build production LibreOffice extensions"
+    dependsOn(production)
+}
+
+tasks.register("buildExtensionDev") {
+    group = "Odisee"
+    description = "Build development LibreOffice extensions"
+    dependsOn(development)
+}
+
+tasks.register("world") {
+    group = "Odisee"
+    description = "Build development and production LibreOffice extensions"
+    dependsOn("buildExtension", "buildExtensionDev")
 }
 
 tasks.named<Delete>("clean") {
-    delete(layout.projectDirectory.dir("Odisee/dist"))
+    extensionDirs.forEach { delete(it.resolve("dist")) }
 }
 
 tasks.named("assemble") {
     setDependsOn(listOf(tasks.named("buildExtension")))
 }
 
+val odiseeDir = extensionDirs.first { it.name == "Odisee" }
+val odiseeName = extensionName(odiseeDir)
+
 tasks.named<Test>("test") {
-    dependsOn("buildExtension")
+    dependsOn("buildExtension", "buildExtensionDev")
     useJUnit()
-    systemProperty("odisee.oxt", layout.projectDirectory.file("Odisee/dist/Odisee.oxt").asFile.absolutePath)
-    systemProperty("odisee.update", updateDescriptor.asFile.absolutePath)
-    systemProperty("odisee.version", extensionVersion)
-    systemProperty("odisee.ext", layout.projectDirectory.dir("Odisee/ext").asFile.absolutePath)
-}
-
-fun xmlAttr(value: String): String =
-    value.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace("\"", "&quot;")
-
-fun manifestXml(): String = """
-    <?xml version="1.0" encoding="UTF-8"?>
-    <manifest:manifest xmlns:manifest="http://openoffice.org/2001/manifest">
-        <manifest:file-entry manifest:full-path="basic/Odisee/" manifest:media-type="application/vnd.sun.star.basic-library"/>
-        <manifest:file-entry manifest:full-path="Paths.xcu" manifest:media-type="application/vnd.sun.star.configuration-data"/>
-        <manifest:file-entry manifest:full-path="etc/pkg-description.txt" manifest:media-type="application/vnd.sun.star.package-bundle-description"/>
-    </manifest:manifest>
-""".trimIndent() + "\n"
-
-fun descriptionXml(extensionVersion: String): String {
-    val version = xmlAttr(extensionVersion)
-    return """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <description xmlns="http://openoffice.org/extensions/description/2006" xmlns:dep="http://openoffice.org/extensions/description/2006" xmlns:xlink="http://www.w3.org/1999/xlink">
-            <identifier value="vnd.artofcoding.odisee.Odisee"/>
-            <version value="$version"/>
-            <dependencies>
-                <OpenOffice.org-minimal-version value="3.3" dep:name="OpenOffice.org 3.3"/>
-            </dependencies>
-            <display-name>
-                <name lang="en">Odisee</name>
-                <name lang="de">Odisee</name>
-            </display-name>
-            <publisher>
-                <name xlink:href="http://www.odisee.org" lang="en">art of coding UG</name>
-            </publisher>
-            <icon>
-                <default xlink:href="images/odisee/Odisee_Signet_24x32.png"/>
-            </icon>
-            <update-information>
-                <src xlink:href="https://www.odisee.org/update/oxt/Odisee-update.xml"/>
-            </update-information>
-            <registration>
-                <simple-license accept-by="admin" default-license-id="ID0" suppress-on-update="true">
-                    <license-text xlink:href="etc/LICENSE.txt" lang="en" license-id="ID0"/>
-                </simple-license>
-            </registration>
-        </description>
-    """.trimIndent() + "\n"
-}
-
-fun updateXml(extensionVersion: String): String {
-    val version = xmlAttr(extensionVersion)
-    return """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <description xmlns="http://openoffice.org/extensions/update/2006" xmlns:xlink="http://www.w3.org/1999/xlink">
-            <identifier value="vnd.artofcoding.odisee.Odisee"/>
-            <version value="$version"/>
-            <update-download>
-                <src xlink:href="https://www.odisee.org/update/oxt/Odisee.oxt"/>
-            </update-download>
-        </description>
-    """.trimIndent() + "\n"
+    systemProperty("odisee.oxt", odiseeDir.resolve("dist/${odiseeName}.oxt").absolutePath)
+    systemProperty("odisee.dev", odiseeDir.resolve("dist/${odiseeName}_dev.oxt").absolutePath)
+    systemProperty("odisee.update", odiseeDir.resolve("dist/${odiseeName}-update.xml").absolutePath)
+    systemProperty("odisee.ext", odiseeDir.resolve("ext").absolutePath)
+    systemProperty("odisee.gitTag", gitTag.get())
+    systemProperty("odisee.versionFallback", fallbackVersion)
 }

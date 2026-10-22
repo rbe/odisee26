@@ -21,8 +21,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The LibreOffice extension archive is the static tree under {@code ext/}
- * plus the manifest and description stamped with the project version.
+ * The LibreOffice extension archive is the tree under {@code ext/}
+ * plus the descriptors stamped with the git tag version.
  */
 public class ExtensionArchiveTest {
 
@@ -66,10 +66,24 @@ public class ExtensionArchiveTest {
     }
 
     @Test
-    public void descriptorsUseTheProjectVersion() throws Exception {
-        final String version = System.getProperty("odisee.version");
-        assertEquals("2.6.0", version);
-        assertFalse(version.contains("-"));
+    public void developmentArchiveMatchesProduction() throws Exception {
+        final Map<String, byte[]> production = zipEntries(Path.of(System.getProperty("odisee.oxt")));
+        final Map<String, byte[]> development = zipEntries(Path.of(System.getProperty("odisee.dev")));
+        assertEquals(production.keySet(), development.keySet());
+        for (String name : production.keySet()) {
+            assertArrayEquals(name, production.get(name), development.get(name));
+        }
+    }
+
+    @Test
+    public void descriptorsUseTheGitTagVersion() throws Exception {
+        final String version = ExtensionDescriptors.versionFromTag(
+                System.getProperty("odisee.gitTag"),
+                System.getProperty("odisee.versionFallback"));
+        assertEquals("2.6.0", System.getProperty("odisee.versionFallback"));
+        if (System.getProperty("odisee.gitTag").isBlank()) {
+            assertEquals("2.6.0", version);
+        }
         assertFalse(version.equals("2.6.34"));
 
         final Map<String, byte[]> entries = zipEntries(Path.of(System.getProperty("odisee.oxt")));
