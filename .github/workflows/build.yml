@@ -25,6 +25,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Prepare
         uses: ./.github/actions/prepare
@@ -43,6 +46,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Prepare
         uses: ./.github/actions/prepare
@@ -59,7 +65,7 @@ jobs:
             \( -path './.git' -o -path './.git/*' \) -prune -o \
             -type d -empty -print \
             | sed 's|^\./||' \
-            | awk '$0 ~ /(^\.gradle($|\/))|(^|\/)build($|\/)|^oxt\/antlib($|\/)|^oxt\/Odisee\/dist($|\/)/' \
+            | awk '$0 ~ /(^\.gradle($|\/))|(^|\/)build($|\/)|^oxt\/Odisee\/dist($|\/)/' \
             | sort -u > build/ci-empty-dirs.txt
 
       - name: Upload build outputs
@@ -71,7 +77,6 @@ jobs:
           path: |
             .gradle
             **/build/
-            oxt/antlib/
             oxt/Odisee/dist/
 
   values:
@@ -115,6 +120,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Prepare
         uses: ./.github/actions/prepare
@@ -150,6 +158,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Prepare
         uses: ./.github/actions/prepare
