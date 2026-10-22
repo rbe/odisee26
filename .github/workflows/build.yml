@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare
         uses: ./.github/actions/prepare
@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare
         uses: ./.github/actions/prepare
@@ -63,7 +63,7 @@ jobs:
             | sort -u > build/ci-empty-dirs.txt
 
       - name: Upload build outputs
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.BUILD_OUTPUTS }}
           include-hidden-files: true
@@ -114,7 +114,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare
         uses: ./.github/actions/prepare
@@ -130,7 +130,7 @@ jobs:
         run: echo "ODISEE_VERSION=$(tr -d '[:space:]' < build/odisee-version.txt)" >> "$GITHUB_ENV"
 
       - name: Upload distribution
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: odisee-${{ env.ODISEE_VERSION }}-linux-x86_64
           path: ${{ env.DISTRIBUTION_ZIP }}
@@ -149,7 +149,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Prepare
         uses: ./.github/actions/prepare
@@ -171,7 +171,7 @@ jobs:
 
       - name: Upload office test reports
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: java-client-office-reports
           path: |

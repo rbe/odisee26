@@ -17,7 +17,7 @@ runs:
   using: composite
   steps:
     - name: Set up Java ${{ inputs.java-version }}
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@v6
       with:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -25,7 +25,7 @@ runs:
 
     - name: Download build outputs
       if: ${{ inputs.build-outputs != '' }}
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: ${{ inputs.build-outputs }}
         path: .
