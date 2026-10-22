@@ -7,6 +7,21 @@
 # Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
 # 
 
+# macOS /bin/bash is 3.2 and rejects declare -A.
+# This file is sourced. $0 is the entry script that was invoked.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]
+then
+    for _odisee_bash in /opt/homebrew/bin/bash /usr/local/bin/bash
+    do
+        if [ -x "${_odisee_bash}" ]
+        then
+            exec "${_odisee_bash}" "$0" "$@"
+        fi
+    done
+    echo "Odisee needs bash 4 or newer. On macOS: brew install bash." >&2
+    exit 1
+fi
+
 #
 # Directories stay in this process. The login shell does not see them.
 # ODISEE_HOME is the value already in the environment, or $HOME/.local/share/odisee.

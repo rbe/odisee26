@@ -315,6 +315,44 @@ class OdictlTest extends GroovyTestCase {
         assertFalse(gradle.contains('.bash_profile'))
     }
 
+    void testBash4RunsOdictl() {
+        String odilib = new File('src/main/container/bin/odilib').getText('UTF-8')
+        int guard = odilib.indexOf('BASH_VERSINFO[0]')
+        int arrays = odilib.indexOf('\ndeclare -A ')
+        assertTrue(odilib, guard >= 0)
+        assertTrue("guard=${guard} arrays=${arrays}", arrays > guard)
+        assertTrue(odilib.contains('/opt/homebrew/bin/bash'))
+        assertTrue(odilib.contains('/usr/local/bin/bash'))
+        assertTrue(odilib.indexOf('/opt/homebrew/bin/bash') < odilib.indexOf('/usr/local/bin/bash'))
+        assertTrue(odilib.contains('exec "${_odisee_bash}" "$0" "$@"'))
+        assertTrue(odilib.contains('Odisee needs bash 4 or newer. On macOS: brew install bash.'))
+        assertFalse(odilib.contains('BASH_SOURCE'))
+        ['odictl', 'odipost', 'odiwatchdog'].each { String name ->
+            String entry = new File("src/main/container/bin/${name}").getText('UTF-8')
+            assertTrue(entry, entry.contains('. ${SCRIPT_DIR}/odilib'))
+            assertTrue(entry, entry.indexOf('. ${SCRIPT_DIR}/odilib') < entry.indexOf('declare -A') || !entry.contains('declare -A'))
+        }
+
+        String major = ['bash', '-c', 'printf %s "${BASH_VERSINFO[0]}"'].execute().text.trim()
+        assertTrue(major, Integer.parseInt(major) >= 4)
+        Path tree = Files.createTempDirectory('odictl-bash4')
+        try {
+            Path home = tree.resolve('home')
+            Files.createDirectories(home)
+            String output = launch(true, ['bash', scriptPath(), 'callback-host', 'ctlbash', 'hooks.example'], [
+                    HOME: home.toString(),
+                    ODISEE_HOME: '',
+                    JAVA_HOME: '',
+                    PATH: '/usr/bin:/bin',
+            ])
+            assertFalse(output.contains('Odisee needs bash 4 or newer.'))
+            assertTrue(output.contains("Callback host 'hooks.example' listed for 'ctlbash'."))
+            assertTrue(Files.readString(home.resolve('.local/share/odisee/etc/callback-hosts')).contains('ctlbash hooks.example'))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
     void testLinuxOfficePortCheckReadsProcNet() {
         Path tree = Files.createTempDirectory('odisee-proc')
         ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
