@@ -37,6 +37,10 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(prepare.contains('actions/download-artifact@v8'))
         assertTrue(prepare.contains('mkdir -p "$dir"'))
         assertTrue(prepare.contains('cache: gradle'))
+        assertTrue(yaml.contains('fetch-depth: 0'))
+        assertTrue(yaml.contains('fetch-tags: true'))
+        assertTrue(testWorkflow.contains('fetch-tags: true'))
+        assertTrue(imageWorkflow.contains('fetch-tags: true'))
         assertTrue(yaml.contains('actions/upload-artifact@v7'))
         assertTrue(yaml.contains('softprops/action-gh-release@v3'))
         assertFalse(yaml.contains('actions/checkout@v4'))
@@ -75,6 +79,8 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(build.contains('name: ${{ env.BUILD_OUTPUTS }}'))
         assertTrue(build.contains('include-hidden-files: true'))
         assertTrue(build.contains('build/ci-empty-dirs.txt'))
+        assertTrue(build.contains('oxt/Odisee/dist/'))
+        assertFalse(build.contains('oxt/antlib/'))
         assertFalse(build.contains('packageDistribution'))
         assertFalse(build.contains(':webservice:test'))
         assertFalse(build.contains('javaClientOfficeTest'))
@@ -98,7 +104,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(testWorkflow.contains('uses: actions/checkout@v7'))
         assertTrue(testWorkflow.indexOf('uses: actions/checkout@v7') < testWorkflow.indexOf('uses: ./.github/actions/prepare'))
         assertTrue(testWorkflow.contains('build-outputs: ${{ inputs.build-outputs }}'))
-        assertTrue(testWorkflow.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :clients:client-javafx:test :webservice:integrationTest :test'))
+        assertTrue(testWorkflow.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :clients:client-javafx:test :oxt:test :webservice:integrationTest :test'))
         assertFalse(testWorkflow.contains('javaClientOfficeTest'))
         assertFalse(testWorkflow.contains('libreOfficeTest'))
         assertFalse(testWorkflow.contains('minioTest'))
@@ -205,6 +211,30 @@ class BuildPipelineTest extends GroovyTestCase {
         String settings = new File(root, 'settings.gradle.kts').text
         assertTrue(settings.contains('include(":clients:client-javafx")'))
         assertFalse(gradle.contains('client-javafx'))
+        assertTrue(gradle.contains(':oxt:buildExtension'))
+        assertTrue(gradle.contains('oxt/Odisee/dist/Odisee.oxt'))
+
+        String oxt = new File(root, 'oxt/build.gradle.kts').text
+        assertTrue(oxt.contains('tasks.register<Zip>(taskName(name, dev))'))
+        assertTrue(oxt.contains('"${name}.oxt"'))
+        assertTrue(oxt.contains('"${name}_dev.oxt"'))
+        assertTrue(oxt.contains('git'))
+        assertTrue(oxt.contains('describe'))
+        assertTrue(oxt.contains('v[0-9]*'))
+        assertTrue(oxt.contains('buildExtensionDev'))
+        assertTrue(oxt.contains('tasks.register("world")'))
+        assertTrue(oxt.contains('extension.properties'))
+        assertTrue(oxt.contains('bin/**'))
+        assertFalse(oxt.contains('inc-build-number'))
+        assertFalse(oxt.contains('substringBefore'))
+        assertFalse(oxt.contains('world-production'))
+        assertFalse(oxt.contains('ant-contrib'))
+        assertFalse(oxt.contains('xmltask'))
+        assertFalse(new File(root, 'oxt/Odisee/build.xml').exists())
+        assertFalse(new File(root, 'oxt/build-base.xml').exists())
+
+        String properties = new File(root, 'gradle.properties').text
+        assertFalse(properties.contains('--add-exports'))
     }
 
     private static String workflow() {

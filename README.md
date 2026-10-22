@@ -5,6 +5,8 @@ Make Your Documents Smile.
 
 ## Build, test, and package
 
+Run `make help` for the local stack, the tests, and a GitHub image.
+
 JDK 21, Gradle 8.14.5, and Grails 7.2.4. LibreOffice UNO is `org.libreoffice:libreoffice` 26.2.2 from Maven Central (the current 26.2 still line published there).
 
 ```bash

@@ -13,6 +13,7 @@ group = "org.odisee"
 
 // Semantic version. CI sets ODISEE_BUILD_NUMBER to the Actions run number: 2.6.0-42.
 val odiseeBaseVersion = "2.6.0"
+extra["odiseeBaseVersion"] = odiseeBaseVersion
 val odiseeBuildNumber = System.getenv("ODISEE_BUILD_NUMBER")?.trim()?.takeIf { it.isNotEmpty() }
 version = if (odiseeBuildNumber == null) odiseeBaseVersion else "$odiseeBaseVersion-$odiseeBuildNumber"
 
