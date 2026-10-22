@@ -8,6 +8,10 @@ Odisee client libraries (http://git.odisee.de/client-java/src[Java],
 http://git.odisee.de/client-vbnet/src[VB.NET],
 http://git.odisee.de/client-php/src[PHP]) along with examples how to use
 the API.
+The JavaFX screens are `clients/client-javafx` (login pane, main frame, and FXML).
+They use the Java client in this repository (`org.odisee.client`).
+`./gradlew :clients:client-javafx:run` starts the window.
+JavaFX is on the module path for that launch.
 
 ==== Java
 
