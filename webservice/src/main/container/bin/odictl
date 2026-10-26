@@ -290,8 +290,34 @@ odictl_trim() {
 
 odictl_lock() {
     mkdir -p "${ODISEE_HOME}/etc" || odictl_fail "could not create ${ODISEE_HOME}/etc"
-    exec 9>>"${ODISEE_HOME}/etc/.odictl.lock" || odictl_fail "could not lock ${ODISEE_HOME}/etc"
-    flock 9 || odictl_fail "could not lock ${ODISEE_HOME}/etc"
+    # Linux flock(1) holds the shell's descriptor. macOS has no flock binary.
+    if command -v flock >/dev/null 2>&1
+    then
+        exec 9>>"${ODISEE_HOME}/etc/.odictl.lock" || odictl_fail "could not lock ${ODISEE_HOME}/etc"
+        flock 9 || odictl_fail "could not lock ${ODISEE_HOME}/etc"
+        return 0
+    fi
+    local dir="${ODISEE_HOME}/etc/.odictl.lock.d"
+    local i=0 holder
+    while [ "$i" -lt 60 ]
+    do
+        if mkdir "$dir" 2>/dev/null
+        then
+            printf '%s\n' "$$" > "${dir}/pid" || odictl_fail "could not lock ${ODISEE_HOME}/etc"
+            ODICTL_LOCK_DIR=$dir
+            trap 'rm -rf -- "$ODICTL_LOCK_DIR"' EXIT
+            return 0
+        fi
+        holder=$(cat "${dir}/pid" 2>/dev/null || true)
+        if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null
+        then
+            rm -rf -- "$dir"
+            continue
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
+    odictl_fail "could not lock ${ODISEE_HOME}/etc"
 }
 
 odictl_write_private() {
