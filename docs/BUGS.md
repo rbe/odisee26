@@ -73,6 +73,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B36 | major | fixed | macOS has no `flock`. `odictl` locked `$ODISEE_HOME/etc` with `flock` and exited 1 (`could not lock`). When `flock` is on `PATH`, that lock stays. Otherwise the lock is the directory `etc/.odictl.lock.d`, removed when `odictl` exits. A directory whose pid is dead is removed and the lock is taken again. |
 | B37 | major | fixed | macOS `netstat` is `/usr/sbin/netstat`. IntelliJ's Gradle `PATH` is `/usr/bin:/bin`. `netstat -f inet` is IPv4 only, and Java's loopback on macOS is often `::1`, so the listener count stayed 0. Darwin uses `/usr/sbin/netstat -an -p tcp` when `netstat` is not on `PATH`. |
 | B38 | major | fixed | `ODISEE_SHELL=1` backgrounds the JVM and then `exec`s an interactive bash. On macOS that job can be stopped before it writes its pid, and `exit` then kills it. The shell disables monitor mode, ignores `HUP`, and records the pid before `exec`. |
+| B39 | minor | fixed | `testLinuxOfficePortCheckReadsProcNet` required `get_inst_status` to see the JVM socket. On macOS that is `netstat`, and the count stayed 0. The test's proof is the `/proc/net/tcp` fixture parser, which runs on every host. The live listener count is asserted on Linux. |
 
 ## Tests added in wave 1
 

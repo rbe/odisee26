@@ -416,7 +416,9 @@ class OdictlTest extends GroovyTestCase {
                     '   1: 00000000000000000000000000000000:07D1 0000000000000000FFFF00000100007F:1234 01 00000000:00000000 00:00000000 00000000 0 0 2 1 0 100 0 0 10 0',
                     '',
             ].join('\n'))
-            String output = launch(true, [bash4(), '-c', [
+            // The fixture files are the parser. A live listener is the Linux
+            // production path (/proc/net/tcp). macOS netstat is a different tool.
+            List<String> lines = [
                     '. "$ODILIB"',
                     'listen=$(proc_tcp_count 2001 0A "$TCP" "$TCP6")',
                     'echo "listen=$listen"',
@@ -426,10 +428,13 @@ class OdictlTest extends GroovyTestCase {
                     'echo "missing=$missing"',
                     'errbytes=$(wc -c < "$ERR" | tr -d " ")',
                     'echo "errbytes=$errbytes"',
-                    'get_inst_status odi1',
-                    'echo "numlist=${INSTSTAT[numlist]}"',
-                    'echo "numconn=${INSTSTAT[numconn]}"',
-            ].join('\n')], [
+            ]
+            if (linuxHost()) {
+                lines.add('get_inst_status odi1')
+                lines.add('echo "numlist=${INSTSTAT[numlist]}"')
+                lines.add('echo "numconn=${INSTSTAT[numconn]}"')
+            }
+            String output = launch(true, [bash4(), '-c', lines.join('\n')], [
                     ODISEE_HOME: home.toString(),
                     HOME: home.toString(),
                     PATH: '/usr/bin:/bin',
@@ -444,8 +449,10 @@ class OdictlTest extends GroovyTestCase {
             assertEquals(output, '2', value(output, 'estab'))
             assertEquals(output, '0', value(output, 'missing'))
             assertEquals(output, '0', value(output, 'errbytes'))
-            assertTrue(output, Integer.parseInt(value(output, 'numlist')) >= 1)
-            assertTrue(output, Integer.parseInt(value(output, 'numconn')) >= 1)
+            if (linuxHost()) {
+                assertTrue(output, Integer.parseInt(value(output, 'numlist')) >= 1)
+                assertTrue(output, Integer.parseInt(value(output, 'numconn')) >= 1)
+            }
             String library = new File('src/main/container/bin/odilib').getText('UTF-8')
             String watchdog = new File('src/main/container/bin/odiwatchdog').getText('UTF-8')
             String containerfile = new File('src/main/container/Containerfile').getText('UTF-8')
@@ -639,6 +646,10 @@ class OdictlTest extends GroovyTestCase {
      * IntelliJ on macOS puts {@code /bin/bash} (3.2) on {@code PATH}.
      * The same candidates {@code odilib} re-execs are used here.
      */
+    private static boolean linuxHost() {
+        System.getProperty('os.name', '').contains('Linux')
+    }
+
     private static String bash4() {
         Integer onPath = bashMajor('bash')
         if (onPath != null && onPath >= 4) {
