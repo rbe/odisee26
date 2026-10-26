@@ -49,6 +49,9 @@ Before `declare -A`, a shell older than 4 re-execs that entry script with `/opt/
 That bash does not need to be first on `PATH`.
 If neither path is executable, Odisee prints `Odisee needs bash 4 or newer. On macOS: brew install bash.` and exits 1.
 Bash 4 or newer, including the container, does not re-exec.
+A Mac checkout lists the development tools in the root `Brewfile`.
+`brew bundle` installs bash, flock, OpenJDK 21, and Podman.
+macOS `netstat` is `/usr/sbin/netstat` when `netstat` is not on `PATH`.
 
 `odictl` is one command on `PATH`.
 It computes its directories when it runs.

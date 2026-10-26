@@ -448,7 +448,8 @@ class OdictlTest extends GroovyTestCase {
             String library = new File('src/main/container/bin/odilib').getText('UTF-8')
             String watchdog = new File('src/main/container/bin/odiwatchdog').getText('UTF-8')
             String containerfile = new File('src/main/container/Containerfile').getText('UTF-8')
-            assertTrue(library.contains('netstat -f inet -p tcp -an'))
+            assertTrue(library.contains('-f inet -p tcp -an'))
+            assertTrue(library.contains('/usr/sbin/netstat'))
             assertFalse(library.contains('ss -lnt'))
             assertTrue(watchdog.contains('proc_tcp_count'))
             assertFalse(watchdog.contains('ss -nlt'))
@@ -540,6 +541,7 @@ class OdictlTest extends GroovyTestCase {
         Files.createDirectories(run.bin)
         writeExe(run.bin.resolve('java'), [
                 '#!/bin/bash',
+                "trap '' HUP",
                 'echo $$ > "$JAVA_PIDFILE"',
                 'printf %s\\\\n "$*" > "$JAVA_ARGS"',
                 'trap \'exit 0\' TERM',
@@ -548,6 +550,7 @@ class OdictlTest extends GroovyTestCase {
         ].join('\n'))
         writeExe(run.bin.resolve('soffice'), [
                 '#!/bin/bash',
+                "trap '' HUP",
                 'echo $$ > "$SOFFICE_PIDFILE"',
                 'trap \'exit 0\' TERM',
                 'while true; do sleep 0.2; done',
@@ -557,7 +560,9 @@ class OdictlTest extends GroovyTestCase {
                 '#!/bin/bash',
                 'printf %s\\\\n "$*" > "$ODICTL_ARGS"',
                 'if [ "$1" = "-q" ] && [ "$2" = "start-inst" ]; then',
+                "    trap '' HUP",
                 '    "$SOFFICE_BIN" "$ODISEE_HOME" &',
+                '    trap - HUP',
                 'fi',
                 'exit 0',
                 '',

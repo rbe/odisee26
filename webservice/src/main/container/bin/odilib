@@ -465,8 +465,15 @@ get_inst_status() {
     # TCP/IP sockets, connections
     case "${ODISEE_OS}" in
         Darwin)
-            INSTSTAT[numlist]=$(netstat -f inet -p tcp -an | grep ${INSTCFG[port]} | grep LIST)
-            INSTSTAT[numconn]=$(netstat -f inet -p tcp -an | grep ${INSTCFG[port]} | grep EST)
+            # IntelliJ's Gradle PATH is /usr/bin:/bin. macOS netstat is /usr/sbin/netstat.
+            local ns
+            ns=$(command -v netstat 2>/dev/null || true)
+            if [ -z "${ns}" ] && [ -x /usr/sbin/netstat ]
+            then
+                ns=/usr/sbin/netstat
+            fi
+            INSTSTAT[numlist]=$("${ns}" -f inet -p tcp -an | grep ${INSTCFG[port]} | grep LIST)
+            INSTSTAT[numconn]=$("${ns}" -f inet -p tcp -an | grep ${INSTCFG[port]} | grep EST)
         ;;
         FreeBSD)
             INSTSTAT[numlist]=$(sockstat -46l -p ${INSTCFG[port]} | grep -v USER)

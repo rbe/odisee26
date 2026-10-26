@@ -20,11 +20,15 @@ ps ax | grep soffice | grep -v grep
 echo
 
 if [ "${ODISEE_SHELL:-}" = "1" ]; then
+    # The interactive shell replaces this process. A background JVM in this
+    # process group receives SIGHUP on macOS unless it already ignores HUP.
+    trap '' HUP
     java \
         -Xms1g -Xmx1g \
         -Djava.security.egd=file:/dev/./urandom \
         -jar ${ODISEE_HOME}/application.jar &
     ODISEE_JVM_PID=$!
+    trap - HUP
     export ODISEE_JVM_PID
     # --rcfile installs the EXIT and TERM traps in the shell that becomes PID 1.
     # A login shell is not used. podman exec is the shell when this variable is unset.
