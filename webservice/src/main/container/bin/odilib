@@ -466,14 +466,16 @@ get_inst_status() {
     case "${ODISEE_OS}" in
         Darwin)
             # IntelliJ's Gradle PATH is /usr/bin:/bin. macOS netstat is /usr/sbin/netstat.
-            local ns
+            # -f inet is IPv4 only. Java's loopback on macOS is often ::1, which is tcp6.
+            local ns raw
             ns=$(command -v netstat 2>/dev/null || true)
             if [ -z "${ns}" ] && [ -x /usr/sbin/netstat ]
             then
                 ns=/usr/sbin/netstat
             fi
-            INSTSTAT[numlist]=$("${ns}" -f inet -p tcp -an | grep ${INSTCFG[port]} | grep LIST)
-            INSTSTAT[numconn]=$("${ns}" -f inet -p tcp -an | grep ${INSTCFG[port]} | grep EST)
+            raw=$("${ns}" -an -p tcp 2>/dev/null || true)
+            INSTSTAT[numlist]=$(printf '%s\n' "${raw}" | grep -E "[^0-9]${INSTCFG[port]}([^0-9]|$)" | grep LIST || true)
+            INSTSTAT[numconn]=$(printf '%s\n' "${raw}" | grep -E "[^0-9]${INSTCFG[port]}([^0-9]|$)" | grep EST || true)
         ;;
         FreeBSD)
             INSTSTAT[numlist]=$(sockstat -46l -p ${INSTCFG[port]} | grep -v USER)

@@ -385,12 +385,13 @@ class OdictlTest extends GroovyTestCase {
 
     void testLinuxOfficePortCheckReadsProcNet() {
         Path tree = Files.createTempDirectory('odisee-proc')
-        ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        InetAddress loopback = InetAddress.getByName('127.0.0.1')
+        ServerSocket server = new ServerSocket(0, 50, loopback)
         Socket client = null
         Socket accepted = null
         try {
             int port = server.localPort
-            client = new Socket(InetAddress.getLoopbackAddress(), port)
+            client = new Socket(loopback, port)
             accepted = server.accept()
             Path home = tree.resolve('odisee')
             Files.createDirectories(home.resolve('etc'))
@@ -448,7 +449,7 @@ class OdictlTest extends GroovyTestCase {
             String library = new File('src/main/container/bin/odilib').getText('UTF-8')
             String watchdog = new File('src/main/container/bin/odiwatchdog').getText('UTF-8')
             String containerfile = new File('src/main/container/Containerfile').getText('UTF-8')
-            assertTrue(library.contains('-f inet -p tcp -an'))
+            assertTrue(library.contains('-an -p tcp'))
             assertTrue(library.contains('/usr/sbin/netstat'))
             assertFalse(library.contains('ss -lnt'))
             assertTrue(watchdog.contains('proc_tcp_count'))

@@ -22,14 +22,23 @@ echo
 if [ "${ODISEE_SHELL:-}" = "1" ]; then
     # The interactive shell replaces this process. A background JVM in this
     # process group receives SIGHUP on macOS unless it already ignores HUP.
+    # Monitor mode would stop this job when the interactive shell starts.
+    set +m
     trap '' HUP
     java \
         -Xms1g -Xmx1g \
         -Djava.security.egd=file:/dev/./urandom \
         -jar ${ODISEE_HOME}/application.jar &
     ODISEE_JVM_PID=$!
+    disown "${ODISEE_JVM_PID}" 2>/dev/null || disown 2>/dev/null || true
     trap - HUP
     export ODISEE_JVM_PID
+    # Record the pid in this process. The JVM may still be stopped when the
+    # shell exits, and then it never reaches its own pid write.
+    if [ -n "${JAVA_PIDFILE:-}" ]
+    then
+        printf '%s\n' "${ODISEE_JVM_PID}" > "${JAVA_PIDFILE}"
+    fi
     # --rcfile installs the EXIT and TERM traps in the shell that becomes PID 1.
     # A login shell is not used. podman exec is the shell when this variable is unset.
     rc=$(mktemp)
