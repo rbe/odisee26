@@ -79,7 +79,7 @@ Tests 1–5 from the basis list:
 | 4 Status 404 / 400 / 503, body is the message | `HttpStatusTest` | no |
 | 5 The pool skips a dead slot | `OfficeConnectionPoolTest` | no |
 
-Tests 1–3 use a Writer template with the user field `Hallo` and read the text back out of the PDF. LibreOffice runs in Podman, headless, on port 2002. The test home is mounted into the container at the same path, so the file URL the server sends is the file LibreOffice opens.
+Tests 1–3 use a Writer template with the user field `Hallo` and read the text back out of the PDF. LibreOffice runs in Podman, headless, and publishes `127.0.0.1:2002`. `--network host` stays inside the Podman machine on macOS, so the port is published instead. The test home is mounted into the container at the same path, so the file URL the server sends is the file LibreOffice opens. The port check uses Python or `nc`, not bash `/dev/tcp`.
 
 ```
 ./gradlew :webservice:libreOfficeTest
@@ -92,9 +92,9 @@ Status: **landed**.
 The Java client proof is `OdiseeClientLocalTest`, task `:clients:client-java:javaClientOfficeTest`. It is not part of `:webservice:test` or `:clients:client-java:test`. The GitHub Actions job `java-client-office` has Podman and runs that task. `./gradlew build` does not start a container.
 
 - The task starts the same LibreOffice container as tests 1–3, on port 2002, with `ODISEE_HOME` mounted at the same path.
-- It starts the webservice against that home. `etc/oidc` names the issuer. `Letter.ott` (user field `Hallo`) is in `var/user/odisee/template`.
-- `OdiseeClient.bearer` posts to `http://127.0.0.1:<port>/odisee/document/generate`. The request is template `Letter`, output format PDF, and user field `Hallo`. The token's client id is `odisee`.
-- The PDF text contains the value written.
+- It starts the webservice against that home. `etc/oidc` names the issuer. `Letter.ott` and the shipped `HalloOdisee.ott` (user field `Hallo`) are in `var/user/odisee/template`.
+- `OdiseeClient.bearer` posts to `http://127.0.0.1:<port>/odisee/document/generate`. One request is template `Letter`, output format PDF, and user field `Hallo`. Another is template `HalloOdisee` as PDF and as DOCX, with `Hallo` set to a value that must appear in the file. The token's client id is `odisee`.
+- The PDF text contains the value written. The DOCX is a zip whose XML text contains the same value. The saved files are under `webservice/build/odisee-test-home/var/user/odisee/output/`.
 - The same request with a gzip body also returns a PDF whose text contains the value.
 - The same request with no credentials is HTTP 401, and that user's output directory does not gain a file.
 - The client sends `Authorization: Bearer` on that request. It does not call `Authenticator.setDefault`.

@@ -114,11 +114,16 @@ tasks.register<Exec>("startLibreOffice") {
         home='$homePath'
         mkdir -p "${'$'}home"
         $podmanBin rm -f odisee-lo-test >/dev/null 2>&1 || true
-        $podmanBin run -d --name odisee-lo-test --network host \
+        # Publish the port. --network host stays inside the Podman machine on macOS,
+        # so 127.0.0.1:2002 on the Mac never opens. The home is mounted at the same
+        # path so the file URL the server sends is the file LibreOffice opens.
+        $podmanBin run -d --name odisee-lo-test \
+            -p 127.0.0.1:2002:2002 \
             -v "${'$'}home:${'$'}home" \
             odisee-libreoffice-test:local
         for i in ${'$'}(seq 1 90); do
-            if bash -c 'echo >/dev/tcp/127.0.0.1/2002' 2>/dev/null; then
+            if python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",2002),2); s.close()' 2>/dev/null \
+                || nc -z 127.0.0.1 2002 2>/dev/null; then
                 exit 0
             fi
             sleep 1

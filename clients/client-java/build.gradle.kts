@@ -50,6 +50,10 @@ tasks.register<Test>("javaClientOfficeTest") {
     systemProperty("odisee.serverJar", bootJar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("odisee.libreoffice.port", "2002")
     systemProperty(
+        "odisee.halloTemplate",
+        webserviceProject.file("src/main/container/var/template/HalloOdisee.ott").absolutePath,
+    )
+    systemProperty(
         "odisee.serverLog",
         layout.buildDirectory.file("java-client-server.log").get().asFile.absolutePath,
     )

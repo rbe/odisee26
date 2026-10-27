@@ -8,6 +8,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import com.sun.net.httpserver.HttpServer;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
@@ -16,6 +17,7 @@ import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Signature;
@@ -28,6 +30,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -125,6 +129,20 @@ public class OdiseeClientLocalTest {
     }
 
     @Test
+    public void halloOdiseeUserFieldIsInThePdf() throws Exception {
+        final String value = "HalloFeld-pdf";
+        final byte[] pdf = generate("HalloOdisee", OutputFormat.PDF, value);
+        assertPdfContains(pdf, value);
+    }
+
+    @Test
+    public void halloOdiseeUserFieldIsInTheDocx() throws Exception {
+        final String value = "HalloFeld-docx";
+        final byte[] docx = generate("HalloOdisee", OutputFormat.DOCX, value);
+        assertDocxContains(docx, value);
+    }
+
+    @Test
     public void noCredentialsIs401AndWritesNoPdf() throws Exception {
         final Path output = home.resolve("var/user").resolve(USER).resolve("output");
         final Set<String> before = filesUnder(output);
@@ -139,6 +157,29 @@ public class OdiseeClientLocalTest {
             assertEquals(e.getMessage(), 401, e.getHttpStatus());
         }
         assertEquals(before, filesUnder(output));
+    }
+
+    private static byte[] generate(final String template, final OutputFormat format, final String value) {
+        final OdiseeClient client = OdiseeClient.bearer(generateUrl, accessToken);
+        client.createRequest(template, format);
+        client.setUserfield("Hallo", value);
+        return client.process(false);
+    }
+
+    private static void assertDocxContains(final byte[] docx, final String value) throws IOException {
+        assertTrue("DOCX is empty. " + tail(serverLog), docx != null && docx.length > 4);
+        assertEquals('P', (char) docx[0]);
+        assertEquals('K', (char) docx[1]);
+        final StringBuilder text = new StringBuilder();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(docx))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (entry.getName().endsWith(".xml")) {
+                    text.append(new String(zip.readAllBytes(), StandardCharsets.UTF_8).replaceAll("<[^>]+>", ""));
+                }
+            }
+        }
+        assertTrue(text.toString(), text.toString().contains(value));
     }
 
     private static void assertPdfContains(final byte[] pdf, final String value) throws IOException {
@@ -166,6 +207,11 @@ public class OdiseeClientLocalTest {
         Files.createDirectories(userRoot.resolve("work"));
         Files.createDirectories(userRoot.resolve("output"));
         LetterTemplate.write(userRoot.resolve("template").resolve("Letter.ott"));
+        final Path hallo = Path.of(required("odisee.halloTemplate"));
+        if (!Files.isRegularFile(hallo)) {
+            fail("HalloOdisee template is missing: " + hallo);
+        }
+        Files.copy(hallo, userRoot.resolve("template").resolve("HalloOdisee.ott"), StandardCopyOption.REPLACE_EXISTING);
         accessToken = sign(issuer);
     }
 
