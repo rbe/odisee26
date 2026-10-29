@@ -333,13 +333,11 @@ class OdictlTest extends GroovyTestCase {
             assertTrue(entry, entry.indexOf('. ${SCRIPT_DIR}/odilib') < entry.indexOf('declare -A') || !entry.contains('declare -A'))
         }
 
-        String major = ['bash', '-c', 'printf %s "${BASH_VERSINFO[0]}"'].execute().text.trim()
-        assertTrue(major, Integer.parseInt(major) >= 4)
         Path tree = Files.createTempDirectory('odictl-bash4')
         try {
             Path home = tree.resolve('home')
             Files.createDirectories(home)
-            String output = launch(true, ['bash', scriptPath(), 'callback-host', 'ctlbash', 'hooks.example'], [
+            String output = launch(true, [bash4(), scriptPath(), 'callback-host', 'ctlbash', 'hooks.example'], [
                     HOME: home.toString(),
                     ODISEE_HOME: '',
                     JAVA_HOME: '',
@@ -353,14 +351,47 @@ class OdictlTest extends GroovyTestCase {
         }
     }
 
+    void testDirectoryLockWhenFlockIsAbsent() {
+        Path tree = Files.createTempDirectory('odictl-lock')
+        try {
+            Path home = tree.resolve('home')
+            Path bindir = tree.resolve('bin')
+            Files.createDirectories(home)
+            Files.createDirectories(bindir)
+            String bash = bash4()
+            Path bashPath = bash == 'bash'
+                    ? Path.of(['bash', '-c', 'command -v bash'].execute().text.trim())
+                    : Path.of(bash)
+            Files.createSymbolicLink(bindir.resolve('bash'), bashPath)
+            ['mkdir', 'cat', 'rm', 'sleep', 'uname', 'tr', 'dirname', 'readlink', 'mktemp', 'chmod', 'mv'].each { String tool ->
+                String found = ['bash', '-c', "command -v ${tool}"].execute().text.trim()
+                if (!found.isEmpty()) {
+                    Files.createSymbolicLink(bindir.resolve(tool), Path.of(found))
+                }
+            }
+            String output = launch(true, [scriptPath(), 'callback-host', 'ctllock', 'hooks.example'], [
+                    HOME: home.toString(),
+                    ODISEE_HOME: '',
+                    JAVA_HOME: '',
+                    PATH: bindir.toString(),
+            ])
+            assertTrue(output, output.contains("Callback host 'hooks.example' listed for 'ctllock'."))
+            assertTrue(Files.readString(home.resolve('.local/share/odisee/etc/callback-hosts')).contains('ctllock hooks.example'))
+            assertFalse(Files.exists(home.resolve('.local/share/odisee/etc/.odictl.lock.d')))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
     void testLinuxOfficePortCheckReadsProcNet() {
         Path tree = Files.createTempDirectory('odisee-proc')
-        ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        InetAddress loopback = InetAddress.getByName('127.0.0.1')
+        ServerSocket server = new ServerSocket(0, 50, loopback)
         Socket client = null
         Socket accepted = null
         try {
             int port = server.localPort
-            client = new Socket(InetAddress.getLoopbackAddress(), port)
+            client = new Socket(loopback, port)
             accepted = server.accept()
             Path home = tree.resolve('odisee')
             Files.createDirectories(home.resolve('etc'))
@@ -385,7 +416,9 @@ class OdictlTest extends GroovyTestCase {
                     '   1: 00000000000000000000000000000000:07D1 0000000000000000FFFF00000100007F:1234 01 00000000:00000000 00:00000000 00000000 0 0 2 1 0 100 0 0 10 0',
                     '',
             ].join('\n'))
-            String output = launch(true, ['/bin/bash', '-c', [
+            // The fixture files are the parser. A live listener is the Linux
+            // production path (/proc/net/tcp). macOS netstat is a different tool.
+            List<String> lines = [
                     '. "$ODILIB"',
                     'listen=$(proc_tcp_count 2001 0A "$TCP" "$TCP6")',
                     'echo "listen=$listen"',
@@ -395,10 +428,13 @@ class OdictlTest extends GroovyTestCase {
                     'echo "missing=$missing"',
                     'errbytes=$(wc -c < "$ERR" | tr -d " ")',
                     'echo "errbytes=$errbytes"',
-                    'get_inst_status odi1',
-                    'echo "numlist=${INSTSTAT[numlist]}"',
-                    'echo "numconn=${INSTSTAT[numconn]}"',
-            ].join('\n')], [
+            ]
+            if (linuxHost()) {
+                lines.add('get_inst_status odi1')
+                lines.add('echo "numlist=${INSTSTAT[numlist]}"')
+                lines.add('echo "numconn=${INSTSTAT[numconn]}"')
+            }
+            String output = launch(true, [bash4(), '-c', lines.join('\n')], [
                     ODISEE_HOME: home.toString(),
                     HOME: home.toString(),
                     PATH: '/usr/bin:/bin',
@@ -413,12 +449,15 @@ class OdictlTest extends GroovyTestCase {
             assertEquals(output, '2', value(output, 'estab'))
             assertEquals(output, '0', value(output, 'missing'))
             assertEquals(output, '0', value(output, 'errbytes'))
-            assertTrue(output, Integer.parseInt(value(output, 'numlist')) >= 1)
-            assertTrue(output, Integer.parseInt(value(output, 'numconn')) >= 1)
+            if (linuxHost()) {
+                assertTrue(output, Integer.parseInt(value(output, 'numlist')) >= 1)
+                assertTrue(output, Integer.parseInt(value(output, 'numconn')) >= 1)
+            }
             String library = new File('src/main/container/bin/odilib').getText('UTF-8')
             String watchdog = new File('src/main/container/bin/odiwatchdog').getText('UTF-8')
             String containerfile = new File('src/main/container/Containerfile').getText('UTF-8')
-            assertTrue(library.contains('netstat -f inet -p tcp -an'))
+            assertTrue(library.contains('-an -p tcp'))
+            assertTrue(library.contains('/usr/sbin/netstat'))
             assertFalse(library.contains('ss -lnt'))
             assertTrue(watchdog.contains('proc_tcp_count'))
             assertFalse(watchdog.contains('ss -nlt'))
@@ -510,6 +549,7 @@ class OdictlTest extends GroovyTestCase {
         Files.createDirectories(run.bin)
         writeExe(run.bin.resolve('java'), [
                 '#!/bin/bash',
+                "trap '' HUP",
                 'echo $$ > "$JAVA_PIDFILE"',
                 'printf %s\\\\n "$*" > "$JAVA_ARGS"',
                 'trap \'exit 0\' TERM',
@@ -518,6 +558,7 @@ class OdictlTest extends GroovyTestCase {
         ].join('\n'))
         writeExe(run.bin.resolve('soffice'), [
                 '#!/bin/bash',
+                "trap '' HUP",
                 'echo $$ > "$SOFFICE_PIDFILE"',
                 'trap \'exit 0\' TERM',
                 'while true; do sleep 0.2; done',
@@ -527,7 +568,9 @@ class OdictlTest extends GroovyTestCase {
                 '#!/bin/bash',
                 'printf %s\\\\n "$*" > "$ODICTL_ARGS"',
                 'if [ "$1" = "-q" ] && [ "$2" = "start-inst" ]; then',
+                "    trap '' HUP",
                 '    "$SOFFICE_BIN" "$ODISEE_HOME" &',
+                '    trap - HUP',
                 'fi',
                 'exit 0',
                 '',
@@ -589,7 +632,47 @@ class OdictlTest extends GroovyTestCase {
     }
 
     private static String commandLine(long pid) {
-        Files.readString(Path.of('/proc/' + pid + '/cmdline'), StandardCharsets.ISO_8859_1).replace('\u0000', ' ')
+        Path proc = Path.of('/proc', Long.toString(pid), 'cmdline')
+        if (Files.isRegularFile(proc)) {
+            return Files.readString(proc, StandardCharsets.ISO_8859_1).replace('\u0000', ' ')
+        }
+        Process ps = new ProcessBuilder('ps', '-p', Long.toString(pid), '-ww', '-o', 'args=').start()
+        String text = ps.inputStream.getText('UTF-8')
+        ps.waitFor(5, TimeUnit.SECONDS)
+        text.trim()
+    }
+
+    /**
+     * IntelliJ on macOS puts {@code /bin/bash} (3.2) on {@code PATH}.
+     * The same candidates {@code odilib} re-execs are used here.
+     */
+    private static boolean linuxHost() {
+        System.getProperty('os.name', '').contains('Linux')
+    }
+
+    private static String bash4() {
+        Integer onPath = bashMajor('bash')
+        if (onPath != null && onPath >= 4) {
+            return 'bash'
+        }
+        for (String candidate : ['/opt/homebrew/bin/bash', '/usr/local/bin/bash']) {
+            if (new File(candidate).canExecute()) {
+                Integer major = bashMajor(candidate)
+                if (major != null && major >= 4) {
+                    return candidate
+                }
+            }
+        }
+        fail('Odisee needs bash 4 or newer. On macOS: brew install bash.')
+        return 'bash'
+    }
+
+    private static Integer bashMajor(String bash) {
+        String text = [bash, '-c', 'printf %s "${BASH_VERSINFO[0]}"'].execute().text.trim()
+        if (!text.isInteger()) {
+            return null
+        }
+        Integer.parseInt(text)
     }
 
     private static boolean died(Path pidFile) {

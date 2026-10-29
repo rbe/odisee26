@@ -1,6 +1,7 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.bundling.Zip
+import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
@@ -51,6 +52,12 @@ subprojects {
             toolchain {
                 languageVersion.set(JavaLanguageVersion.of(21))
             }
+        }
+    }
+    // A --tests filter is applied to every project. A project with no match still succeeds.
+    tasks.withType<Test>().configureEach {
+        filter {
+            isFailOnNoMatchingTests = false
         }
     }
 }

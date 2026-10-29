@@ -45,4 +45,17 @@ class OdiseeFileFormat {
         OOO_FORMAT.find { it.filter == name || it.extension == name }
     }
 
+    static Map getAt(String name) {
+        get(name)
+    }
+
+    /**
+     * The suffix after the last dot. {@code docx} is four characters, so the last three are not the extension.
+     */
+    static String extensionOf(String fileName) {
+        String lower = fileName == null ? '' : fileName.toLowerCase()
+        int dot = lower.lastIndexOf('.')
+        dot >= 0 && dot < lower.length() - 1 ? lower.substring(dot + 1) : lower
+    }
+
 }

@@ -426,7 +426,7 @@ class OdiseeXmlCategory {
         final Path outputDir = Paths.get(outputPath)
         Map<Path, List<Map<String, String>>> optionsByFile = new LinkedHashMap<>()
         formats.each { OutputFormats.Choice format ->
-            String extension = SafePaths.requireSimpleName(format.extension, 'output format')
+            String extension = SafePaths.requireSimpleName(format.extension, 'output format').toLowerCase()
             Path file = outputDir.resolve("${documentBasename}.${extension}")
             output << file
             optionsByFile[file] = format.options

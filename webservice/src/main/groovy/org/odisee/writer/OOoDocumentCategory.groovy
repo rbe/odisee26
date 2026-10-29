@@ -156,9 +156,13 @@ class OOoDocumentCategory {
             // Properties for saving component
             List properties = []
             // Filter for saving?
-            String ext = file.fileName.toString().toLowerCase()[-3..-1]
+            String ext = OdiseeFileFormat.extensionOf(file.fileName.toString())
             if (!(ext ==~ /od[gpst]/)) {
-                properties << makePropertyValue('FilterName', OdiseeFileFormat[ext].filter)
+                Map format = OdiseeFileFormat.get(ext)
+                if (format == null) {
+                    throw new OdiseeException("Unsupported output format '${ext}'", OdiseeException.UNPROCESSABLE)
+                }
+                properties << makePropertyValue('FilterName', format.filter)
             }
             // Copy given properties
             props?.each { k, v ->

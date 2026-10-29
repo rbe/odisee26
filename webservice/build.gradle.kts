@@ -3,7 +3,6 @@ import org.springframework.boot.gradle.tasks.run.BootRun
 
 plugins {
     id("org.apache.grails.gradle.grails-web") version "7.2.4"
-    id("org.apache.grails.gradle.grails-gsp") version "7.2.4"
 }
 
 apply(from = rootProject.file("gradle/podman-executable.gradle.kts"))
@@ -20,18 +19,25 @@ repositories {
     mavenCentral()
 }
 
+// No GSP views, no encodeAs calls, no database, and no respond().
+configurations.configureEach {
+    exclude(group = "org.apache.grails", module = "grails-gsp")
+    exclude(group = "org.apache.grails", module = "grails-layout")
+    exclude(group = "org.apache.grails", module = "grails-codecs")
+    exclude(group = "org.apache.grails", module = "grails-datasource")
+    exclude(group = "org.apache.grails", module = "grails-rest-transforms")
+}
+
 dependencies {
     implementation(platform("org.apache.grails:grails-bom:$grailsVersion"))
 
     implementation("org.apache.grails:grails-core")
-    implementation("org.apache.grails:grails-rest-transforms")
+    implementation("org.apache.grails:grails-converters")
     implementation("org.apache.grails:grails-databinding")
     implementation("org.apache.grails:grails-services")
     implementation("org.apache.grails:grails-url-mappings")
     implementation("org.apache.grails:grails-interceptors")
     implementation("org.apache.grails:grails-web-boot")
-    implementation("org.apache.grails:grails-gsp")
-    implementation("org.apache.grails:grails-layout")
     implementation("org.apache.grails:grails-logging")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-logging")
@@ -108,11 +114,16 @@ tasks.register<Exec>("startLibreOffice") {
         home='$homePath'
         mkdir -p "${'$'}home"
         $podmanBin rm -f odisee-lo-test >/dev/null 2>&1 || true
-        $podmanBin run -d --name odisee-lo-test --network host \
+        # Publish the port. --network host stays inside the Podman machine on macOS,
+        # so 127.0.0.1:2002 on the Mac never opens. The home is mounted at the same
+        # path so the file URL the server sends is the file LibreOffice opens.
+        $podmanBin run -d --name odisee-lo-test \
+            -p 127.0.0.1:2002:2002 \
             -v "${'$'}home:${'$'}home" \
             odisee-libreoffice-test:local
         for i in ${'$'}(seq 1 90); do
-            if bash -c 'echo >/dev/tcp/127.0.0.1/2002' 2>/dev/null; then
+            if python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",2002),2); s.close()' 2>/dev/null \
+                || nc -z 127.0.0.1 2002 2>/dev/null; then
                 exit 0
             fi
             sleep 1

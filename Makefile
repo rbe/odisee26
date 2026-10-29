@@ -56,6 +56,7 @@
 # Gradle checks PATH and then those two paths (gradle/podman-executable.gradle.kts).
 # macOS /bin/bash is 3.2. odictl re-execs Homebrew bash
 # (/opt/homebrew/bin/bash or /usr/local/bin/bash). Otherwise brew install bash.
+# brew bundle installs the root Brewfile: bash, flock, openjdk@21, and podman.
 
 .DEFAULT_GOAL := help
 
