@@ -322,3 +322,34 @@ tasks.register<Exec>("startStack") {
         """.trimIndent(),
     )
 }
+
+fun odiseeContainerCommand(action: String, images: List<String> = emptyList()): List<String> {
+    val script = rootProject.file("gradle/odisee-containers.sh").absolutePath
+    val composeDir = file("src/main/container").absolutePath
+    return listOf("bash", script, action, podmanExecutable, composeDir, version.toString()) + images
+}
+
+tasks.register<Exec>("stopOdisee") {
+    group = "Odisee"
+    description = "Stop odisee-lo-test, odisee-minio-test, odisee-keycloak-test, and the odisee compose project. A missing container is success."
+    commandLine = odiseeContainerCommand("stop")
+}
+
+tasks.register<Exec>("removeOdiseeContainers") {
+    group = "Odisee"
+    description = "Remove the test containers with podman rm -f and the compose project with podman compose down. A missing container is success."
+    commandLine = odiseeContainerCommand("rm")
+}
+
+tasks.register<Exec>("cleanOdiseeImages") {
+    group = "Odisee"
+    description = "Remove the LibreOffice test image, the MinIO and Keycloak images, and the service image startStack builds. A missing image is success."
+    dependsOn("removeOdiseeContainers")
+    commandLine = odiseeContainerCommand("images", listOf(
+        "odisee-libreoffice-test:local",
+        minioImage,
+        keycloakImage,
+        "odisee/odisee:$version",
+        "odisee/webservice:$version",
+    ))
+}

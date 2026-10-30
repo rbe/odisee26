@@ -50,6 +50,21 @@
 # The JUnit targets start their own containers.
 # They do not use the compose stack from make stack.
 #
+# Stop and remove:
+# make stop runs ./gradlew :webservice:stopOdisee.
+# It stops odisee-lo-test (startLibreOffice), odisee-minio-test (startMinio),
+# and odisee-keycloak-test (startKeycloak), and it stops the compose project odisee
+# (services odisee, minio, and keycloak).
+# make rm runs ./gradlew :webservice:removeOdiseeContainers.
+# It removes the test containers with podman rm -f and removes the stack with
+# podman compose down. A missing container is success. The compose volumes stay.
+# make clean-images runs ./gradlew :webservice:cleanOdiseeImages.
+# That removes the containers first, then the images those commands built or pulled:
+# odisee-libreoffice-test:local, alpine/minio:RELEASE.2025-10-15T17-29-55Z,
+# quay.io/keycloak/keycloak:26.8.0, and the service image startStack builds
+# (odisee/odisee and odisee/webservice at the project version).
+# A missing image is success. Other images on the machine stay.
+#
 # setup:
 # make setup checks that podman is on PATH.
 # On a Mac the binary is /opt/homebrew/bin/podman or /usr/local/bin/podman.
@@ -65,7 +80,7 @@ ODICTL := webservice/src/main/container/bin/odictl
 export CLIENT_ID
 export CLIENT_SECRET
 
-.PHONY: setup stack user token test test-office test-minio test-keycloak test-java pull run help
+.PHONY: setup stack user token test test-office test-minio test-keycloak test-java pull run stop rm clean-images help
 
 setup: ## First. Check that podman is on PATH. On a Mac: /opt/homebrew/bin/podman or /usr/local/bin/podman
 	@echo 'macOS /bin/bash is 3.2. odictl re-execs Homebrew bash. Otherwise brew install bash.'
@@ -122,6 +137,15 @@ pull: ## Published GitHub image. VERSION is required, for example 2.6.0-42
 run: ## Run that image on port 8080. VERSION is required, for example 2.6.0-42
 	$(if $(VERSION),,$(error VERSION is required, for example 2.6.0-42))
 	podman run -it -p 8080:8080 "ghcr.io/rbe/odisee26:$(VERSION)"
+
+stop: ## Stop the test containers and the compose stack. A missing container is success
+	./gradlew :webservice:stopOdisee
+
+rm: ## Remove those containers. A missing container is success
+	./gradlew :webservice:removeOdiseeContainers
+
+clean-images: ## Remove the Odisee images after the containers are gone
+	./gradlew :webservice:cleanOdiseeImages
 
 help: ## Print every target and when to use it
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
