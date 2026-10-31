@@ -24,6 +24,9 @@ class MakefileHelpTest extends GroovyTestCase {
             'test-java',
             'pull',
             'run',
+            'stop',
+            'rm',
+            'clean-images',
             'help',
     ]
 
@@ -87,6 +90,23 @@ class MakefileHelpTest extends GroovyTestCase {
                 ':clients:client-java:javaClientOfficeTest',
                 'start their own containers',
                 'compose stack from make stack',
+                'make stop',
+                ':webservice:stopOdisee',
+                'odisee-lo-test',
+                'odisee-minio-test',
+                'odisee-keycloak-test',
+                'make rm',
+                ':webservice:removeOdiseeContainers',
+                'podman rm -f',
+                'podman compose down',
+                'A missing container is success',
+                'make clean-images',
+                ':webservice:cleanOdiseeImages',
+                'odisee-libreoffice-test:local',
+                'alpine/minio:RELEASE.2025-10-15T17-29-55Z',
+                'quay.io/keycloak/keycloak:26.8.0',
+                'A missing image is success',
+                'Other images on the machine stay',
                 '/opt/homebrew/bin/podman',
                 '/usr/local/bin/podman',
                 '/bin/bash is 3.2',
@@ -112,6 +132,9 @@ class MakefileHelpTest extends GroovyTestCase {
         assertTrue(make(0, ['-n', 'test-minio']).out.contains('./gradlew :webservice:minioTest'))
         assertTrue(make(0, ['-n', 'test-keycloak']).out.contains('./gradlew :webservice:keycloakTest'))
         assertTrue(make(0, ['-n', 'test-java']).out.contains('./gradlew :clients:client-java:javaClientOfficeTest'))
+        assertTrue(make(0, ['-n', 'stop']).out.contains('./gradlew :webservice:stopOdisee'))
+        assertTrue(make(0, ['-n', 'rm']).out.contains('./gradlew :webservice:removeOdiseeContainers'))
+        assertTrue(make(0, ['-n', 'clean-images']).out.contains('./gradlew :webservice:cleanOdiseeImages'))
 
         String pull = make(0, ['-n', 'pull', 'VERSION=2.6.0-42']).out
         assertTrue(pull.contains('podman pull "ghcr.io/rbe/odisee26:2.6.0-42"'))

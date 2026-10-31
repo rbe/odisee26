@@ -278,7 +278,7 @@ username endpoint region bucket accessKey secret
 
 The service image ships with `compose.yaml`.
 `./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak` with `podman compose`.
-`make stack` runs that task. `make help` lists the targets. The how-to is the comment block in the root `Makefile`.
+`make stack` runs that task. `make stop`, `make rm`, and `make clean-images` stop those containers, remove them, and remove the images they use. `make help` lists the targets. The how-to is the comment block in the root `Makefile`.
 GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master`, on a `v*` tag, and on a manual run.
 One manifest lists `linux/amd64` and `linux/arm64`.
 There is no `darwin` image.
