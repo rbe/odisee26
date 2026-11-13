@@ -117,6 +117,9 @@ jobs:
     needs: [build, test]
     runs-on: ubuntu-26.04
     timeout-minutes: 60
+    permissions:
+      actions: write
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -149,6 +152,18 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: ${{ env.DISTRIBUTION_ZIP }}
+
+      - name: Keep the current distribution and one former version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          deletions=$(gh api --paginate "/repos/${GITHUB_REPOSITORY}/actions/artifacts" \
+            --jq '.artifacts[] | select(.expired | not) | [.id, .name] | @tsv' \
+            | bash .github/scripts/published-versions.sh artifacts "$ODISEE_VERSION")
+          for id in $deletions; do
+            gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" >/dev/null
+          done
 
   java-client-office:
     name: Java client office proof

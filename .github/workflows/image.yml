@@ -81,7 +81,6 @@ jobs:
             --platform linux/amd64,linux/arm64
             --manifest "${image}:${version}"
             --layers
-            --cache-to "${cache_repo}"
             --build-arg "projectVersion=${version}"
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
             --label "org.opencontainers.image.version=${version}"
@@ -100,3 +99,24 @@ jobs:
               fi
               ;;
           esac
+
+      - name: Keep the current image tag and one former version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < build/odisee-version.txt)
+          owner="${GITHUB_REPOSITORY_OWNER}"
+          package=$(printf '%s' "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')
+          kind=$(gh api "users/${owner}" --jq .type)
+          if [ "$kind" = "Organization" ]; then
+            root="orgs/${owner}"
+          else
+            root="users/${owner}"
+          fi
+          deletions=$(gh api --paginate "/${root}/packages/container/${package}/versions" \
+            --jq '.[] | [.id, ((.metadata.container.tags // []) | join(","))] | @tsv' \
+            | bash .github/scripts/published-versions.sh images "$version")
+          for id in $deletions; do
+            gh api --method DELETE "/${root}/packages/container/${package}/versions/${id}" >/dev/null
+          done
