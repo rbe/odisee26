@@ -287,6 +287,9 @@ There is no `darwin` image.
 A `v*` tag also pushes that tag name.
 A manual run of another branch pushes only `2.6.0-<build>`.
 Pull requests do not publish.
+After a publish, the distribution artifact and the `2.6.0-<build>` image tag keep that version and one former version.
+Older ones are deleted.
+`latest` stays.
 The first publish is private until the package is set public.
 
 [source,bash]

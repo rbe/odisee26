@@ -119,6 +119,10 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(packaged.contains('name: odisee-${{ env.ODISEE_VERSION }}-linux-x86_64'))
         assertTrue(packaged.contains('${{ env.DISTRIBUTION_ZIP }}'))
         assertTrue(packaged.contains("startsWith(github.ref, 'refs/tags/v')"))
+        assertTrue(packaged.contains('actions: write'))
+        assertTrue(packaged.contains('contents: write'))
+        assertTrue(packaged.contains('published-versions.sh artifacts'))
+        assertTrue(packaged.indexOf('Upload distribution') < packaged.indexOf('published-versions.sh artifacts'))
 
         String image = jobs['image']
         assertTrue(image.contains('needs: [test, values]'))
@@ -147,7 +151,8 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(imageWorkflow.contains('--layers'))
         assertTrue(imageWorkflow.contains('cache_repo="ghcr.io/${repo}/cache"'))
         assertTrue(imageWorkflow.contains('--cache-from "${cache_repo}"'))
-        assertTrue(imageWorkflow.contains('--cache-to "${cache_repo}"'))
+        assertFalse(imageWorkflow.contains('--cache-to'))
+        assertTrue(imageWorkflow.contains('published-versions.sh images'))
         assertFalse(imageWorkflow.contains('${image}:cache'))
         assertTrue(imageWorkflow.contains('podman manifest rm "${image}:${version}"'))
         int versionPush = imageWorkflow.indexOf('podman manifest push --all "${image}:${version}"' + "\n")
