@@ -30,21 +30,21 @@
         <Font name="Arial" size="48.0" />
       </font>
     </Label>
-    <Label layoutX="377.0" layoutY="222.0" text="Benutzer">
+    <Label layoutX="357.0" layoutY="222.0" text="Service URL">
       <font>
         <Font name="System Bold" size="13.0" fx:id="x1" />
       </font>
       <labelFor>
-        <TextField fx:id="loginUsername" layoutX="443.0" layoutY="219.0" prefWidth="200.0" promptText="John Doe" />
+        <TextField fx:id="serviceUrl" layoutX="443.0" layoutY="219.0" prefWidth="260.0" promptText="http://127.0.0.1:8080/odisee/document/generate" text="http://127.0.0.1:8080/odisee/document/generate" />
       </labelFor>
     </Label>
-    <Label font="$x1" layoutX="377.0" layoutY="247.0" text="Passwort">
+    <Label font="$x1" layoutX="357.0" layoutY="247.0" text="Bearer Token">
       <labelFor>
-        <PasswordField fx:id="loginPassword" layoutX="443.0" layoutY="244.0" prefWidth="200.0" promptText="Abrakadabra" />
+        <PasswordField fx:id="bearerToken" layoutX="443.0" layoutY="244.0" prefWidth="260.0" promptText="Bearer access token" />
       </labelFor>
     </Label>
-    <fx:reference source="loginUsername" />
-    <fx:reference source="loginPassword" />
+    <fx:reference source="serviceUrl" />
+    <fx:reference source="bearerToken" />
     <Button fx:id="loginButton" layoutX="443.0" layoutY="276.0" mnemonicParsing="false" onAction="#loginButtonPressed" text="Anmelden" />
   </children>
 </AnchorPane>

@@ -9,18 +9,48 @@
 
 CREATE OR REPLACE PACKAGE BODY httputil
 AS
+    PROCEDURE apply_authorization(
+        httpreq IN OUT UTL_HTTP.req
+        , bearer_token IN VARCHAR2
+    )
+    AS
+        trimmed VARCHAR2(4096) := TRIM(bearer_token);
+    BEGIN
+        IF trimmed IS NOT NULL AND LENGTH(trimmed) > 0 THEN
+            UTL_HTTP.SET_HEADER(httpreq, 'Authorization', 'Bearer ' || trimmed);
+        END IF;
+    END;
+
+    PROCEDURE write_utf8_body(
+        httpreq IN OUT UTL_HTTP.req
+        , data IN VARCHAR2
+    )
+    AS
+        raw_body RAW(32767);
+        byte_len PLS_INTEGER;
+    BEGIN
+        raw_body := UTL_I18N.STRING_TO_RAW(NVL(data, ''), 'AL32UTF8');
+        byte_len := NVL(UTL_RAW.LENGTH(raw_body), 0);
+        UTL_HTTP.SET_HEADER(httpreq, 'Content-Length', TO_CHAR(byte_len));
+        IF byte_len > 0 THEN
+            UTL_HTTP.WRITE_RAW(httpreq, raw_body);
+        END IF;
+    END;
+
     /*
      * Get data by a GET request and receive text.
      */
     PROCEDURE get(
         url IN VARCHAR2
         , result OUT CLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     )
     AS
         httpreq UTL_HTTP.req;
         httpresp UTL_HTTP.resp;
     BEGIN
         httpreq := UTL_HTTP.begin_request(url, 'GET', 'HTTP/1.1');
+        apply_authorization(httpreq, bearer_token);
         httpresp := UTL_HTTP.get_response(httpreq);
         process_response(url, httpresp, result);
     END;
@@ -30,12 +60,14 @@ AS
     PROCEDURE get(
         url IN VARCHAR2
         , result OUT BLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     )
     AS
         httpreq UTL_HTTP.req;
         httpresp UTL_HTTP.resp;
     BEGIN
         httpreq := UTL_HTTP.begin_request(url, 'GET', 'HTTP/1.1');
+        apply_authorization(httpreq, bearer_token);
         httpresp := UTL_HTTP.get_response(httpreq);
         process_response(url, httpresp, result);
     END;
@@ -47,16 +79,17 @@ AS
         , data IN VARCHAR2
         , charset IN VARCHAR2 DEFAULT 'UTF-8'
         , result OUT CLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     )
     AS
         httpreq UTL_HTTP.req;
         httpresp UTL_HTTP.resp;
     BEGIN
         httpreq := UTL_HTTP.begin_request(url, 'POST', 'HTTP/1.1');
-        UTL_HTTP.set_body_charset(httpreq, charset);
-        UTL_HTTP.set_header(httpreq, 'Content-Type', 'text/xml');
-        UTL_HTTP.set_header(httpreq, 'Content-Length', LENGTH(data));
-        UTL_HTTP.write_text(httpreq, data);
+        UTL_HTTP.set_body_charset(httpreq, 'UTF-8');
+        UTL_HTTP.set_header(httpreq, 'Content-Type', 'text/xml; charset=UTF-8');
+        apply_authorization(httpreq, bearer_token);
+        write_utf8_body(httpreq, data);
         httpresp := UTL_HTTP.get_response(httpreq);
         process_response(url, httpresp, result);
     END;
@@ -68,18 +101,20 @@ AS
         , data IN VARCHAR2
         , charset IN VARCHAR2 DEFAULT 'UTF-8'
         , result OUT BLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     )
     AS
         httpreq UTL_HTTP.req;
         httpresp UTL_HTTP.resp;
     BEGIN
-        httpreq := UTL_HTTP.BEGIN_REQUEST(url, 'POST', 'HTTP/1.1');
-        UTL_HTTP.SET_BODY_CHARSET(httpreq, charset);
-        UTL_HTTP.SET_HEADER(httpreq, 'Content-Type', 'text/xml');
-        UTL_HTTP.SET_HEADER(httpreq, 'Content-Length', LENGTH(data));
-        UTL_HTTP.write_text(httpreq, data);
-        httpresp := UTL_HTTP.GET_RESPONSE(httpreq);
-        process_response(url, httpresp, result);
+        post_document(
+            url => url
+            , data => data
+            , content_type => 'text/xml; charset=UTF-8'
+            , charset => charset
+            , result => result
+            , bearer_token => bearer_token
+        );
     END;
     /*
      * Post a request with an explicit Content-Type and receive binary data.
@@ -90,16 +125,17 @@ AS
         , content_type IN VARCHAR2
         , charset IN VARCHAR2 DEFAULT 'UTF-8'
         , result OUT BLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     )
     AS
         httpreq UTL_HTTP.req;
         httpresp UTL_HTTP.resp;
     BEGIN
         httpreq := UTL_HTTP.BEGIN_REQUEST(url, 'POST', 'HTTP/1.1');
-        UTL_HTTP.SET_BODY_CHARSET(httpreq, charset);
+        UTL_HTTP.SET_BODY_CHARSET(httpreq, 'UTF-8');
         UTL_HTTP.SET_HEADER(httpreq, 'Content-Type', content_type);
-        UTL_HTTP.SET_HEADER(httpreq, 'Content-Length', LENGTH(data));
-        UTL_HTTP.write_text(httpreq, data);
+        apply_authorization(httpreq, bearer_token);
+        write_utf8_body(httpreq, data);
         httpresp := UTL_HTTP.GET_RESPONSE(httpreq);
         process_response(url, httpresp, result);
     END;
@@ -114,16 +150,16 @@ AS
     AS
         content_type VARCHAR2(100);
         html VARCHAR2(32767);
+        status_code PLS_INTEGER := resp.status_code;
     BEGIN
-        -- Success?
-        IF resp.status_code = 200 THEN
-            -- Read answer
+        IF status_code >= 400 THEN
+            UTL_HTTP.END_RESPONSE(resp);
+            RAISE_APPLICATION_ERROR(-20001, 'HTTP ' || status_code);
+        END IF;
+        IF status_code = 200 THEN
             UTL_HTTP.GET_HEADER_BY_NAME(r => resp, name => 'Content-Type', value => content_type);
-            -- Initialize the CLOB.
             DBMS_LOB.CREATETEMPORARY(result, FALSE);
-            -- BLOB?
-            IF INSTR(content_type, 'text/') > 0 THEN
-                -- Read the CLOB
+            IF INSTR(content_type, 'text/') > 0 OR INSTR(content_type, 'application/json') > 0 THEN
                 LOOP
                     UTL_HTTP.READ_TEXT(resp, html, 32767);
                     DBMS_LOB.WRITEAPPEND(result, LENGTH(html), html);
@@ -146,22 +182,20 @@ AS
     AS
         content_type VARCHAR2(100);
         bin RAW(32767);
+        status_code PLS_INTEGER := resp.status_code;
     BEGIN
-        -- Success?
-        IF resp.status_code = 200 THEN
-            -- Read answer
+        IF status_code >= 400 THEN
+            UTL_HTTP.END_RESPONSE(resp);
+            RAISE_APPLICATION_ERROR(-20001, 'HTTP ' || status_code);
+        END IF;
+        IF status_code = 200 THEN
             UTL_HTTP.GET_HEADER_BY_NAME(r => resp, name => 'Content-Type', value => content_type);
-            -- Initialize the BLOB.
             DBMS_LOB.CREATETEMPORARY(result, FALSE);
-            -- BLOB?
             IF INSTR(content_type, 'image/') > 0 OR INSTR(content_type, 'application/') > 0 THEN
-                -- Read the BLOB
                 LOOP
                     UTL_HTTP.READ_RAW(resp, bin, 32767);
                     DBMS_LOB.WRITEAPPEND(result, UTL_RAW.length(bin), bin);
                 END LOOP;
-            -- Relase the resources associated with the temporary LOB.
-            --DBMS_LOB.freetemporary(result);
             END IF;
         END IF;
         UTL_HTTP.END_RESPONSE(resp);

@@ -63,4 +63,55 @@ public class OdiseeClientSchemaTest {
         assertTrue(Files.readString(json).contains("\"delivery\":\"store\""));
     }
 
+    @Test
+    public void multipleCreateRequestCallsAppendDistinctRequests() throws Exception {
+        final OdiseeClient client = OdiseeClient.bearer("http://127.0.0.1:8080/odisee/document/generate", "token");
+        final de.odisee.xml.server.request.Request first = client.createRequest("FirstTemplate", OutputFormat.PDF);
+        client.setUserfield(first, "FirstField", "alpha");
+        final de.odisee.xml.server.request.Request second = client.createRequest("SecondTemplate", OutputFormat.ODT);
+        client.setUserfield(second, "SecondField", "beta");
+
+        org.junit.Assert.assertNotSame(first, second);
+        org.junit.Assert.assertEquals("FirstTemplate", first.getTemplate().getName());
+        org.junit.Assert.assertEquals("SecondTemplate", second.getTemplate().getName());
+
+        final Path out = Files.createTempFile("odisee-multi", ".xml");
+        client.saveRequestTo(out);
+        final String xml = Files.readString(out);
+        assertTrue(xml.contains("name=\"FirstTemplate\""));
+        assertTrue(xml.contains("name=\"SecondTemplate\""));
+        assertTrue(xml.contains(">alpha<"));
+        assertTrue(xml.contains(">beta<"));
+
+        SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+                .newSchema(Path.of("src/main/schema/request.xsd").toFile())
+                .newValidator()
+                .validate(new StreamSource(out.toFile()));
+    }
+
+    @Test
+    public void executeBasicMacroWithoutParametersMarshalsValidSchema() throws Exception {
+        final OdiseeClient client = OdiseeClient.bearer("http://127.0.0.1:8080/odisee/document/generate", "token");
+        client.createRequest("HalloOdisee", OutputFormat.PDF);
+        client.executeBasicMacroInDocument("Standard.Module1.Main");
+        client.executeMacro("Standard.Module1.Second", OdiseeClient.LOCATION_DOCUMENT, OdiseeClient.LANGUAGE_BASIC, null);
+
+        final Path out = Files.createTempFile("odisee-macro", ".xml");
+        client.saveRequestTo(out);
+        final String xml = Files.readString(out);
+        assertTrue(xml.contains("Standard.Module1.Main"));
+        assertTrue(xml.contains("Standard.Module1.Second"));
+
+        SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+                .newSchema(Path.of("src/main/schema/request.xsd").toFile())
+                .newValidator()
+                .validate(new StreamSource(out.toFile()));
+    }
+
+    @Test
+    public void javaClientBuildDropsUnusedSpringSecurityCrypto() throws Exception {
+        final String gradle = Files.readString(Path.of("build.gradle.kts"));
+        org.junit.Assert.assertFalse(gradle.contains("spring-security-crypto"));
+    }
+
 }

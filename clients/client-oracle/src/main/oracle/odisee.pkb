@@ -27,6 +27,18 @@ AS
         RETURN escaped;
     END;
 
+    FUNCTION xml_escape(value IN VARCHAR2) RETURN VARCHAR2
+    IS
+        escaped VARCHAR2(32767) := NVL(value, '');
+    BEGIN
+        escaped := REPLACE(escaped, '&', '&amp;');
+        escaped := REPLACE(escaped, '<', '&lt;');
+        escaped := REPLACE(escaped, '>', '&gt;');
+        escaped := REPLACE(escaped, '"', '&quot;');
+        escaped := REPLACE(escaped, '''', '&apos;');
+        RETURN escaped;
+    END;
+
     FUNCTION json_bool(flag IN BOOLEAN) RETURN VARCHAR2
     IS
     BEGIN
@@ -78,6 +90,39 @@ AS
         RETURN fragment || '}';
     END;
 
+    FUNCTION userfield_xml(
+        field_name IN VARCHAR2
+        , field_value IN VARCHAR2
+        , post_set_macro IN VARCHAR2
+    ) RETURN VARCHAR2
+    IS
+        fragment VARCHAR2(32767);
+    BEGIN
+        fragment := '<userfield name="' || xml_escape(field_name) || '"';
+        IF post_set_macro IS NOT NULL AND LENGTH(post_set_macro) > 0 THEN
+            fragment := fragment || ' post-macro="' || xml_escape(post_set_macro) || '"';
+        END IF;
+        RETURN fragment || '>' || xml_escape(field_value) || '</userfield>';
+    END;
+
+    FUNCTION endpoint_url RETURN VARCHAR2
+    IS
+        base VARCHAR2(1000) := RTRIM(NVL(odisee_service_url, ''), '/');
+    BEGIN
+        IF base LIKE '%/odisee/document/generate' THEN
+            RETURN base;
+        ELSIF base LIKE '%/odisee' THEN
+            RETURN base || '/document/generate';
+        END IF;
+        RETURN base || '/odisee/document/generate';
+    END;
+
+    PROCEDURE set_bearer_token(token IN VARCHAR2)
+    IS
+    BEGIN
+        bearer_token := token;
+    END;
+
     PROCEDURE use_json
     IS
     BEGIN
@@ -90,7 +135,7 @@ AS
         request_format := 'xml';
     END;
     /*
-     * Create header for XML request.
+     * Create header for v2 XML or JSON request.
      */
     PROCEDURE header(
         ooo_host IN VARCHAR2 DEFAULT '127.0.0.1'
@@ -104,6 +149,7 @@ AS
         , archivefiles IN BOOLEAN DEFAULT FALSE
     )
     AS
+        template_tag VARCHAR2(32767);
     BEGIN
         IF request_format = 'json' THEN
             json_first_instruction := TRUE;
@@ -119,18 +165,24 @@ AS
                 || '},"instructions":[';
             RETURN;
         END IF;
+        template_tag := '<template name="' || xml_escape(template)
+            || '" outputFormat="' || xml_escape(output_format)
+            || '" revision="LATEST"';
+        IF pre_save_macro IS NOT NULL AND LENGTH(pre_save_macro) > 0 THEN
+            template_tag := template_tag || ' pre-save-macro="' || xml_escape(pre_save_macro) || '"';
+        END IF;
+        template_tag := template_tag || '/>';
         xml.DELETE;
-        xml.EXTEND(7);
-        xml(1) := '<!DOCTYPE odisee [ <!ELEMENT characters (character*) > <!ELEMENT character (#PCDATA ) > <!ENTITY nbsp "&#160;"> <!ENTITY iexcl "&#161;"> <!ENTITY cent "&#162;"> <!ENTITY pound "&#163;"> <!ENTITY curren "&#164;"> <!ENTITY yen "&#165;"> <!ENTITY brvbar "&#166;"> <!ENTITY sect "&#167;"> <!ENTITY uml "&#168;"> <!ENTITY copy "&#169;"> <!ENTITY ordf "&#170;"> <!ENTITY laquo "&#171;"> <!ENTITY not "&#172;"> <!ENTITY shy "&#173;"> <!ENTITY reg "&#174;"> <!ENTITY macr "&#175;"> <!ENTITY deg "&#176;"> <!ENTITY plusmn "&#177;"> <!ENTITY sup2 "&#178;"> <!ENTITY sup3 "&#179;"> <!ENTITY acute "&#180;"> <!ENTITY micro "&#181;"> <!ENTITY para "&#182;"> <!ENTITY middot "&#183;"> <!ENTITY cedil "&#184;"> <!ENTITY sup1 "&#185;"> <!ENTITY ordm "&#186;"> <!ENTITY raquo "&#187;"> <!ENTITY frac14 "&#188;"> <!ENTITY frac12 "&#189;"> <!ENTITY frac34 "&#190;"> <!ENTITY iquest "&#191;"> <!ENTITY Agrave "&#192;"> <!ENTITY Aacute "&#193;"> <!ENTITY Acirc "&#194;"> <!ENTITY Atilde "&#195;"> <!ENTITY Auml "&#196;"> <!ENTITY Aring "&#197;"> <!ENTITY AElig "&#198;"> <!ENTITY Ccedil "&#199;"> <!ENTITY Egrave "&#200;"> <!ENTITY Eacute "&#201;"> <!ENTITY Ecirc "&#202;"> <!ENTITY Euml "&#203;"> <!ENTITY Igrave "&#204;"> <!ENTITY Iacute "&#205;"> <!ENTITY Icirc "&#206;"> <!ENTITY Iuml "&#207;"> <!ENTITY ETH "&#208;"> <!ENTITY Ntilde "&#209;"> <!ENTITY Ograve "&#210;"> <!ENTITY Oacute "&#211;"> <!ENTITY Ocirc "&#212;"> <!ENTITY Otilde "&#213;"> <!ENTITY Ouml "&#214;"> <!ENTITY times "&#215;"> <!ENTITY Oslash "&#216;"> <!ENTITY Ugrave "&#217;"> <!ENTITY Uacute "&#218;"> <!ENTITY Ucirc "&#219;"> <!ENTITY Uuml "&#220;"> <!ENTITY Yacute "&#221;"> <!ENTITY THORN "&#222;"> <!ENTITY szlig "&#223;"> <!ENTITY agrave "&#224;"> <!ENTITY aacute "&#225;"> <!ENTITY acirc "&#226;"> <!ENTITY atilde "&#227;"> <!ENTITY auml "&#228;"> <!ENTITY aring "&#229;"> <!ENTITY aelig "&#230;"> <!ENTITY ccedil "&#231;"> <!ENTITY egrave "&#232;"> <!ENTITY eacute "&#233;"> <!ENTITY ecirc "&#234;"> <!ENTITY euml "&#235;"> <!ENTITY igrave "&#236;"> <!ENTITY iacute "&#237;"> <!ENTITY icirc "&#238;"> <!ENTITY iuml "&#239;"> <!ENTITY eth "&#240;"> <!ENTITY ntilde "&#241;"> <!ENTITY ograve "&#242;"> <!ENTITY oacute "&#243;"> <!ENTITY ocirc "&#244;"> <!ENTITY otilde "&#245;"> <!ENTITY ouml "&#246;"> <!ENTITY divide "&#247;"> <!ENTITY oslash "&#248;"> <!ENTITY ugrave "&#249;"> <!ENTITY uacute "&#250;"> <!ENTITY ucirc "&#251;"> <!ENTITY uuml "&#252;"> <!ENTITY yacute "&#253;"> <!ENTITY thorn "&#254;"> <!ENTITY yuml "&#255;"> <!ENTITY fnof "&#402;"> <!ENTITY Alpha "&#913;"> <!ENTITY Beta "&#914;"> <!ENTITY Gamma "&#915;"> <!ENTITY Delta "&#916;"> <!ENTITY Epsilon "&#917;"> <!ENTITY Zeta "&#918;"> <!ENTITY Eta "&#919;"> <!ENTITY Theta "&#920;"> <!ENTITY Iota "&#921;"> <!ENTITY Kappa "&#922;"> <!ENTITY Lambda "&#923;"> <!ENTITY Mu "&#924;"> <!ENTITY Nu "&#925;"> <!ENTITY Xi "&#926;"> <!ENTITY Omicron "&#927;"> <!ENTITY Pi "&#928;"> <!ENTITY Rho "&#929;"> <!ENTITY Sigma "&#931;"> <!ENTITY Tau "&#932;"> <!ENTITY Upsilon "&#933;"> <!ENTITY Phi "&#934;"> <!ENTITY Chi "&#935;"> <!ENTITY Psi "&#936;"> <!ENTITY Omega "&#937;"> <!ENTITY alpha "&#945;"> <!ENTITY beta "&#946;"> <!ENTITY gamma "&#947;"> <!ENTITY delta "&#948;"> <!ENTITY epsilon "&#949;"> <!ENTITY zeta "&#950;"> <!ENTITY eta "&#951;"> <!ENTITY theta "&#952;"> <!ENTITY iota "&#953;"> <!ENTITY kappa "&#954;"> <!ENTITY lambda "&#955;"> <!ENTITY mu "&#956;"> <!ENTITY nu "&#957;"> <!ENTITY xi "&#958;"> <!ENTITY omicron "&#959;"> <!ENTITY pi "&#960;"> <!ENTITY rho "&#961;"> <!ENTITY sigmaf "&#962;"> <!ENTITY sigma "&#963;"> <!ENTITY tau "&#964;"> <!ENTITY upsilon "&#965;"> <!ENTITY phi "&#966;"> <!ENTITY chi "&#967;"> <!ENTITY psi "&#968;"> <!ENTITY omega "&#969;"> <!ENTITY thetasym "&#977;"> <!ENTITY upsih "&#978;"> <!ENTITY piv "&#982;"> <!ENTITY bull "&#8226;"> <!ENTITY hellip "&#8230;"> <!ENTITY prime "&#8242;"> <!ENTITY Prime "&#8243;"> <!ENTITY oline "&#8254;"> <!ENTITY frasl "&#8260;"> <!ENTITY weierp "&#8472;"> <!ENTITY image "&#8465;"> <!ENTITY real "&#8476;"> <!ENTITY trade "&#8482;"> <!ENTITY alefsym "&#8501;"> <!ENTITY larr "&#8592;"> <!ENTITY uarr "&#8593;"> <!ENTITY rarr "&#8594;"> <!ENTITY darr "&#8595;"> <!ENTITY harr "&#8596;"> <!ENTITY crarr "&#8629;"> <!ENTITY lArr "&#8656;"> <!ENTITY uArr "&#8657;"> <!ENTITY rArr "&#8658;"> <!ENTITY dArr "&#8659;"> <!ENTITY hArr "&#8660;"> <!ENTITY forall "&#8704;"> <!ENTITY part "&#8706;"> <!ENTITY exist "&#8707;"> <!ENTITY empty "&#8709;"> <!ENTITY nabla "&#8711;"> <!ENTITY isin "&#8712;"> <!ENTITY notin "&#8713;"> <!ENTITY ni "&#8715;"> <!ENTITY prod "&#8719;"> <!ENTITY sum "&#8721;"> <!ENTITY minus "&#8722;"> <!ENTITY lowast "&#8727;"> <!ENTITY radic "&#8730;"> <!ENTITY prop "&#8733;"> <!ENTITY infin "&#8734;"> <!ENTITY ang "&#8736;"> <!ENTITY and "&#8743;"> <!ENTITY or "&#8744;"> <!ENTITY cap "&#8745;"> <!ENTITY cup "&#8746;"> <!ENTITY int "&#8747;"> <!ENTITY there4 "&#8756;"> <!ENTITY sim "&#8764;"> <!ENTITY cong "&#8773;"> <!ENTITY asymp "&#8776;"> <!ENTITY ne "&#8800;"> <!ENTITY equiv "&#8801;"> <!ENTITY le "&#8804;"> <!ENTITY ge "&#8805;"> <!ENTITY sub "&#8834;"> <!ENTITY sup "&#8835;"> <!ENTITY nsub "&#8836;"> <!ENTITY sube "&#8838;"> <!ENTITY supe "&#8839;"> <!ENTITY oplus "&#8853;"> <!ENTITY otimes "&#8855;"> <!ENTITY perp "&#8869;"> <!ENTITY sdot "&#8901;"> <!ENTITY lceil "&#8968;"> <!ENTITY rceil "&#8969;"> <!ENTITY lfloor "&#8970;"> <!ENTITY rfloor "&#8971;"> <!ENTITY lang "&#9001;"> <!ENTITY rang "&#9002;"> <!ENTITY loz "&#9674;"> <!ENTITY spades "&#9824;"> <!ENTITY clubs "&#9827;"> <!ENTITY hearts "&#9829;"> <!ENTITY diams "&#9830;"> <!ENTITY quot "&#34;" > <!ENTITY amp "&#38;" > <!ENTITY lt "&#60;" > <!ENTITY gt "&#62;" > <!ENTITY OElig "&#338;" > <!ENTITY oelig "&#339;" > <!ENTITY Scaron "&#352;" > <!ENTITY scaron "&#353;" > <!ENTITY Yuml "&#376;" > <!ENTITY circ "&#710;" > <!ENTITY tilde "&#732;" > <!ENTITY ensp "&#8194;"> <!ENTITY emsp "&#8195;"> <!ENTITY thinsp "&#8201;"> <!ENTITY zwnj "&#8204;"> <!ENTITY zwj "&#8205;"> <!ENTITY lrm "&#8206;"> <!ENTITY rlm "&#8207;"> <!ENTITY ndash "&#8211;"> <!ENTITY mdash "&#8212;"> <!ENTITY lsquo "&#8216;"> <!ENTITY rsquo "&#8217;"> <!ENTITY sbquo "&#8218;"> <!ENTITY ldquo "&#8220;"> <!ENTITY rdquo "&#8221;"> <!ENTITY bdquo "&#8222;"> <!ENTITY dagger "&#8224;"> <!ENTITY Dagger "&#8225;"> <!ENTITY permil "&#8240;"> <!ENTITY lsaquo "&#8249;"> <!ENTITY rsaquo "&#8250;"><!ENTITY euro "&#8364;" >]>';
-        xml(2) := '<odisee>';
-        xml(3) := '<request name="' || template || '" id="' || id || '">';
-        xml(4) := '<ooo host="' || ooo_host || '" port="' || ooo_port || '" output="' || output || '" outputFormat="' || output_format || '" pre-save-macro="' || pre_save_macro || '"/>';
-        xml(5) := '<archive database="' || archivedb || '" files="' || archivefiles || '" />';
-        xml(6) := '<template name="' || template || '" revision="LATEST" />';
-        xml(7) := '<userfields>';
+        xml.EXTEND(6);
+        xml(1) := '<?xml version="1.0" encoding="UTF-8"?>';
+        xml(2) := '<odisee xmlns="http://xmlns.odisee.de/v2/request">';
+        xml(3) := '<request name="' || xml_escape(template) || '" id="' || xml_escape(TO_CHAR(id)) || '">';
+        xml(4) := template_tag;
+        xml(5) := '<archive database="' || json_bool(archivedb) || '" files="' || json_bool(archivefiles) || '"/>';
+        xml(6) := '<instructions>';
     END;
     /*
-     * Create footer for XML request.
+     * Create footer for v2 XML or JSON request.
      */
     PROCEDURE footer
     AS
@@ -141,7 +193,7 @@ AS
             RETURN;
         END IF;
         xml.EXTEND(3);
-        xml(xml.LAST - 2) := '</userfields>';
+        xml(xml.LAST - 2) := '</instructions>';
         xml(xml.LAST - 1) := '</request>';
         xml(xml.LAST) := '</odisee>';
     END;
@@ -160,7 +212,7 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="' || name || '" post-set-macro="' || post_set_macro || '">' || value || '</userfield>';
+        xml(xml.LAST) := userfield_xml(name, value, post_set_macro);
     END;
     /*
      * Add a number field.
@@ -177,7 +229,7 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="' || name || '" post-set-macro="' || post_set_macro || '">' || value || '</userfield>';
+        xml(xml.LAST) := userfield_xml(name, TO_CHAR(value), post_set_macro);
     END;
     /*
      * Add a DATE field.
@@ -195,7 +247,7 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="' || name || '" post-set-macro="' || post_set_macro || '">' || TO_CHAR(value, format) || '</userfield>';
+        xml(xml.LAST) := userfield_xml(name, TO_CHAR(value, format), post_set_macro);
     END;
     /*
      * Set/add a VARCHAR2 in a table cell.
@@ -216,7 +268,7 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="' || table_coord || '" post-set-macro="' || post_set_macro || '">' || value || '</userfield>';
+        xml(xml.LAST) := userfield_xml(table_coord, value, post_set_macro);
     END;
     /*
      * Set/add a NUMBER in a table cell.
@@ -237,7 +289,7 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="' || table_coord || '" post-set-macro="' || post_set_macro || '">' || value || '</userfield>';
+        xml(xml.LAST) := userfield_xml(table_coord, TO_CHAR(value), post_set_macro);
     END;
     /*
      * Set/add a DATE in a table cell.
@@ -259,7 +311,7 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="' || table_coord || '" post-set-macro="' || post_set_macro || '">' || TO_CHAR(value, format) || '</userfield>';
+        xml(xml.LAST) := userfield_xml(table_coord, TO_CHAR(value, format), post_set_macro);
     END;
     /*
      * Set width of a table cell.
@@ -276,24 +328,24 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="setwidth_' || tablename || '" post-set-macro="' || post_set_macro || '">' || widths || '</userfield>';
+        xml(xml.LAST) := userfield_xml('setwidth_' || tablename, widths, post_set_macro);
     END;
     /*
      * Align a table cell.
      */
     PROCEDURE aligntablecell(
         tablename IN VARCHAR2
-        , alings IN VARCHAR2
+        , aligns IN VARCHAR2
         , post_set_macro IN VARCHAR2 DEFAULT ''
     )
     AS
     BEGIN
         IF request_format = 'json' THEN
-            append_instruction(userfield_json('align_' || tablename, alings, post_set_macro));
+            append_instruction(userfield_json('align_' || tablename, aligns, post_set_macro));
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<userfield name="align_' || tablename || '" post-set-macro="' || post_set_macro || '">' || aligns || '</userfield>';
+        xml(xml.LAST) := userfield_xml('align_' || tablename, aligns, post_set_macro);
     END;
     /*
      * Insert a graphic at a bookmark.
@@ -310,10 +362,12 @@ AS
             RETURN;
         END IF;
         xml.EXTEND;
-        xml(xml.LAST) := '<insert type="graphic" bookmark="' || bookmark || '" url="' || url || '" />';
+        xml(xml.LAST) := '<image type="' || xml_escape(image_type(url))
+            || '" bookmark="' || xml_escape(bookmark)
+            || '" url="' || xml_escape(url) || '"/>';
     END;
     /*
-     * Generate the XML request, post it to the OOo Service and return generated document as BLOB.
+     * Generate the request, post it to the Odisee service with Bearer auth, and return generated document as BLOB.
      */
     PROCEDURE generate(
         document OUT BLOB
@@ -322,19 +376,28 @@ AS
     )
     AS
     BEGIN
+        oooxml := '';
         FOR i IN xml.FIRST .. xml.LAST LOOP
             oooxml := oooxml || xml(i);
         END LOOP;
         IF request_format = 'json' THEN
             httputil.post_document(
-                url => odisee_service_url || '/oooDocument/generate'
+                url => endpoint_url
                 , data => oooxml
                 , content_type => 'application/json; charset=UTF-8'
                 , charset => charset
                 , result => document
+                , bearer_token => bearer_token
             );
         ELSE
-            httputil.post(url => odisee_service_url || '/oooDocument/generate', data => oooxml, charset => charset, result => document);
+            httputil.post_document(
+                url => endpoint_url
+                , data => oooxml
+                , content_type => 'text/xml; charset=UTF-8'
+                , charset => charset
+                , result => document
+                , bearer_token => bearer_token
+            );
         END IF;
     END;
 END;

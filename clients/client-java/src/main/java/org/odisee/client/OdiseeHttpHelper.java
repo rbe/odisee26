@@ -20,9 +20,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.net.CookieHandler;
-import java.net.CookieManager;
-import java.net.CookiePolicy;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -156,9 +153,8 @@ final class OdiseeHttpHelper {
             connection.setDoInput(true);
             connection.setDoOutput(true);
             connection.setUseCaches(false);
+            connection.setInstanceFollowRedirects(false);
             connection.setRequestProperty("User-Agent", "Odisee/Java Client");
-            CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL));
-            System.setProperty("http.maxRedirects", "3");
             return connection;
         } catch (IOException e) {
             LOGGER.warn("", e);

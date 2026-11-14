@@ -55,6 +55,11 @@ Namespace Helper
                 Key(sb, states, "response")
                 WriteResponse(sb, states, response)
             End If
+            Dim delivery As String = document.DocumentElement.GetAttribute("delivery")
+            If delivery IsNot Nothing AndAlso delivery.Length > 0 Then
+                Key(sb, states, "delivery")
+                StringValue(sb, delivery)
+            End If
             EndObject(sb, states)
             Return sb.ToString()
         End Function
@@ -65,6 +70,7 @@ Namespace Helper
             Dim instructions As New List(Of XmlElement)()
             Dim sawInstructions As Boolean = False
             Dim requestPostProcess As XmlElement = Nothing
+            Dim requestOutput As XmlElement = Nothing
             Dim child As XmlElement
             For Each child In Children(element)
                 Select Case LocalName(child)
@@ -81,6 +87,8 @@ Namespace Helper
                         Next
                     Case "post-process"
                         requestPostProcess = child
+                    Case "output"
+                        requestOutput = child
                 End Select
             Next
             If sawInstructions Then
@@ -96,6 +104,62 @@ Namespace Helper
                 Key(sb, states, "postProcess")
                 WritePostProcess(sb, states, requestPostProcess)
             End If
+            If requestOutput IsNot Nothing Then
+                Dim formatElement As XmlElement = FirstChildNamed(requestOutput, "format")
+                If formatElement IsNot Nothing Then
+                    Key(sb, states, "output")
+                    WriteOutput(sb, states, formatElement)
+                End If
+            End If
+            EndObject(sb, states)
+        End Sub
+
+        Private Shared Function FirstChildNamed(ByVal parent As XmlElement, ByVal wanted As String) As XmlElement
+            Dim child As XmlElement
+            For Each child In Children(parent)
+                If LocalName(child) = wanted Then
+                    Return child
+                End If
+            Next
+            Return Nothing
+        End Function
+
+        Private Shared Sub WriteOutput(ByVal sb As StringBuilder, ByVal states As Stack(Of Boolean), ByVal formatElement As XmlElement)
+            StartObjectValue(sb, states)
+            Key(sb, states, "format")
+            StartObjectValue(sb, states)
+            Dim formatType As String = formatElement.GetAttribute("type")
+            If formatType IsNot Nothing AndAlso formatType.Length > 0 Then
+                Key(sb, states, "type")
+                StringValue(sb, formatType)
+            End If
+            Dim options As New List(Of XmlElement)()
+            Dim child As XmlElement
+            For Each child In Children(formatElement)
+                If LocalName(child) = "options" Then
+                    Dim opt As XmlElement
+                    For Each opt In Children(child)
+                        If LocalName(opt) = "option" Then
+                            options.Add(opt)
+                        End If
+                    Next
+                End If
+            Next
+            If options.Count > 0 Then
+                Key(sb, states, "options")
+                StartArrayValue(sb, states)
+                Dim opt As XmlElement
+                For Each opt In options
+                    StartObjectElement(sb, states)
+                    Key(sb, states, "name")
+                    StringValue(sb, opt.GetAttribute("name"))
+                    Key(sb, states, "value")
+                    StringValue(sb, opt.GetAttribute("value"))
+                    EndObject(sb, states)
+                Next
+                EndArray(sb, states)
+            End If
+            EndObject(sb, states)
             EndObject(sb, states)
         End Sub
 

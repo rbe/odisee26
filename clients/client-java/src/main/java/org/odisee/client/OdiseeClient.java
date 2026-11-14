@@ -30,10 +30,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.zip.GZIPOutputStream;
@@ -48,7 +51,7 @@ public final class OdiseeClient {
 
     private final ObjectFactory factory;
 
-    private final Request actualRequest;
+    private Request actualRequest;
 
     private String serviceURL;
 
@@ -61,7 +64,6 @@ public final class OdiseeClient {
     private OdiseeClient() {
         factory = new ObjectFactory();
         odisee = factory.createOdisee();
-        actualRequest = factory.createRequest();
     }
 
     public OdiseeClient(final String serviceURL) {
@@ -111,6 +113,14 @@ public final class OdiseeClient {
         return format;
     }
 
+    private Request ensureActualRequest() {
+        if (actualRequest == null) {
+            actualRequest = factory.createRequest();
+            odisee.getRequest().add(actualRequest);
+        }
+        return actualRequest;
+    }
+
     private Instructions getInstructions(final Request request) {
         final List<Instructions> allInstructions = request.getInstructions();
         Instructions instructions;
@@ -147,12 +157,14 @@ public final class OdiseeClient {
         macro.setName(macroName);
         macro.setLocation(location);
         macro.setLanguage(language);
-        for (String p : parameters) {
-            final Parameter parameter = factory.createParameter();
-            parameter.setValue(p);
-            macro.getParameter().add(parameter);
+        if (parameters != null) {
+            for (String p : parameters) {
+                final Parameter parameter = factory.createParameter();
+                parameter.setValue(p);
+                macro.getParameter().add(parameter);
+            }
         }
-        getInstructionsObject(actualRequest).add(macro);
+        getInstructionsObject(ensureActualRequest()).add(macro);
         return this;
     }
 
@@ -161,33 +173,45 @@ public final class OdiseeClient {
     }
 
     public OdiseeClient executeBasicMacroInDocument(final String macroName) {
-        return executeMacro(macroName, LOCATION_DOCUMENT, LANGUAGE_BASIC, null);
+        return executeMacro(macroName, LOCATION_DOCUMENT, LANGUAGE_BASIC, Collections.emptyList());
     }
 
-    public OdiseeClient setTableCellValue(final String tableName, final String coordinate, final String value) {
+    public OdiseeClient setTableCellValue(final Request request, final String tableName, final String coordinate,
+                                          final String value) {
+        Objects.requireNonNull(request);
         final Userfield userfieldTableCell = factory.createUserfield();
         userfieldTableCell.setName(String.format("%s!%s", tableName, coordinate));
         userfieldTableCell.setContent(value);
-        getInstructionsObject(actualRequest).add(userfieldTableCell);
+        getInstructionsObject(request).add(userfieldTableCell);
+        return this;
+    }
+
+    public OdiseeClient setTableCellValue(final String tableName, final String coordinate, final String value) {
+        return setTableCellValue(ensureActualRequest(), tableName, coordinate, value);
+    }
+
+    public OdiseeClient setUserfield(final Request request, final String userfieldName, final String value) {
+        Objects.requireNonNull(request);
+        final Userfield userfield = factory.createUserfield();
+        userfield.setName(userfieldName);
+        userfield.setContent(value);
+        getInstructionsObject(request).add(userfield);
         return this;
     }
 
     public OdiseeClient setUserfield(final String userfieldName, final String value) {
-        final Userfield userfield = factory.createUserfield();
-        userfield.setName(userfieldName);
-        userfield.setContent(value);
-        getInstructionsObject(actualRequest).add(userfield);
-        return this;
+        return setUserfield(ensureActualRequest(), userfieldName, value);
     }
 
     public OdiseeClient setLatestTemplate(final String template, final OutputFormat outputFormat) {
-        final Template requestTemplate = actualRequest.getTemplate();
+        final Request target = ensureActualRequest();
+        final Template requestTemplate = target.getTemplate();
         if (null == requestTemplate) {
-            actualRequest.setTemplate(factory.createTemplate());
+            target.setTemplate(factory.createTemplate());
         }
-        actualRequest.getTemplate().setName(template);
-        actualRequest.getTemplate().setRevision("LATEST");
-        actualRequest.getTemplate().setOutputFormat(outputFormat.name());
+        target.getTemplate().setName(template);
+        target.getTemplate().setRevision("LATEST");
+        target.getTemplate().setOutputFormat(outputFormat.name());
         return this;
     }
 
@@ -199,21 +223,42 @@ public final class OdiseeClient {
         return this;
     }
 
+    public Request createRequest(final String template) {
+        return createRequest(template, OutputFormat.PDF);
+    }
+
     public Request createRequest(final String template, final OutputFormat outputFormat) {
+        actualRequest = factory.createRequest();
         odisee.getRequest().add(actualRequest);
         setLatestTemplate(template, outputFormat);
         return actualRequest;
     }
 
+    public byte[] process() {
+        return process(false);
+    }
+
     public byte[] process(final boolean sendCompressed) {
         try {
+            final URL url = toServiceUrl(serviceURL);
             final String body = getRequestBody();
             final String contentType = contentType();
             return sendCompressed
-                    ? httpHelper.postCompressed(new URL(serviceURL), body, contentType)
-                    : httpHelper.post(new URL(serviceURL), body, contentType);
+                    ? httpHelper.postCompressed(url, body, contentType)
+                    : httpHelper.post(url, body, contentType);
         } catch (IOException e) {
             throw new OdiseeClientException(e);
+        }
+    }
+
+    private static URL toServiceUrl(final String rawUrl) throws IOException {
+        if (rawUrl == null) {
+            throw new MalformedURLException(OdiseeConstant.ERR_NO_SERVICE_URL);
+        }
+        try {
+            return URI.create(rawUrl).toURL();
+        } catch (IllegalArgumentException e) {
+            throw new MalformedURLException(e.getMessage());
         }
     }
 

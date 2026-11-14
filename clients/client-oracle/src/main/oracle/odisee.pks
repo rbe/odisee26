@@ -10,11 +10,17 @@ CREATE OR REPLACE PACKAGE odisee
 AS
     -- Where is the Odisee service?
     odisee_service_url VARCHAR(1000);
+    -- Bearer access token sent as Authorization: Bearer <token>.
+    bearer_token VARCHAR2(4096);
     /*
      * Wire format for generate(): 'xml' (default) or 'json'.
      * Call use_json before header when posting JSON.
      */
     request_format VARCHAR2(10) := 'xml';
+    /*
+     * Set the Bearer access token used by generate().
+     */
+    PROCEDURE set_bearer_token(token IN VARCHAR2);
     /*
      * Post the next request as JSON. The service converts it to XML.
      */
@@ -102,9 +108,7 @@ AS
      */
     PROCEDURE settablecellwidth(
         tablename IN VARCHAR2
-        , rownm IN NUMBER
-        , colnum IN NUMBER
-        , width IN NUMBER
+        , widths IN VARCHAR2
         , post_set_macro IN VARCHAR2 DEFAULT ''
     );
     /*
@@ -112,7 +116,7 @@ AS
      */
     PROCEDURE aligntablecell(
         tablename IN VARCHAR2
-        , alings IN VARCHAR2
+        , aligns IN VARCHAR2
         , post_set_macro IN VARCHAR2 DEFAULT ''
     );
     /*

@@ -1,4 +1,5 @@
-POST http://localhost:8080/document/generate
+POST http://localhost:8080/odisee/document/generate
+Authorization: Bearer {{token}}
 Content-Type: application/json; charset=UTF-8
 Accept: */*
 

@@ -19,7 +19,6 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.17")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.apache.pdfbox:pdfbox:3.0.8")
-    testImplementation("org.springframework.security:spring-security-crypto:6.4.5")
     testRuntimeOnly("org.slf4j:slf4j-simple:2.0.17")
 }
 

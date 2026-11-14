@@ -24,8 +24,9 @@ use \Odisee\Odisee;
 if (class_exists('Odisee\Odisee', true)) {
     // Actual date and time
     $d = date('d. M Y H:i:s');
-    // Create Odisee client with service URL and authentication
-    $odisee = Odisee::createClient('http://service.odisee.de', 'odisee', 'odisee');
+    // Create Odisee client with service URL and Bearer token
+    $token = getenv('ODISEE_BEARER_TOKEN') ?: '';
+    $odisee = Odisee::bearer('http://127.0.0.1:8080/odisee/document/generate', $token);
     // Create a new request for template HalloOdisee
     $request = $odisee->createRequest('HalloOdisee');
     // Set value for userfield 'hallo'
@@ -34,9 +35,9 @@ if (class_exists('Odisee\Odisee', true)) {
     $odisee->setTableCellValue($request, 'Tabelle1', 'A4', 'support@odisee.de');
     // Generate document, PDF by default
     $document = $odisee->process();
-     // Set content type and stream generated document
+    // Set content type and stream generated document
     header("Content-Type: application/pdf", TRUE);
-    echo file_get_contents($document);
+    echo $document;
 }
 
 ?>

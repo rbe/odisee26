@@ -80,6 +80,38 @@ public class OdiseeHttpAuthorizationTest {
         }
     }
 
+    @Test
+    public void bearerTokenIsSentAndDoesNotMutateGlobalHttpSettings() throws Exception {
+        final AtomicReference<String> authorization = new AtomicReference<>();
+        final HttpServer server = server(authorization, 200);
+        server.start();
+        final java.net.CookieHandler previousCookieHandler = java.net.CookieHandler.getDefault();
+        final String previousMaxRedirects = System.getProperty("http.maxRedirects");
+        java.net.CookieHandler.setDefault(null);
+        System.clearProperty("http.maxRedirects");
+        try {
+            final String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/odisee/document/generate";
+            final OdiseeClient client = OdiseeClient.bearer(url, "token-xyz");
+            client.createRequest("Letter", OutputFormat.PDF);
+            client.setUserfield("Hallo", "bearer-hallo");
+
+            final byte[] body = client.process();
+
+            assertEquals("Bearer token-xyz", authorization.get());
+            assertArrayEquals("pdf-bytes".getBytes(StandardCharsets.UTF_8), body);
+            assertNull(java.net.CookieHandler.getDefault());
+            assertNull(System.getProperty("http.maxRedirects"));
+        } finally {
+            java.net.CookieHandler.setDefault(previousCookieHandler);
+            if (previousMaxRedirects == null) {
+                System.clearProperty("http.maxRedirects");
+            } else {
+                System.setProperty("http.maxRedirects", previousMaxRedirects);
+            }
+            server.stop(0);
+        }
+    }
+
     private static HttpServer server(final AtomicReference<String> authorization, final int successStatus)
             throws IOException {
         final HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);

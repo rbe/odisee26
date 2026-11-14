@@ -43,97 +43,117 @@ class OdiseeHttpHelper
     private static $ODISEE_URI = '/odisee/document/generate';
 
     /**
-     * Do a HTTP POST to Odisee service using f-functions like fsockopen().
-     * @param string $host Odisee service host (server name or IP).
-     * @param string $username Odisee username.
-     * @param string $password Password.
-     * @param string $path Relative URI.
-     * @param string $referer Who are we? Who is calling?
-     * @param string $data_to_send Data.
-     * @return mixed HTTP response.
-     * @throws OdiseeException When fsockopen() or fputs() cannot be called.
+     * Resolve endpoint URL without duplicating the generate path.
+     * @param string $serviceUrl
+     * @param string $path
+     * @return string
      */
-    private static function f_post($host, $username, $password, $path, $referer, $data_to_send, $contentType = 'text/xml')
+    private static function resolveUrl($serviceUrl, $path)
     {
-        if (is_callable('fsockopen') && is_callable('fputs')) {
-            $fp = fsockopen($host, 80);
-            fputs($fp, "POST $path HTTP/1.1\r\n");
-            fputs($fp, "Host: $host\r\n");
-            fputs($fp, "Referer: $referer\r\n");
-            fputs($fp, "Content-type: $contentType\r\n");
-            fputs($fp, "Content-length: " . strlen($data_to_send) . "\r\n");
-            fputs($fp, "Connection: close\r\n");
-            fputs($fp, "\r\n");
-            fputs($fp, $data_to_send);
-            $res = "";
-            while (!feof($fp)) {
-                $res .= fgets($fp, self::$BUF_SIZE);
-            }
-            fclose($fp);
-            return $res;
-        } else {
-            throw new OdiseeException('Cannot call fsockopen() or fputs()');
+        $trimmed = rtrim($serviceUrl, '/');
+        if ($path === '' || substr($trimmed, -strlen($path)) === $path) {
+            return $trimmed;
         }
+        return $trimmed . $path;
     }
 
     /**
-     * Do a HTTP POST to Odisee service using curl.
-     * @param string $host Odisee service host (server name or IP).
-     * @param string $username Odisee username.
-     * @param string $password Password.
+     * Do an HTTP POST to the Odisee service using curl and Bearer authentication.
+     * @param string $host Odisee service base URL or full endpoint URL.
+     * @param string $accessToken Bearer access token.
      * @param string $path Relative URI.
-     * @param string $referer Who are we? Who is calling?
-     * @param string $data_to_send Data.
-     * @return mixed HTTP response.
-     * @throws OdiseeException When curl_xxx() functions cannot be called.
+     * @param string $referer Who is calling.
+     * @param string $data_to_send Request payload.
+     * @param string $contentType MIME type.
+     * @return string Response body bytes.
+     * @throws OdiseeException On transport or HTTP >= 400 error.
      */
-    private static function &curl_post($host, $username, $password, $path, $referer, $data_to_send, $contentType = 'text/xml')
+    private static function curl_post($host, $accessToken, $path, $referer, $data_to_send, $contentType = 'text/xml')
     {
-        if (is_callable('curl_init')) { // extension_loaded
-            // Initialize curl
-            $ch = curl_init();
+        if (!OdiseeStringHelper::checkStr($accessToken) || trim($accessToken) === '') {
+            throw new OdiseeException('Bearer access token is required');
+        }
+        if (!is_callable('curl_init')) {
+            throw new OdiseeException('Cannot call curl functions');
+        }
+        $old_umask = umask(077);
+        $tmpDir = dirname(__FILE__) . '/var/tmp';
+        if (!is_dir($tmpDir) || !is_writable($tmpDir)) {
+            $tmpDir = sys_get_temp_dir();
+        }
+        $filename = tempnam($tmpDir, 'odisee_temp_');
+        if ($filename === false) {
+            umask($old_umask);
+            throw new OdiseeException('Cannot create temporary file');
+        }
+        $fp = fopen($filename, 'wb');
+        if ($fp === false) {
+            @unlink($filename);
+            umask($old_umask);
+            throw new OdiseeException('Cannot open temporary file');
+        }
+        $ch = curl_init();
+        $execOk = false;
+        $curlErrno = 0;
+        $curlError = '';
+        $status = 0;
+        $body = '';
+        try {
+            $headers = array(
+                'Content-Type: ' . $contentType,
+                'Authorization: Bearer ' . trim($accessToken),
+            );
             curl_setopt($ch, CURLOPT_HEADER, FALSE);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: ' . $contentType));
-            curl_setopt($ch, CURLOPT_URL, $host . $path);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_URL, self::resolveUrl($host, $path));
             curl_setopt($ch, CURLOPT_REFERER, $referer);
-            curl_setopt($ch, CURLOPT_USERPWD, $username . ":" . $password);
             curl_setopt($ch, CURLOPT_BUFFERSIZE, self::$BUF_SIZE);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, self::$CONNECT_TIMEOUT);
             curl_setopt($ch, CURLOPT_TIMEOUT, self::$TIMEOUT);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
             curl_setopt($ch, CURLOPT_POST, TRUE);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data_to_send);
-            // Make temporary file
-            $old_umask = umask(077);
-            $filename = tempnam(dirname(__FILE__) . 'var/tmp', 'odisee_temp_');
-            $fp = fopen($filename, 'w');
-            // Call Odisee
             curl_setopt($ch, CURLOPT_FILE, $fp);
-            curl_exec($ch);
-            // Cleanup
-            curl_close($ch);
+            $execOk = curl_exec($ch);
+            $curlErrno = curl_errno($ch);
+            $curlError = curl_error($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             fclose($fp);
-            // Restore old umask
+            $fp = null;
+            $read = file_get_contents($filename);
+            $body = $read === false ? '' : $read;
+        } finally {
+            if (is_resource($fp)) {
+                fclose($fp);
+            }
+            curl_close($ch);
+            if (is_string($filename) && file_exists($filename)) {
+                @unlink($filename);
+            }
             umask($old_umask);
-            return $filename;
-        } else {
-            throw new OdiseeException('Cannot call curl functions');
         }
+        if ($execOk === false || $curlErrno !== 0) {
+            throw new OdiseeException('HTTP request failed: ' . $curlError);
+        }
+        if ($status >= 400) {
+            $detail = trim($body);
+            throw new OdiseeException($detail !== '' ? ('HTTP ' . $status . ': ' . $detail) : ('HTTP ' . $status), $status);
+        }
+        return $body;
     }
 
     /**
      * Request a document from Odisee service.
-     * @param string $host Odisee service host (server name or IP).
-     * @param string $username Odisee username.
-     * @param string $password Password.
-     * @param string $referer Who are we? Who is calling?
-     * @param string $data_to_send Data.
-     * @return mixed HTTP response.
-     * @throws OdiseeException When fsockopen() or fputs() cannot be called.
+     * @param string $host Odisee service URL.
+     * @param string $accessToken Bearer access token.
+     * @param string $referer Who is calling.
+     * @param string $data_to_send Request payload.
+     * @param string $contentType MIME type.
+     * @return string HTTP response body.
+     * @throws OdiseeException On transport or HTTP >= 400 error.
      */
-    public static function &post($host, $username, $password, $referer, $data_to_send, $contentType = 'text/xml')
+    public static function post($host, $accessToken, $referer, $data_to_send, $contentType = 'text/xml')
     {
-        return self::curl_post($host, $username, $password, self::$ODISEE_URI, $referer, $data_to_send, $contentType);
+        return self::curl_post($host, $accessToken, self::$ODISEE_URI, $referer, $data_to_send, $contentType);
     }
 
 }

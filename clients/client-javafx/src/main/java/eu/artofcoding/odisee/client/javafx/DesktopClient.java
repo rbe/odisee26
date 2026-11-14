@@ -5,7 +5,7 @@ import org.odisee.client.OutputFormat;
 
 /**
  * Desktop entry to {@code org.odisee.client.OdiseeClient}.
- * {@code open} uses the service URL, username, and password.
+ * {@code open} uses the service URL and bearer access token.
  * {@code preparePdf} calls {@code createRequest(template, OutputFormat.PDF)} and {@code setUserfield}.
  */
 public final class DesktopClient {
@@ -13,8 +13,8 @@ public final class DesktopClient {
     private DesktopClient() {
     }
 
-    public static OdiseeClient open(final String serviceUrl, final String username, final String password) {
-        return new OdiseeClient(serviceUrl, username, password);
+    public static OdiseeClient open(final String serviceUrl, final String accessToken) {
+        return OdiseeClient.bearer(serviceUrl, accessToken);
     }
 
     public static OdiseeClient preparePdf(final OdiseeClient client, final String template,

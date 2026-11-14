@@ -84,4 +84,18 @@ if ($mergeJson['response']['base64'] !== false) {
     fail_test('response.base64 must be a JSON boolean');
 }
 
+$outputDoc = new DOMDocument();
+$outputDoc->loadXML('<odisee delivery="both">'
+    . '<request name="Typed">'
+    . '<template name="Letter" outputFormat="odt"/>'
+    . '<instructions><userfield name="Hallo">x</userfield></instructions>'
+    . '<output><format type="pdf"><options><option name="watermark" value="DRAFT"/></options></format></output>'
+    . '</request>'
+    . '</odisee>');
+$outputRaw = OdiseeJson::fromDom($outputDoc);
+$expectedOutput = '{"request":[{"name":"Typed","template":{"name":"Letter","outputFormat":"odt"},"instructions":[{"instruction":"userfield","name":"Hallo","value":"x"}],"output":{"format":{"type":"pdf","options":[{"name":"watermark","value":"DRAFT"}]}}}],"delivery":"both"}';
+if ($outputRaw !== $expectedOutput) {
+    fail_test("PHP output/format JSON mismatch:\n" . $outputRaw);
+}
+
 echo "ok\n";
