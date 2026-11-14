@@ -17,7 +17,6 @@ import groovy.xml.XmlSlurper
 import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
 import org.odisee.io.SafePaths
-import org.odisee.ooo.connection.OdiseeServerRuntimeException
 import org.odisee.ooo.connection.OfficeConnection
 import org.odisee.ooo.connection.OfficeConnectionFactory
 import org.odisee.ooo.connection.UnoCall
@@ -31,7 +30,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
-import java.nio.file.attribute.FileAttribute
 import java.nio.file.attribute.PosixFilePermission
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
@@ -151,11 +149,16 @@ class OdiseeXmlCategory {
      */
     static void processTexttable(XComponent template, Map arg, texttable) {
         String ttName = texttable.'@name'.toString()
-        Profile.time "OOoTextTableCategory.processTexttable(${ttName})", {
+        String ttCoordinate = texttable.'@coordinate'?.toString()?.trim()
+        String target = ttName
+        if (ttCoordinate && !ttName.contains('!') && !ttName.contains('$')) {
+            target = ttCoordinate.contains('!') ? ttCoordinate : "${ttName}!${ttCoordinate}"
+        }
+        Profile.time "OOoTextTableCategory.processTexttable(${target})", {
             OdiseeXmlCategory.processInstruction template, { t ->
                 String ttContent = texttable.text()?.toString() ?: ''
                 use(OOoTextTableCategory) {
-                    t[ttName] = ttContent
+                    t[target] = ttContent
                 }
             }, [post: [name: texttable.'@post-macro'.toString()]]
         }
@@ -178,18 +181,18 @@ class OdiseeXmlCategory {
      * Insert autotext.
      */
     static void processAutotext(XComponent template, Map arg, autotext) {
-        //
         String autotextGroup = autotext.'@group'.toString() ?: 'Standard'
         String autotextName = autotext.'@name'.toString()
         String bookmark = autotext.'@bookmark'.toString()
-        String atend = autotext.'@atend'.toString() == OdiseeConstant.S_TRUE
-        //
+        boolean atend = autotext.'@atend'.toString() == OdiseeConstant.S_TRUE
         OdiseeXmlCategory.processInstruction template, { t ->
             use(OOoAutotextCategory) {
                 if (bookmark) {
                     t.insertAutotextAtBookmark(autotextGroup, autotextName, bookmark)
                 } else if (atend) {
                     t.insertAutotextAtEnd(autotextGroup, autotextName)
+                } else {
+                    throw new OdiseeException("Autotext '${autotextName}' requires bookmark or atend=true", OdiseeException.UNPROCESSABLE)
                 }
             }
         }, [post: [name: autotext.'@post-macro'.toString()]]
@@ -200,7 +203,7 @@ class OdiseeXmlCategory {
      */
     static void processImage(XComponent template, Map arg, image) {
         final String imageType = image.'@type'.toString()
-        final String imageUrl = image.'@url'.toString()
+        final String imageUrl = image.'@url'.toString()?.trim()
         int imageWidth = 0
         try {
             imageWidth = image.'@width'?.toString()?.toInteger() ?: 0
@@ -213,39 +216,87 @@ class OdiseeXmlCategory {
         } catch (NumberFormatException e) {
             // ignore
         }
-        final String bookmarkName = image.'@bookmark'.toString()
+        final String bookmarkName = image.'@bookmark'.toString()?.trim()
+        imageExtension(imageType)
         OdiseeXmlCategory.processInstruction template, { t ->
-            final String imageContent = image.text()?.toString() ?: ''
+            final String imageContent = image.text()?.toString()?.trim() ?: ''
             use(OOoImageCategory) {
                 if (imageContent && bookmarkName) {
-                    String _imageUrl = saveImageToFile(arg, imageType, imageContent)
-                    t.insertImageAtBookmark(imageType, bookmarkName, _imageUrl, imageWidth, imageHeight)
+                    Path tempImage = saveImageToFile(arg, imageType, imageContent)
+                    boolean managedByTemplate = arg?.tempImages instanceof List
+                    if (managedByTemplate) {
+                        ((List<Path>) arg.tempImages) << tempImage
+                    }
+                    try {
+                        t.insertImageAtBookmark(imageType, bookmarkName, tempImage, imageWidth, imageHeight)
+                    } finally {
+                        if (!managedByTemplate) {
+                            deleteTempImageQuietly(tempImage)
+                        }
+                    }
                 } else if (imageUrl && bookmarkName) {
-                    t.insertImageAtBookmark(imageType, bookmarkName, imageUrl, imageWidth, imageHeight)
+                    String safeUrl = OOoImageCategory.requireSafeImageUrl(imageUrl)
+                    t.insertImageAtBookmark(imageType, bookmarkName, safeUrl, imageWidth, imageHeight)
+                } else {
+                    throw new OdiseeException('Image instruction requires bookmark and base64 data or url', OdiseeException.UNPROCESSABLE)
                 }
             }
         }, [post: [name: image.'@post-macro'.toString()]]
     }
 
-    private static String saveImageToFile(Map arg, String imageType, String imageContent) {
-        byte[] imageData = Base64.decoder.decode(imageContent.toString().trim())
-        Path outputPath = Paths.get(arg.outputPath)
-        FileAttribute<Set<PosixFilePermission>> fileAttribute = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))
-        String extension
-        switch (imageType) {
-            case { it =~ /.*png/ }:
-                extension = "png"
-                break
-            case { it =~ /.*jp?g/ }:
-                extension = "jpeg"
-                break
-            default:
-                throw new OdiseeServerRuntimeException("Unsupported image type ${imageType}")
+    static String imageExtension(String imageType) {
+        String normalized = imageType == null ? '' : imageType.trim().toLowerCase(Locale.ROOT)
+        if (normalized == 'png' || normalized == 'image/png') {
+            return 'png'
         }
-        Path tempImage = Files.createTempFile(outputPath, "image", ".${extension}", fileAttribute)
-        Files.write(tempImage, imageData, StandardOpenOption.WRITE)
-        String _imageUrl = tempImage.toAbsolutePath().toUri().toString()
-        _imageUrl
+        if (normalized == 'jpg' || normalized == 'jpeg' || normalized == 'image/jpg' || normalized == 'image/jpeg') {
+            return 'jpeg'
+        }
+        throw new OdiseeException("Unsupported image type '${imageType}'", OdiseeException.UNPROCESSABLE)
+    }
+
+    static void restrictTempPermissions(Path file) {
+        if (file == null) {
+            return
+        }
+        try {
+            Set<PosixFilePermission> perms = PosixFilePermissions.fromString('rw-------')
+            Files.setPosixFilePermissions(file, perms)
+        } catch (UnsupportedOperationException ignored) {
+        }
+    }
+
+    private static void deleteTempImageQuietly(Path file) {
+        if (file == null) {
+            return
+        }
+        try {
+            Files.deleteIfExists(file)
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static Path saveImageToFile(Map arg, String imageType, String imageContent) {
+        String extension = imageExtension(imageType)
+        byte[] imageData
+        try {
+            imageData = Base64.mimeDecoder.decode(imageContent.toString().trim())
+        } catch (IllegalArgumentException e) {
+            OdiseeException ex = new OdiseeException('Invalid base64 image content', e)
+            ex.httpStatus = OdiseeException.UNPROCESSABLE
+            throw ex
+        }
+        Path outputPath = arg?.outputPath ? Paths.get(arg.outputPath.toString()) : Files.createTempDirectory('odisee-img')
+        Files.createDirectories(outputPath)
+        Path tempImage = Files.createTempFile(outputPath, 'image', ".${extension}")
+        try {
+            restrictTempPermissions(tempImage)
+            Files.write(tempImage, imageData, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)
+            return tempImage
+        } catch (Throwable e) {
+            deleteTempImageQuietly(tempImage)
+            throw e
+        }
     }
 
     /**
@@ -285,7 +336,7 @@ class OdiseeXmlCategory {
             throw new OdiseeException('cell requires sheet and coordinate', OdiseeException.BAD_REQUEST)
         }
         String value = cell.text()?.toString() ?: ''
-        Map parsed = Coordinate.parseCoordinate(coordinate)
+        Map parsed = Coordinate.requireCellCoordinate(coordinate)
         int column = parsed.columnIndex as int
         int row = parsed.rowIndex as int
         OdiseeXmlCategory.processInstruction template, { t ->
@@ -355,7 +406,7 @@ class OdiseeXmlCategory {
      */
     static OfficeDocumentType applicationOf(XComponent component, Path template) {
         if (component != null) {
-            use(org.odisee.uno.UnoCategory) {
+            OfficeDocumentType detected = use(org.odisee.uno.UnoCategory) {
                 if (component.uno(com.sun.star.sheet.XSpreadsheetDocument)) {
                     return OfficeDocumentType.SPREADSHEET
                 }
@@ -365,6 +416,10 @@ class OdiseeXmlCategory {
                 if (component.uno(com.sun.star.text.XTextDocument)) {
                     return OfficeDocumentType.TEXT
                 }
+                return null
+            }
+            if (detected != null) {
+                return detected
             }
         }
         OfficeDocumentType.fromFileName(template?.fileName?.toString())
@@ -408,6 +463,8 @@ class OdiseeXmlCategory {
         def template = request.template[0]
         final String outputPath = template.'@outputPath'.toString()
         arg.outputPath = outputPath
+        List<Path> tempImages = []
+        arg.tempImages = tempImages
         // Set basename for document(s) to generate: dir for template, name of template including revision and ID
         // TODO name must be generated to avoid name clashes with multiple requests
         String documentBasename = null
@@ -500,7 +557,7 @@ class OdiseeXmlCategory {
                             if (filterData && FormatOptions.pdfFamily(file.fileName.toString())) {
                                 xComponent.saveAsPdf(file, application.pdfExportFilter, filterData)
                             } else if (FormatOptions.pdfaFallback(file.fileName.toString(), filterData)) {
-                                xComponent.saveAsPDF_A(file)
+                                xComponent.saveAsPDF_A(file, application.pdfExportFilter)
                             } else {
                                 xComponent.saveAs(file)
                             }
@@ -538,13 +595,16 @@ class OdiseeXmlCategory {
                         }
                     } catch (UnoDeadlineExceeded closeDeadline) {
                         leavePool = true
-                        log.error 'Odisee: Closing the office document exceeded its deadline', closeDeadline
+                        log.log(java.util.logging.Level.SEVERE, 'Odisee: Closing the office document exceeded its deadline', closeDeadline)
                     } catch (Throwable closeError) {
-                        log.error 'Odisee: Could not close the office document', closeError
+                        log.log(java.util.logging.Level.SEVERE, 'Odisee: Could not close the office document', closeError)
                     }
                 }
                 if (leavePool) {
                     officeConnectionFactory?.dropSlot(oooConnection)
+                }
+                tempImages.each { Path tempImage ->
+                    deleteTempImageQuietly(tempImage)
                 }
             }
         }

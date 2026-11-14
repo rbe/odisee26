@@ -33,16 +33,18 @@ final class FileHelper {
     public static Map decomposeFilename(final String filename) {
         final Map<String, String> map = [:]
         if (filename) {
-            if (filename.contains('.')) {
-                final String[] split = filename.split('[.]')
-                map[S_NAME] = split[0..-2].join('')
-                map[S_EXT] = split[-1]
+            int lastSlash = Math.max(filename.lastIndexOf('/'), filename.lastIndexOf('\\'))
+            String dirPrefix = lastSlash >= 0 ? filename.substring(0, lastSlash + 1) : ''
+            String baseName = lastSlash >= 0 ? filename.substring(lastSlash + 1) : filename
+            int lastDot = baseName.lastIndexOf('.')
+            if (lastDot > 0 && lastDot < baseName.length() - 1) {
+                map[S_NAME] = dirPrefix + baseName.substring(0, lastDot)
+                map[S_EXT] = baseName.substring(lastDot + 1)
             } else {
                 map[S_NAME] = filename
                 map[S_EXT] = 'xxx'
             }
         }
-        // Return
         map
     }
 

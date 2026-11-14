@@ -11,30 +11,173 @@
  */
 package org.odisee.writer
 
+import com.sun.star.beans.XPropertySet
+import com.sun.star.drawing.XDrawPagesSupplier
 import com.sun.star.frame.*
 import com.sun.star.lang.XComponent
+import com.sun.star.lang.XMultiComponentFactory
+import com.sun.star.presentation.XPresentationSupplier
 import com.sun.star.script.provider.XScript
+import com.sun.star.script.provider.XScriptProvider
 import com.sun.star.script.provider.XScriptProviderSupplier
+import com.sun.star.sheet.XSpreadsheetDocument
+import com.sun.star.text.XTextDocument
+import com.sun.star.uno.Any
+import com.sun.star.uno.XComponentContext
 import com.sun.star.util.CloseVetoException
 import com.sun.star.util.XCloseable
 import com.sun.star.util.XRefreshable
 import groovy.util.logging.Log
 import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
+import org.odisee.document.OfficeDocumentType
 import org.odisee.io.OdiseePath
 import org.odisee.ooo.connection.OfficeConnection
 import org.odisee.uno.UnoCategory
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
+import java.lang.ref.ReferenceQueue
+import java.lang.ref.WeakReference
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Things we can do with any OpenOffice.org document.
  */
 @Log
 class OOoDocumentCategory {
+
+    private static final ReferenceQueue<XComponent> COMPONENT_QUEUE = new ReferenceQueue<>()
+
+    private static final ConcurrentHashMap<ComponentKey, ComponentState> COMPONENT_STATE = new ConcurrentHashMap<>()
+
+    private static final class ComponentKey extends WeakReference<XComponent> {
+        private final int hash
+
+        ComponentKey(XComponent referent) {
+            super(referent)
+            this.hash = System.identityHashCode(referent)
+        }
+
+        ComponentKey(XComponent referent, ReferenceQueue<XComponent> queue) {
+            super(referent, queue)
+            this.hash = System.identityHashCode(referent)
+        }
+
+        @Override
+        int hashCode() {
+            hash
+        }
+
+        @Override
+        boolean equals(Object other) {
+            if (this.is(other)) {
+                return true
+            }
+            if (!(other instanceof ComponentKey)) {
+                return false
+            }
+            XComponent left = this.get()
+            XComponent right = ((ComponentKey) other).get()
+            left != null && left.is(right)
+        }
+    }
+
+    private static final class ComponentState {
+        final OfficeConnection connection
+        final Path file
+
+        ComponentState(OfficeConnection connection, Path file) {
+            this.connection = connection
+            this.file = file
+        }
+    }
+
+    private static void expungeComponentState() {
+        ComponentKey expired
+        while ((expired = (ComponentKey) COMPONENT_QUEUE.poll()) != null) {
+            COMPONENT_STATE.remove(expired)
+        }
+    }
+
+    static void bindConnection(XComponent component, OfficeConnection connection, Path file = null) {
+        expungeComponentState()
+        if (component != null && connection != null) {
+            COMPONENT_STATE.put(new ComponentKey(component, COMPONENT_QUEUE), new ComponentState(connection, file))
+        }
+    }
+
+    static void unbindConnection(XComponent component) {
+        expungeComponentState()
+        if (component != null) {
+            COMPONENT_STATE.remove(new ComponentKey(component))
+        }
+    }
+
+    static OfficeConnection getOooConnection(XComponent component) {
+        expungeComponentState()
+        component == null ? null : COMPONENT_STATE.get(new ComponentKey(component))?.connection
+    }
+
+    static Path getFile(XComponent component) {
+        expungeComponentState()
+        component == null ? null : COMPONENT_STATE.get(new ComponentKey(component))?.file
+    }
+
+    static int trackedComponentCount() {
+        expungeComponentState()
+        COMPONENT_STATE.size()
+    }
+
+    static XMultiComponentFactory remoteServiceManager(OfficeConnection connection) {
+        connection?.getXRemoteServiceManager()
+    }
+
+    static XComponentContext remoteComponentContext(OfficeConnection connection) {
+        XMultiComponentFactory serviceManager = remoteServiceManager(connection)
+        if (serviceManager == null) {
+            return null
+        }
+        use(UnoCategory) {
+            XPropertySet props = (XPropertySet) serviceManager.uno(XPropertySet)
+            if (props == null) {
+                return null
+            }
+            Object raw = props.getPropertyValue('DefaultContext')
+            if (raw instanceof Any) {
+                raw = ((Any) raw).object
+            }
+            if (raw instanceof XComponentContext) {
+                return (XComponentContext) raw
+            }
+            raw == null ? null : (XComponentContext) raw.uno(XComponentContext)
+        }
+    }
+
+    static OfficeDocumentType applicationOf(XComponent component, Path fallbackFile = null) {
+        if (component != null) {
+            OfficeDocumentType detected = use(UnoCategory) {
+                if (component.uno(XSpreadsheetDocument)) {
+                    return OfficeDocumentType.SPREADSHEET
+                }
+                if (component.uno(XPresentationSupplier)) {
+                    return OfficeDocumentType.PRESENTATION
+                }
+                if (component.uno(XTextDocument)) {
+                    return OfficeDocumentType.TEXT
+                }
+                if (component.uno(XDrawPagesSupplier)) {
+                    return OfficeDocumentType.PRESENTATION
+                }
+                return null
+            }
+            if (detected != null) {
+                return detected
+            }
+        }
+        Path known = fallbackFile ?: getFile(component)
+        OfficeDocumentType.fromFileName(known?.fileName?.toString())
+    }
 
     /**
      * Standard properties for opening a document.
@@ -68,7 +211,6 @@ class OOoDocumentCategory {
      * Ensure proper file URL.
      */
     static String getFileURL(Path file) {
-        //'file:///' + ((file.toURL() as String) - 'file:')
         file.toUri().toString()
     }
 
@@ -83,49 +225,32 @@ class OOoDocumentCategory {
      * Open an OpenOffice.org document.
      */
     static XComponent open(Path file, OfficeConnection oooConnection, props = null) {
-        // Add connection to template's File object
-        file.metaClass._oooConnection = oooConnection
-        file.metaClass.getOooConnection = { -> _oooConnection }
-        // Properties for loading component
         List properties = []
-        // Is this a template?
         String filename = file.fileName.toString()
-        if (filename.length() > 3 && filename.toLowerCase()[-3..-1] ==~ TEMPLATE_EXT_REGEX) {
-            // Check if template exists
+        if (filename.length() > 3 && filename.toLowerCase(Locale.ROOT)[-3..-1] ==~ TEMPLATE_EXT_REGEX) {
             if (!Files.exists(file)) {
-                throw new OdiseeException("Template ${file} not found")
+                throw new OdiseeException("Template ${file} not found", OdiseeException.NOT_FOUND)
             }
-            // Set property for loading
             properties << makePropertyValue('AsTemplate', Boolean.TRUE)
         }
-        // Copy given properties
         props?.each { k, v ->
             properties << makePropertyValue(k as String, v)
         }
         String sURL = null
-        // If we got a regular file and no private: URL
-        if (file ==~ PRIVATE_URL_REGEX) {
-            // URL must be private:... for this
+        if (file.toString() ==~ PRIVATE_URL_REGEX) {
             sURL = file.toString()
         } else {
-            // Does the file exist? If not, create an empty file
             if (!Files.exists(file)) {
                 Files.createFile(file)
             }
-            // Ensure correct URL to prevent "URL seems to be an unsupported one"
             sURL = getFileURL(file)
         }
-        // Open document
-        XComponentLoader xComponentLoader = oooConnection.getXComponentLoader()
+        XComponentLoader xComponentLoader = oooConnection?.getXComponentLoader()
         if (!xComponentLoader) {
-            throw new OdiseeException('No XComponentLoader!')
+            throw new OdiseeException('No XComponentLoader!', OdiseeException.UNPROCESSABLE)
         }
         XComponent xComponent = xComponentLoader.loadComponentFromURL(sURL, '_blank', 0, (properties ?: null) as com.sun.star.beans.PropertyValue[])
-        xComponent.metaClass._oooConnection = oooConnection
-        xComponent.metaClass.getOooConnection = { -> _oooConnection }
-        xComponent.metaClass._file = file
-        xComponent.metaClass.getFile = { -> _file }
-        // Return component
+        bindConnection(xComponent, oooConnection, file)
         xComponent
     }
 
@@ -135,13 +260,10 @@ class OOoDocumentCategory {
      */
     static save(XComponent component) {
         use(UnoCategory) {
-            // Refresh component
             refresh(component)
-            // Refresh text fields
             use(OOoFieldCategory) {
                 component.refreshTextFields()
             }
-            // Get XStorable and call store()
             XStorable xStorable = (XStorable) component.uno(XStorable)
             xStorable.store()
         }
@@ -153,128 +275,74 @@ class OOoDocumentCategory {
      */
     static saveAs(XComponent component, Path file, props = null) {
         use(UnoCategory) {
-            // Properties for saving component
             List properties = []
-            // Filter for saving?
             String ext = OdiseeFileFormat.extensionOf(file.fileName.toString())
             if (!(ext ==~ /od[gpst]/)) {
-                Map format = OdiseeFileFormat.get(ext)
+                OfficeDocumentType application = applicationOf(component)
+                Map format = OdiseeFileFormat.get(ext, application)
                 if (format == null) {
                     throw new OdiseeException("Unsupported output format '${ext}'", OdiseeException.UNPROCESSABLE)
                 }
                 properties << makePropertyValue('FilterName', format.filter)
             }
-            // Copy given properties
             props?.each { k, v ->
                 properties << makePropertyValue(k, v)
             }
-            /*
-            // Refresh
-            refresh(component)
-            */
-/*
-            // Refresh text fields
-            use(OOoFieldCategory) {
-                component.refreshTextFields()
-            }
-*/
-            // Save document
             String fileURL = getFileURL(file)
             try {
                 XStorable xStorable = (XStorable) component.uno(XStorable)
+                if (xStorable == null) {
+                    throw new OdiseeException("Could not save document at ${fileURL}: component is not storable", OdiseeException.UNPROCESSABLE)
+                }
                 xStorable.storeToURL(fileURL, (properties ?: null) as com.sun.star.beans.PropertyValue[])
+            } catch (OdiseeException e) {
+                throw e
             } catch (e) {
-                throw new OdiseeException("Could not save document at ${fileURL}", e)
+                OdiseeException ex = new OdiseeException("Could not save document at ${fileURL}", e)
+                ex.httpStatus = OdiseeException.UNPROCESSABLE
+                throw ex
             }
         }
     }
 
     /**
-     * Save an OpenOffice.org document to an alternate URL or format.
-     * @param component com.sun.star.lang.XComponent
+     * Save an OpenOffice.org document as ISO 19005-1 PDF/A-1 using the application's PDF export filter.
+     * Encryption/permission passwords are omitted because PDF/A forbids an Encrypt trailer dictionary.
      */
-    static saveAsPDF_A(XComponent component, Path file) {
-        List<com.sun.star.beans.PropertyValue> pdfFilterData = new LinkedList<>();
-
-        // Specify that PDF related permissions of this file must be
-        // restricted. It is meaningfull only if the “PermissionPassword”
-        // property is not empty
-        pdfFilterData << makePropertyValue("RestrictPermissions", Boolean.TRUE);
-
-        // Set the password that a user will need to change the permissions
-        // of the exported PDF. The password should be in clear text.
-        // Must be used with the “RestrictPermissions” property
-        pdfFilterData << makePropertyValue("PermissionPassword", "nopermission");
-
-        // Specifies printing of the document:
-        //   0: PDF document cannot be printed
-        //   1: PDF document can be printed at low resolution only
-        //   2: PDF document can be printed at maximum resolution.
-        pdfFilterData << makePropertyValue("Printing", 2);
-
-        // Specifies the changes allowed to the document:
-        //   0: PDF document cannot be changed
-        //   1: Inserting, deleting and rotating pages is allowed
-        //   2: Filling of form field is allowed
-        //   3: Filling of form field and commenting is allowed
-        //   4: All the changes of the previous selections are permitted,
-        //      with the only exclusion of page extraction
-        pdfFilterData << makePropertyValue("Changes", 0);
-
-        // Specifies that the pages and the PDF document content can be
-        // extracted to be used in other documents: Copy from the PDF
-        // document and paste eleswhere
-        pdfFilterData << makePropertyValue("EnableCopyingOfContent", Boolean.FALSE);
-
-        // Specifies that the PDF document content can be extracted to
-        // be used in accessibility applications
-        pdfFilterData << makePropertyValue("EnableTextAccessForAccessibilityTools", Boolean.FALSE);
-
-        // Specifies if graphics are exported to PDF using a
-        // lossless compression. If this property is set to true,
-        // it overwrites the "Quality" property
-        pdfFilterData << makePropertyValue("UseLosslessCompression", Boolean.TRUE);
-
-        // Specifies whether form fields are exported as widgets or
-        // only their fixed print representation is exported
-        pdfFilterData << makePropertyValue("ExportFormFields", Boolean.FALSE);
-
-        // Specifies the action to be performed when the PDF document
-        // is opened:
-        //   0: Opens with default zoom magnification
-        //   1: Opens magnified to fit the entire page within the window
-        //   2: Opens magnified to fit the entire page width within
-        //      the window
-        //   3: Opens magnified to fit the entire width of its boundig
-        //      box within the window (cuts out margins)
-        //   4: Opens with a zoom level given in the “Zoom” property
-        pdfFilterData << makePropertyValue("Magnification", 1);
-
-        // Specifies that automatically inserted empty pages are
-        // suppressed. This option only applies for storing Writer
-        // documents.
-        pdfFilterData << makePropertyValue("IsSkipEmptyPages", Boolean.TRUE);
-
-        // Specifies the PDF version that should be generated:
-        //   0: PDF 1.4 (default selection)
-        //   1: PDF/A-1 (ISO 19005-1:2005)
-        pdfFilterData << makePropertyValue("SelectPdfVersion", 1);
+    static saveAsPDF_A(XComponent component, Path file, String filterName = null) {
+        OfficeDocumentType application = applicationOf(component)
+        String resolvedFilter = filterName ?: (OdiseeFileFormat.get('pdf', application)?.filter ?: application.pdfExportFilter)
+        List<com.sun.star.beans.PropertyValue> pdfFilterData = new LinkedList<>()
+        pdfFilterData << makePropertyValue('SelectPdfVersion', 1)
+        pdfFilterData << makePropertyValue('UseTaggedPDF', Boolean.TRUE)
+        pdfFilterData << makePropertyValue('UseLosslessCompression', Boolean.TRUE)
+        pdfFilterData << makePropertyValue('ExportFormFields', Boolean.FALSE)
+        if (resolvedFilter == 'writer_pdf_Export') {
+            pdfFilterData << makePropertyValue('IsSkipEmptyPages', Boolean.TRUE)
+        }
 
         com.sun.star.beans.PropertyValue[] pfdArray = pdfFilterData.toArray(new com.sun.star.beans.PropertyValue[pdfFilterData.size()])
 
-        List<com.sun.star.beans.PropertyValue> conversionProperties = new LinkedList<>();
-        conversionProperties << makePropertyValue("FilterName", "writer_pdf_Export");
-        conversionProperties << makePropertyValue("Overwrite", Boolean.TRUE);
-        conversionProperties << makePropertyValue("FilterData", pfdArray);
+        List<com.sun.star.beans.PropertyValue> conversionProperties = new LinkedList<>()
+        conversionProperties << makePropertyValue('FilterName', resolvedFilter)
+        conversionProperties << makePropertyValue('Overwrite', Boolean.TRUE)
+        conversionProperties << makePropertyValue('FilterData', pfdArray)
         com.sun.star.beans.PropertyValue[] cpArray = conversionProperties.toArray(new com.sun.star.beans.PropertyValue[conversionProperties.size()])
 
         use(UnoCategory) {
             String fileURL = getFileURL(file)
             try {
                 XStorable xStorable = (XStorable) component.uno(XStorable)
+                if (xStorable == null) {
+                    throw new OdiseeException("Could not save document at ${fileURL}: component is not storable", OdiseeException.UNPROCESSABLE)
+                }
                 xStorable.storeToURL(fileURL, cpArray)
+            } catch (OdiseeException e) {
+                throw e
             } catch (e) {
-                throw new OdiseeException("Could not save document at ${fileURL}", e)
+                OdiseeException ex = new OdiseeException("Could not save document at ${fileURL}", e)
+                ex.httpStatus = OdiseeException.UNPROCESSABLE
+                throw ex
             }
         }
     }
@@ -289,7 +357,8 @@ class OOoDocumentCategory {
         }
         com.sun.star.beans.PropertyValue[] filterArray = pdfFilterData.toArray(new com.sun.star.beans.PropertyValue[pdfFilterData.size()])
         List<com.sun.star.beans.PropertyValue> conversionProperties = new LinkedList<>()
-        conversionProperties << makePropertyValue('FilterName', filterName ?: 'writer_pdf_Export')
+        String resolvedFilter = filterName ?: (OdiseeFileFormat.get('pdf', applicationOf(component))?.filter ?: 'writer_pdf_Export')
+        conversionProperties << makePropertyValue('FilterName', resolvedFilter)
         conversionProperties << makePropertyValue('Overwrite', Boolean.TRUE)
         conversionProperties << makePropertyValue('FilterData', filterArray)
         com.sun.star.beans.PropertyValue[] properties = conversionProperties.toArray(new com.sun.star.beans.PropertyValue[conversionProperties.size()])
@@ -297,9 +366,16 @@ class OOoDocumentCategory {
             String fileURL = getFileURL(file)
             try {
                 XStorable xStorable = (XStorable) component.uno(XStorable)
+                if (xStorable == null) {
+                    throw new OdiseeException("Could not save document at ${fileURL}: component is not storable", OdiseeException.UNPROCESSABLE)
+                }
                 xStorable.storeToURL(fileURL, properties)
+            } catch (OdiseeException e) {
+                throw e
             } catch (e) {
-                throw new OdiseeException("Could not save document at ${fileURL}", e)
+                OdiseeException ex = new OdiseeException("Could not save document at ${fileURL}", e)
+                ex.httpStatus = OdiseeException.UNPROCESSABLE
+                throw ex
             }
         }
     }
@@ -310,31 +386,23 @@ class OOoDocumentCategory {
      */
     static close(XComponent component) {
         try {
-            use(UnoCategory) {
-                // Close through XModel
-                XModel xModel = (XModel) component.uno(XModel)
-                if (xModel) {
-                    XCloseable xCloseable = (XCloseable) xModel.uno(XCloseable)
-                    try {
-                        xCloseable.close(true)
-                    } catch (CloseVetoException e) {
-                        // Ignore
+            if (component != null) {
+                use(UnoCategory) {
+                    XModel xModel = (XModel) component.uno(XModel)
+                    XCloseable xCloseable = xModel == null ? (XCloseable) component.uno(XCloseable) : (XCloseable) xModel.uno(XCloseable)
+                    if (xCloseable != null) {
+                        try {
+                            xCloseable.close(true)
+                        } catch (CloseVetoException e) {
+                            // Ignore
+                        }
+                    } else {
+                        component.dispose()
                     }
-                } else {
-                    /*
-                    XCloseable xCloseable = component.uno(com.sun.star.util.XCloseable)
-                    xCloseable.close(true)
-                    */
-                    // Dispose document
-                    component.dispose()
                 }
             }
         } finally {
-            // Remove references
-            component.metaClass._oooConnection = null
-            component.metaClass.getOooConnection = null
-            component.metaClass._file = null
-            component.metaClass.getFile = null
+            unbindConnection(component)
         }
     }
 
@@ -356,27 +424,31 @@ class OOoDocumentCategory {
     static executeDispatch(XComponent component, String name, Map params = null) {
         Profile.time "OOoDocumentCategory.executeDispatch($name)", {
             use(UnoCategory) {
-                // Get XMultiComponentFactory
-                OfficeConnection oooConnection = (OfficeConnection) component.oooConnection
-                if (oooConnection) {
-                    Object o = oooConnection.xMultiComponentFactory.createInstanceWithContext('com.sun.star.frame.DispatchHelper', oooConnection.xOfficeComponentContext)
-                    // XDispatchHelper
-                    XDispatchHelper dispatchHelper = (XDispatchHelper) o.uno(XDispatchHelper)
-                    com.sun.star.beans.PropertyValue[] props = params.collect { k, v ->
-                        makePropertyValue(k, v)
-                    } as com.sun.star.beans.PropertyValue[]
-                    // XModel
-                    XModel xModel = (XModel) component.uno(XModel)
-                    // XController
-                    XController xController = xModel.currentController //getCurrentController()
-                    // XFrame
-                    XFrame xFrame = xController.frame //getFrame()
-                    // Call dispatcher
-                    XDispatchProvider xDispatchProvider = (XDispatchProvider) xFrame.uno(XDispatchProvider)
-                    dispatchHelper.executeDispatch(xDispatchProvider, name, '', 0, props)
-                } else {
-                    log.debug "Cannot execute dispatch ${name}: no connection!"
+                OfficeConnection oooConnection = getOooConnection(component)
+                if (!oooConnection) {
+                    throw new OdiseeException("Cannot execute dispatch '${name}': no office connection", OdiseeException.UNPROCESSABLE)
                 }
+                XMultiComponentFactory serviceManager = remoteServiceManager(oooConnection)
+                XComponentContext componentContext = remoteComponentContext(oooConnection)
+                if (!serviceManager || !componentContext) {
+                    throw new OdiseeException("Cannot execute dispatch '${name}': office context is not available", OdiseeException.UNPROCESSABLE)
+                }
+                Object o = serviceManager.createInstanceWithContext('com.sun.star.frame.DispatchHelper', componentContext)
+                XDispatchHelper dispatchHelper = o == null ? null : (XDispatchHelper) o.uno(XDispatchHelper)
+                if (dispatchHelper == null) {
+                    throw new OdiseeException("Cannot execute dispatch '${name}': DispatchHelper is not available", OdiseeException.UNPROCESSABLE)
+                }
+                com.sun.star.beans.PropertyValue[] props = (params ?: [:]).collect { k, v ->
+                    makePropertyValue(k, v)
+                } as com.sun.star.beans.PropertyValue[]
+                XModel xModel = (XModel) component.uno(XModel)
+                XController xController = xModel?.currentController
+                XFrame xFrame = xController?.frame
+                XDispatchProvider xDispatchProvider = xFrame == null ? null : (XDispatchProvider) xFrame.uno(XDispatchProvider)
+                if (xDispatchProvider == null) {
+                    throw new OdiseeException("Cannot execute dispatch '${name}': document frame is not available", OdiseeException.UNPROCESSABLE)
+                }
+                dispatchHelper.executeDispatch(xDispatchProvider, name, '', 0, props)
             }
         }
     }
@@ -386,32 +458,39 @@ class OOoDocumentCategory {
      */
     static executeMacro(XComponent component, String macroName, Object[] params = []) {
         Profile.time "OOoDocumentCategory.executeMacro($macroName)", {
-            def name = new StringBuilder()
-            // No URL?
+            StringBuilder builder = new StringBuilder()
             if (!macroName.startsWith('vnd')) {
-                name << 'vnd.sun.star.script:'
+                builder << 'vnd.sun.star.script:'
             }
-            // Append macro name; no information about language and location? Append default.
-            if (macroName ==~ MACRO_URL_W_OPT) {
-                name << macroName
-            } else {
-                name << (macroName << '?language=Basic&location=document')
+            builder << macroName
+            if (!(macroName ==~ MACRO_URL_W_OPT)) {
+                builder << '?language=Basic&location=document'
             }
-            // Ensure a java.lang.String and replace HTML entities
-            name = name.toString().replaceAll('&amp;', '&')
+            String name = builder.toString().replaceAll('&amp;', '&')
             if (OdiseePath.ODISEE_DEBUG) {
-                log.debug "Processing macro '${name}'"
+                log.fine "Processing macro '${name}'"
             }
             try {
                 use(UnoCategory) {
-                    XScriptProviderSupplier xScriptPS = (XScriptProviderSupplier) component.uno(XScriptProviderSupplier)
-                    XScript xScript = xScriptPS.scriptProvider.getScript(name.toString())
+                    XScriptProviderSupplier xScriptPS = component == null ? null : (XScriptProviderSupplier) component.uno(XScriptProviderSupplier)
+                    XScriptProvider provider = xScriptPS?.scriptProvider
+                    if (provider == null) {
+                        throw new OdiseeException("Cannot execute macro '${name}': script provider is not available", OdiseeException.UNPROCESSABLE)
+                    }
+                    XScript xScript = provider.getScript(name)
+                    if (xScript == null) {
+                        throw new OdiseeException("Macro '${name}' was not found", OdiseeException.UNPROCESSABLE)
+                    }
                     short[][] outParamIndex = [TWO_ZERO, TWO_ZERO] as short[][]
-                    Object[][] outParam = [TWO_NULL, TWO_NULL]/* as Object[][]*/
-                    xScript.invoke(params/* as Object[]*/, outParamIndex, outParam)
+                    Object[][] outParam = [TWO_NULL, TWO_NULL]
+                    xScript.invoke((params ?: [] as Object[]), outParamIndex, outParam)
                 }
-            } catch (e) {
-                log.log(java.util.logging.Level.FINE, "Cannot execute macro: ${name}", e)
+            } catch (OdiseeException e) {
+                throw e
+            } catch (Exception e) {
+                OdiseeException ex = new OdiseeException("Cannot execute macro '${name}': ${e.message ?: e.class.simpleName}", e)
+                ex.httpStatus = OdiseeException.UNPROCESSABLE
+                throw ex
             }
         }
     }

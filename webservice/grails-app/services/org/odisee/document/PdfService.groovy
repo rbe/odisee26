@@ -12,7 +12,9 @@ package org.odisee.document
 
 import org.apache.pdfbox.io.IOUtils
 import org.apache.pdfbox.multipdf.PDFMergerUtility
+import org.odisee.api.OdiseeException
 
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -32,17 +34,33 @@ class PdfService {
      * @return
      */
     Path mergeDocuments(Path target, List<Path> pdfFiles) {
+        if (target == null) {
+            throw new OdiseeException('Cannot merge PDF documents: target path is missing', OdiseeException.UNPROCESSABLE)
+        }
+        if (!pdfFiles) {
+            throw new OdiseeException('Cannot merge PDF documents: no input files specified', OdiseeException.UNPROCESSABLE)
+        }
         PDFMergerUtility merger = new PDFMergerUtility()
         try {
             pdfFiles.each { Path p ->
+                if (p == null || !Files.isRegularFile(p)) {
+                    throw new OdiseeException("Merge input '${p}' does not exist", OdiseeException.UNPROCESSABLE)
+                }
                 merger.addSource(p.toFile())
+            }
+            if (target.parent != null) {
+                Files.createDirectories(target.parent)
             }
             merger.destinationFileName = target.toAbsolutePath().toString()
             merger.mergeDocuments(IOUtils.createMemoryOnlyStreamCache())
             target
+        } catch (OdiseeException e) {
+            throw e
         } catch (e) {
             log.error "Could not merge ${pdfFiles.join(', ')} into ${target}", e
-            null
+            OdiseeException ex = new OdiseeException("Could not merge PDF documents into '${target.fileName}': ${e.message ?: e.class.simpleName}", e)
+            ex.httpStatus = OdiseeException.UNPROCESSABLE
+            throw ex
         }
     }
 
