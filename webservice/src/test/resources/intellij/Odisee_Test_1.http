@@ -1,4 +1,6 @@
 POST http://localhost:8080/odisee/document/generate
+Authorization: Bearer {{token}}
+Content-Type: text/xml; charset=UTF-8
 Accept: */*
 
 < ../../../main/container/var/request/test_1_HalloOdisee_single_odt.xml

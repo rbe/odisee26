@@ -47,6 +47,10 @@ class OdiseeJson
                     break;
             }
         }
+        $delivery = $root->getAttribute('delivery');
+        if ($delivery !== '') {
+            $body['delivery'] = $delivery;
+        }
         $flags = 0;
         if (defined('JSON_UNESCAPED_UNICODE')) {
             $flags |= JSON_UNESCAPED_UNICODE;
@@ -71,6 +75,7 @@ class OdiseeJson
         $instructions = array();
         $sawInstructions = false;
         $requestPostProcess = null;
+        $requestOutput = null;
         foreach (self::elements($element) as $child) {
             switch (self::localName($child)) {
                 case 'template':
@@ -87,6 +92,9 @@ class OdiseeJson
                 case 'post-process':
                     $requestPostProcess = self::postProcess($child);
                     break;
+                case 'output':
+                    $requestOutput = self::output($child);
+                    break;
             }
         }
         if ($sawInstructions) {
@@ -94,6 +102,54 @@ class OdiseeJson
         }
         if ($requestPostProcess !== null) {
             $map['postProcess'] = $requestPostProcess;
+        }
+        if ($requestOutput !== null) {
+            $map['output'] = $requestOutput;
+        }
+        return $map;
+    }
+
+    /**
+     * @param DOMElement $element
+     * @return array|null
+     */
+    private static function output(DOMElement $element)
+    {
+        $map = array();
+        foreach (self::elements($element) as $child) {
+            if (self::localName($child) === 'format') {
+                $map['format'] = self::format($child);
+            }
+        }
+        return count($map) > 0 ? $map : null;
+    }
+
+    /**
+     * @param DOMElement $element
+     * @return array
+     */
+    private static function format(DOMElement $element)
+    {
+        $map = array();
+        $type = $element->getAttribute('type');
+        if ($type !== '') {
+            $map['type'] = $type;
+        }
+        $options = array();
+        foreach (self::elements($element) as $child) {
+            if (self::localName($child) === 'options') {
+                foreach (self::elements($child) as $option) {
+                    if (self::localName($option) === 'option') {
+                        $options[] = array(
+                            'name' => $option->getAttribute('name'),
+                            'value' => $option->getAttribute('value'),
+                        );
+                    }
+                }
+            }
+        }
+        if (count($options) > 0) {
+            $map['options'] = $options;
         }
         return $map;
     }

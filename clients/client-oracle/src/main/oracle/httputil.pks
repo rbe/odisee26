@@ -12,25 +12,29 @@ AS
     PROCEDURE get(
         url IN VARCHAR2
         , result OUT CLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     );
     PROCEDURE get(
         url IN VARCHAR2
         , result OUT BLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     );
     PROCEDURE post(
         url IN VARCHAR2
         , data IN VARCHAR2
         , charset IN VARCHAR2 DEFAULT 'UTF-8'
         , result OUT CLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     );
     PROCEDURE post(
         url IN VARCHAR2
         , data IN VARCHAR2
         , charset IN VARCHAR2 DEFAULT 'UTF-8'
         , result OUT BLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     );
     /*
-     * Post a request with an explicit Content-Type (text/xml or application/json).
+     * Post a request with an explicit Content-Type (text/xml or application/json) and Bearer token.
      */
     PROCEDURE post_document(
         url IN VARCHAR2
@@ -38,6 +42,7 @@ AS
         , content_type IN VARCHAR2
         , charset IN VARCHAR2 DEFAULT 'UTF-8'
         , result OUT BLOB
+        , bearer_token IN VARCHAR2 DEFAULT NULL
     );
     PROCEDURE process_response(
         url IN VARCHAR2

@@ -14,8 +14,8 @@
 ## Working with a single request
 
     :::php
-    // Create Odisee client with service URL and authentication
-    $odisee = Odisee::createClient('http://service.odisee.de', 'username', 'password');
+    // Create Odisee client with service URL and Bearer token
+    $odisee = Odisee::bearer('http://127.0.0.1:8080/odisee/document/generate', $token);
     // Create a new request for template HalloOdisee
     $request = $odisee->createRequest('HalloOdisee');
     // Set value for userfield 'hallo'
@@ -31,7 +31,7 @@ XML is the default. Call `useJson()` before `process()` to POST `application/jso
 The service converts that JSON into the XML request it already executes.
 
     :::php
-    $odisee = Odisee::createClient('http://service.odisee.de', 'username', 'password');
+    $odisee = Odisee::bearer('http://127.0.0.1:8080/odisee/document/generate', $token);
     $odisee->useJson();
     $request = $odisee->createRequest('HalloOdisee');
     $odisee->setUserfield($request, 'hallo', 'Odisee');
@@ -41,8 +41,8 @@ The service converts that JSON into the XML request it already executes.
 
     :::php
     // Example using fluent API
-    $odisee = Odisee::createClient('http://service.odisee.de', 'username', 'password');
-    $request = $odisee->createRequest('HalloOdisee')
+    $odisee = Odisee::bearer('http://127.0.0.1:8080/odisee/document/generate', $token);
+    $request = $odisee->createRequest('HalloOdisee');
     $odisee->setUserfield($request, 'hallo', 'Odisee von PHP am ' . $d)
-           ->setTableCellValue($request, 'Tabelle1', 'A4', 'support@odisee.de')
+           ->setTableCellValue($request, 'Tabelle1', 'A4', 'support@odisee.de');
     $document = $odisee->process();

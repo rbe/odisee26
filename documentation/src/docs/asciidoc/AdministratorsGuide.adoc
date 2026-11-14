@@ -5,12 +5,12 @@
 1. Software
 +
 .Writer
-(Ubuntu 18.04)
+(Ubuntu 26.04)
 
     apt-get install libreoffice-writer
 +
 .German Localization
-(Ubuntu 18.04)
+(Ubuntu 26.04)
 
     apt-get install libreoffice-l10n-de hunspell-de-de-frami mythes-de hyphen-de
 
@@ -111,18 +111,15 @@ linux-x86_64
 [[configure-libreoffice-in-odisee]]
 === Configure LibreOffice in Odisee
 
-Odisee can find LibreOffice installations by its own, just give it a
-try:
+Odisee can probe for a local installation with `odictl -q findooo`:
 
 [source,bash,linenums]
 ----
-[odisee@linux ~]$ odictl -q find-inst
-Installation path: /usr/lib/libreoffice
-Java classpath: /usr/lib/libreoffice/ure-link/share/java/juh.jar:
-                /usr/lib/libreoffice/ure-link/share/java/jurt.jar:
-                /usr/lib/libreoffice/ure-link/share/java/ridl.jar:
-                /usr/lib/libreoffice/program/classes/unoil.jar
+[odisee@linux ~]$ odictl -q findooo
+Found installation in /usr/lib/libreoffice
 ----
+
+UNO Java classes are packaged in `application.jar` from Maven Central (`org.libreoffice:libreoffice` (`libreoffice.jar`) and `org.libreoffice:unoloader`). Local `juh.jar`, `jurt.jar`, `ridl.jar`, and `unoil.jar` files are not used.
 
 If the above command succeeds, you can easily add LibreOffice instances
 through `odictl`. A typical instance is named like `odi<N>` and listens
@@ -407,20 +404,16 @@ That task does not use this compose file.
 
 ==== Apache httpd
 
-1. Enable modules: deflate, headers, proxy, proxy_ajp, ssl
+Embedded Tomcat serves HTTP on port 8080 under `/odisee`. An optional Apache reverse proxy forwards HTTP to that listener:
 
-        a2enmod deflate headers proxy proxy_ajp ssl
-
-2. Edit `$ODISEE_HOME/etc/apache/odisee.conf` or `odisee_ssl.conf` and copy into your Apache configuration
-
-3. Enable modules: deflate, headers, proxy, proxy_ajp, ssl
+1. Enable modules: deflate, headers, proxy, proxy_http, ssl
 +
 [source,bash,lineno]
 ----
-a2enmod deflate headers proxy proxy_ajp ssl
+a2enmod deflate headers proxy proxy_http ssl
 ----
 
-4. Edit `$ODISEE_HOME/etc/apache/odisee.conf` or `odisee_ssl.conf` and copy into your Apache configuration
+2. Forward `/odisee` in your virtual host configuration (`ProxyPreserveHost On` and `ProxyPass /odisee http://127.0.0.1:8080/odisee`).
 
 === Fonts
 

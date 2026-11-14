@@ -81,6 +81,16 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 | B44 | minor | fixed | `packageDistribution`, `prepareOdiseeImage`, and `Containerfile` pre-created or staged legacy shared `var/template`, `var/document`, `var/merge`, `var/image`, and `var/request` directories. Only runtime directories stay; tenant files live under `var/user/{name}/`. |
 | B45 | minor | fixed | A manual `workflow_dispatch` image build on a feature branch ran `published-versions.sh` and evicted an older `master` `2.6.0-<run>` version, and `image.yml` did not ignore HTTP 404 when listing container versions on a brand-new GHCR package. |
 
+## Clients and documentation
+
+| ID | Severity | Status | Bug |
+|---|---|---|---|
+| B57 | blocker | fixed | `OdiseeClient` reused one `final Request` across `createRequest` calls, `executeBasicMacroInDocument(String)` threw `NullPointerException` when `parameters` was null, `OdiseeHttpHelper` mutated JVM-global `CookieHandler.setDefault` and `http.maxRedirects`, `OdiseeClient.process` called deprecated `new URL(String)`, `OdiseeJson` dropped `output/format`, `clients/client-java` kept an unused `spring-security-crypto` test dependency, and `DesktopClient` / `LoginPane` still used HTTP Basic instead of `OdiseeClient.bearer`. |
+| B58 | blocker | fixed | `clients/client-php` sent only `CURLOPT_USERPWD` HTTP Basic, joined `dirname(__FILE__) . 'var/tmp'` without a slash and leaked temporary files, returned error bodies on HTTP >= 400, and dropped `output/format` in `OdiseeJson`. |
+| B59 | blocker | fixed | `clients/client-vbnet` sent only HTTP Basic/Digest with `Encoding.Default`, swallowed HTTP >= 400 responses other than 401/404, appended duplicate `<template>` elements in `setLatestTemplate`, wrapped `<action>` in `<post-process><instructions>` with `input/@file` instead of `input/@filename`, missed the first `Read` in `saveDocument` byte counts, and dropped `output/format` in `Helper.Json`. |
+| B60 | blocker | fixed | `clients/client-oracle` sent no `Authorization: Bearer` header, posted to `/oooDocument/generate`, emitted `<!DOCTYPE>` and legacy `<userfields>`/`<insert>` tags rejected by the v2 schema, misspelled `aligns` as `alings` in `aligntablecell`, and computed `Content-Length` with character `LENGTH` instead of UTF-8 byte length. |
+| B61 | minor | fixed | `.cursor/skills/release/SKILL.md` omitted the `${GITHUB_REF_NAME}` GHCR tag pushed on `v*` tags; `UsersGuide.adoc`, `AdministratorsGuide.adoc`, `clients/client-php/README.md`, `clients/client-vbnet/README.md`, and `webservice/src/test/resources/intellij/*.http` still carried HTTP Basic examples, missing `/odisee` context paths, `find-inst`, and nonexistent Apache AJP configuration files. |
+
 ## Tests added in wave 1
 
 - `TemplateLocatorTest` — `LATEST` is numeric, revision 1 falls back to `Name.ott`, path escape is rejected.

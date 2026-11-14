@@ -21,20 +21,7 @@ Public Class OdiseeSimpleClient
     ''' <summary>
     ''' The service URL.
     ''' </summary>
-    ''' <remarks></remarks>
     Private serviceURL As String
-
-    ''' <summary>
-    ''' The username (for HTTP BASIC authentication).
-    ''' </summary>
-    ''' <remarks></remarks>
-    Private username As String
-
-    ''' <summary>
-    ''' The password (for HTTP BASIC authentication).
-    ''' </summary>
-    ''' <remarks></remarks>
-    Private password As String
 
     ''' <summary>
     ''' xml (default) or json.
@@ -42,10 +29,9 @@ Public Class OdiseeSimpleClient
     Private requestFormat As String = "xml"
 
     ''' <summary>
-    ''' The auth key (e.g. used for non-public templates).
+    ''' The bearer access token for the Odisee service.
     ''' </summary>
-    ''' <remarks></remarks>
-    Private authKey As String
+    Private accessToken As String
 
     ''' <summary>
     ''' The Odisee request XML document.
@@ -100,31 +86,15 @@ Public Class OdiseeSimpleClient
         Return odiseeClient
     End Function
 
-    '
-    ' Factory method for creating a Odisee XML client.
-    '
-    Public Shared Function createClient(ByVal serviceURL As String, ByVal authKey As String) As OdiseeSimpleClient
+    Public Shared Function bearer(ByVal serviceURL As String, ByVal accessToken As String) As OdiseeSimpleClient
         Dim odiseeClient As OdiseeSimpleClient = New OdiseeSimpleClient()
-        ' Set service URL
         odiseeClient.serviceURL = serviceURL
-        ' Set authkey
-        odiseeClient.authKey = authKey
-        ' Return instance of OdiseeClient
+        odiseeClient.accessToken = accessToken
         Return odiseeClient
     End Function
 
-    '
-    ' Factory method for creating a Odisee XML client.
-    '
-    Public Shared Function createClient(ByVal serviceURL As String, ByVal username As String, ByVal password As String) As OdiseeSimpleClient
-        Dim odiseeClient As OdiseeSimpleClient = New OdiseeSimpleClient()
-        ' Set service URL
-        odiseeClient.serviceURL = serviceURL
-        ' Remember username and password
-        odiseeClient.username = username
-        odiseeClient.password = password
-        ' Return instance of OdiseeClient
-        Return odiseeClient
+    Public Shared Function createClient(ByVal serviceURL As String, ByVal accessToken As String) As OdiseeSimpleClient
+        Return bearer(serviceURL, accessToken)
     End Function
 
 #End Region
@@ -159,9 +129,8 @@ Public Class OdiseeSimpleClient
         xmlElement.SetAttribute("type", "merge-with")
         xmlElement.AppendChild(__xmlDoc.CreateElement("result-placeholder"))
         Dim inputFileElement As XmlElement = __xmlDoc.CreateElement("input")
-        inputFileElement.SetAttribute("file", filepath)
+        inputFileElement.SetAttribute("filename", filepath)
         xmlElement.AppendChild(inputFileElement)
-        ' Append in last instructions-element
         Helper.Xml.appendPostProcessInstruction(actualRequest, xmlElement)
         Return Me
     End Function
@@ -258,16 +227,25 @@ Public Class OdiseeSimpleClient
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function setLatestTemplate(ByVal template As String, ByVal outputFormat As String) As OdiseeSimpleClient
-        Dim templateElement As XmlElement = __xmlDoc.CreateElement("template")
-        actualRequest.AppendChild(templateElement)
+        Dim existing As XmlNode = actualRequest.SelectSingleNode("template")
+        Dim templateElement As XmlElement
+        If existing IsNot Nothing AndAlso TypeOf existing Is XmlElement Then
+            templateElement = CType(existing, XmlElement)
+        Else
+            templateElement = __xmlDoc.CreateElement("template")
+            Dim archiveNode As XmlNode = actualRequest.SelectSingleNode("archive")
+            Dim instructionsNode As XmlNode = actualRequest.SelectSingleNode("instructions")
+            If archiveNode IsNot Nothing Then
+                actualRequest.InsertBefore(templateElement, archiveNode)
+            ElseIf instructionsNode IsNot Nothing Then
+                actualRequest.InsertBefore(templateElement, instructionsNode)
+            Else
+                actualRequest.AppendChild(templateElement)
+            End If
+        End If
         templateElement.SetAttribute("name", template)
-        ' Use latest revision of template
         templateElement.SetAttribute("revision", "LATEST")
-        ' Output format by file extension
         templateElement.SetAttribute("outputFormat", outputFormat)
-        ' Append element to request
-        actualRequest.AppendChild(templateElement)
-        '
         Return Me
     End Function
 
@@ -315,31 +293,20 @@ Public Class OdiseeSimpleClient
     ''' </summary>
     ''' <returns></returns>
     ''' <remarks></remarks>
-    Public Function process() As WebResponse
-        ' Check state
-        ' Service URL set?
-        If IsNothing(serviceURL) Then
+    Public Function process(Optional ByVal timeout As Integer = 30000) As HttpWebResponse
+        If String.IsNullOrWhiteSpace(serviceURL) Then
             Throw New Exception(OdiseeConstant.ERR_NO_SERVICE_URL)
         End If
-        ' Username w/o password?
-        If Not IsNothing(username) And IsNothing(password) Then
+        If String.IsNullOrWhiteSpace(accessToken) Then
             Throw New Exception(OdiseeConstant.ERR_NO_AUTH_INFO)
         End If
-        ' Send Odisee request through HTTP POST
-        Dim webResponse As WebResponse
         Dim body As String = __xmlDoc.OuterXml
         Dim contentType As String = "text/xml; charset=UTF-8"
         If requestFormat = "json" Then
             body = Helper.Json.FromXml(__xmlDoc)
             contentType = "application/json; charset=UTF-8"
         End If
-        If Not IsNothing(username) And Not IsNothing(password) Then
-            webResponse = Helper.HttpPost.doDigestAuthPost(body, contentType, New Uri(serviceURL), username, password)
-        Else
-            webResponse = Helper.HttpPost.doDigestAuthPost(body, contentType, New Uri(serviceURL))
-        End If
-        ' Return response from Odisee HTTP server
-        Return webResponse
+        Return Helper.HttpPost.doBearerPost(body, contentType, New Uri(serviceURL), accessToken, timeout)
     End Function
 
 #End Region

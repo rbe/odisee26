@@ -341,8 +341,8 @@ Public Class OdiseeTester
         If odiseeRequestXML.Length = 0 Then
             makeOdiseeRequestButton_Click(Nothing, Nothing)
         End If
-        If odiseeServer = "" Or username = "" Or password = "" Then
-            MsgBox("Bitte geben Sie einen Server, Benutzername und Passwort ein!")
+        If odiseeServer = "" Or password = "" Then
+            MsgBox("Bitte geben Sie einen Server und ein Bearer-Token ein!")
         Else
             ' Save user input
             toolStripStatusLabel.Text = "Saving settings..."
@@ -392,11 +392,8 @@ Public Class OdiseeTester
     ''' <returns></returns>
     ''' <remarks></remarks>
     Private Function makeOdiseeClient() As OdiseeClient
-        ' Create Odisee client through factory using a service URL and username/password for HTTP BASIC authentication
-        odiseeClient = OdiseeClient.createClient(odiseeGenerateDocumentURI, username, password)
-        ' Create a first request for a certain template
+        odiseeClient = OdiseeClient.bearer(odiseeGenerateDocumentURI, password)
         odiseeClient.createRequest(template)
-        ' Parse XML from textbox
         odiseeClient.xmlDoc.LoadXml(odiseeRequestXML)
         Return odiseeClient
     End Function
@@ -473,9 +470,9 @@ Public Class OdiseeTester
                 myState.requestNumber = myState.requestNumber + 1
                 ' Process request
                 If myState.timeout > 0 Then
-                    webResponse = myState.odiseeClient.process(myState.timeout, myState.httpAuthMethod)
+                    webResponse = myState.odiseeClient.process(myState.timeout)
                 Else
-                    webResponse = myState.odiseeClient.process(0, myState.httpAuthMethod)
+                    webResponse = myState.odiseeClient.process(0)
                 End If
                 Dim contentLength As Long
                 If Not IsNothing(webResponse) Then

@@ -28,29 +28,14 @@ class Odisee
 {
 
     /**
-     * @var array Cache instances of OdiseeClient created by createClient().
-     */
-    private static $_instances = array();
-
-    /**
-     * @var string URL of Odisee service, w/o last part: /odisee/document/generate.
+     * @var string URL of Odisee service.
      */
     private $serviceURL;
 
     /**
-     * @var string Odisee user.
+     * @var string Bearer access token for Odisee service.
      */
-    private $username;
-
-    /**
-     * @var string Password.
-     */
-    private $password;
-
-    /**
-     * @var null|string Authkey for Odisee service.
-     */
-    private $authkey;
+    private $accessToken;
 
     /**
      * @var DOMDocument XML document for Odisee request.
@@ -70,16 +55,15 @@ class Odisee
     /**
      * Private constructor, setup XML document.
      * @param string $serviceURL URL of Odisee service.
-     * @param string $username The username.
-     * @param string $password The password.
-     * @param null|string $authkey Authentication key, used w/ authenticating w/o password.
+     * @param string $accessToken Bearer access token.
      */
-    private function __construct($serviceURL, $username, $password, $authkey = null)
+    private function __construct($serviceURL, $accessToken)
     {
+        if (!OdiseeStringHelper::checkStr($accessToken) || trim($accessToken) === '') {
+            throw new OdiseeException('Bearer access token is required');
+        }
         $this->serviceURL = $serviceURL;
-        $this->username = $username;
-        $this->password = $password;
-        $this->authkey = $authkey;
+        $this->accessToken = trim($accessToken);
         $this->initializeXmlDocument();
     }
 
@@ -100,32 +84,34 @@ class Odisee
     //<editor-fold desc="Odisee Client Factory">
 
     /**
+     * Create an Odisee client sending Authorization: Bearer.
      * @param string $serviceURL URL of Odisee service.
-     * @param string $authkey Authentication key, used w/ authenticating w/o password.
+     * @param string $accessToken Keycloak client-credentials access token.
      * @return Odisee
      */
-    public static function createClientWithAuthkey($serviceURL, $authkey)
+    public static function bearer($serviceURL, $accessToken)
     {
-        $ident = $serviceURL . "_" . $authkey;
-        if (!isset(self::$_instances[$ident])) {
-            self::$_instances[$ident] = new self($serviceURL, null, null, $authkey);
-        }
-        return self::$_instances[$ident];
+        return new self($serviceURL, $accessToken);
     }
 
     /**
      * @param string $serviceURL URL of Odisee service.
-     * @param string $username The username.
-     * @param string $password The password.
+     * @param string $accessToken Bearer access token.
      * @return Odisee
      */
-    public static function createClient($serviceURL, $username, $password)
+    public static function createClientWithAuthkey($serviceURL, $accessToken)
     {
-        $ident = $serviceURL . "_" . $username;
-        if (!isset(self::$_instances[$ident])) {
-            self::$_instances[$ident] = new self($serviceURL, $username, $password);
-        }
-        return self::$_instances[$ident];
+        return self::bearer($serviceURL, $accessToken);
+    }
+
+    /**
+     * @param string $serviceURL URL of Odisee service.
+     * @param string $accessToken Bearer access token.
+     * @return Odisee
+     */
+    public static function createClient($serviceURL, $accessToken)
+    {
+        return self::bearer($serviceURL, $accessToken);
     }
 
     //</editor-fold>
@@ -314,12 +300,12 @@ class Odisee
     /**
      * Process Odisee request and return a document.
      * @param bool $debug
-     * @return mixed Odisee generated document on success, false otherwise.
+     * @return string Odisee generated document on success.
      * @throws OdiseeException
      */
     public function process($debug = FALSE)
     {
-        if (OdiseeStringHelper::checkStr($this->serviceURL) && strpos($this->serviceURL, 'http') == 0) {
+        if (OdiseeStringHelper::checkStr($this->serviceURL) && strpos($this->serviceURL, 'http') === 0) {
             $contentType = 'text/xml; charset=UTF-8';
             $data = $this->xmlDoc->saveXML();
             if ($this->requestFormat === 'json') {
@@ -339,8 +325,7 @@ class Odisee
             if (isset($_SERVER['SERVER_PROTOCOL']) && isset($_SERVER['SERVER_NAME']) && isset($_SERVER['SERVER_PORT'])) {
                 $referer = $_SERVER['SERVER_PROTOCOL'] . '://' . $_SERVER['SERVER_NAME'] . ':' . $_SERVER['SERVER_PORT'];
             }
-            $document = OdiseeHttpHelper::post($this->serviceURL, $this->username, $this->password, $referer, $data, $contentType);
-            return $document;
+            return OdiseeHttpHelper::post($this->serviceURL, $this->accessToken, $referer, $data, $contentType);
         } else {
             throw new OdiseeException('Incorrect service URL!');
         }

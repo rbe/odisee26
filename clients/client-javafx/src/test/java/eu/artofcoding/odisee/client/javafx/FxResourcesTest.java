@@ -5,6 +5,7 @@ import org.junit.Test;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -25,6 +26,16 @@ public class FxResourcesTest {
         assertResource("/images/Odisee_Maskottchen_positiv.png");
         assertResource("/images/Odisee_Maskottchen_negativ.png");
         assertResource("/images/Odisee_Signet.png");
+    }
+
+    @Test
+    public void loginPaneUsesBearerTokenInputs() throws Exception {
+        final String fxml = read(FxmlNames.path("LoginPane"));
+        assertTrue(fxml.contains("fx:id=\"serviceUrl\""));
+        assertTrue(fxml.contains("fx:id=\"bearerToken\""));
+        assertFalse(fxml.contains("loginUsername"));
+        assertFalse(fxml.contains("loginPassword"));
+        assertNotNull(LoginController.class.getDeclaredMethod("loginTokenFocus"));
     }
 
     private static void assertScreen(final String name, final String controller) throws Exception {

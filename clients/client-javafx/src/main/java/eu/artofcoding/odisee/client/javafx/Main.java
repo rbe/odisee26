@@ -26,7 +26,7 @@ public class Main extends Application {
         stage.show();
         //
         LoginController loginController = (LoginController) loginPanelLoader.getController();
-        loginController.loginUsernameFocus();
+        loginController.loginTokenFocus();
     }
 
     public static void main(String[] args) {

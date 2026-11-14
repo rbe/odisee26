@@ -70,6 +70,24 @@ public class OdiseeJsonTest {
                 + "\"delivery\":\"both\"}", OdiseeJson.fromXml(xml));
     }
 
+    @Test
+    public void outputFormatAndOptionsArePreservedInJson() {
+        final String xml = "<odisee>"
+                + "<request name=\"Typed\">"
+                + "<template name=\"Letter\" outputFormat=\"odt\"/>"
+                + "<instructions><userfield name=\"Hallo\">x</userfield></instructions>"
+                + "<output><format type=\"pdf\"><options>"
+                + "<option name=\"pdf-version\" value=\"1.4\"/>"
+                + "<option name=\"watermark\" value=\"DRAFT\"/>"
+                + "</options></format></output>"
+                + "</request></odisee>";
+        assertEquals("{\"request\":[{\"name\":\"Typed\",\"template\":{\"name\":\"Letter\",\"outputFormat\":\"odt\"},"
+                + "\"instructions\":[{\"instruction\":\"userfield\",\"name\":\"Hallo\",\"value\":\"x\"}],"
+                + "\"output\":{\"format\":{\"type\":\"pdf\",\"options\":["
+                + "{\"name\":\"pdf-version\",\"value\":\"1.4\"},"
+                + "{\"name\":\"watermark\",\"value\":\"DRAFT\"}]}}}]}", OdiseeJson.fromXml(xml));
+    }
+
     private static String resource(final String name) throws IOException {
         try (InputStream in = OdiseeJsonTest.class.getResourceAsStream("/" + name)) {
             if (in == null) {

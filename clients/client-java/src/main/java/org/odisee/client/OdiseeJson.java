@@ -83,6 +83,7 @@ public final class OdiseeJson {
         final List<Object> instructions = new ArrayList<>();
         boolean sawInstructions = false;
         Map<String, Object> requestPostProcess = null;
+        Map<String, Object> requestOutput = null;
         for (Element child : elements(element)) {
             switch (localName(child)) {
                 case "template":
@@ -99,6 +100,9 @@ public final class OdiseeJson {
                 case "post-process":
                     requestPostProcess = postProcess(child);
                     break;
+                case "output":
+                    requestOutput = output(child);
+                    break;
                 default:
                     break;
             }
@@ -108,6 +112,44 @@ public final class OdiseeJson {
         }
         if (requestPostProcess != null) {
             map.put("postProcess", requestPostProcess);
+        }
+        if (requestOutput != null) {
+            map.put("output", requestOutput);
+        }
+        return map;
+    }
+
+    private static Map<String, Object> output(final Element element) {
+        final Map<String, Object> map = new LinkedHashMap<>();
+        for (Element child : elements(element)) {
+            if ("format".equals(localName(child))) {
+                map.put("format", format(child));
+            }
+        }
+        return map.isEmpty() ? null : map;
+    }
+
+    private static Map<String, Object> format(final Element element) {
+        final Map<String, Object> map = new LinkedHashMap<>();
+        final String type = element.getAttribute("type");
+        if (type != null && !type.isEmpty()) {
+            map.put("type", type);
+        }
+        final List<Object> options = new ArrayList<>();
+        for (Element child : elements(element)) {
+            if ("options".equals(localName(child))) {
+                for (Element option : elements(child)) {
+                    if ("option".equals(localName(option))) {
+                        final Map<String, Object> pair = new LinkedHashMap<>();
+                        pair.put("name", option.getAttribute("name"));
+                        pair.put("value", option.getAttribute("value"));
+                        options.add(pair);
+                    }
+                }
+            }
+        }
+        if (!options.isEmpty()) {
+            map.put("options", options);
         }
         return map;
     }

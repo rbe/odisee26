@@ -8,12 +8,13 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
+import org.odisee.client.OdiseeClient;
 
 import java.net.URL;
 import java.util.ResourceBundle;
 
 public class LoginController implements Initializable {
-    
+
     @FXML
     private AnchorPane loginPane;
 
@@ -24,13 +25,15 @@ public class LoginController implements Initializable {
     private ImageView odiseeMaskottchenNegativ;
 
     @FXML
-    private TextField loginUsername;
+    private TextField serviceUrl;
 
     @FXML
-    private PasswordField loginPassword;
+    private PasswordField bearerToken;
 
     @FXML
     private Button loginButton;
+
+    private OdiseeClient client;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -38,22 +41,25 @@ public class LoginController implements Initializable {
         odiseeMaskottchenPositiv.setImage(Resources.getOdiseeMaskottchenPositiv());
         odiseeMaskottchenNegativ.setImage(Resources.getOdiseeMaskottchenNegativ());
     }
-    
-    public void loginUsernameFocus() {
-        loginUsername.requestFocus();
+
+    public void loginTokenFocus() {
+        bearerToken.requestFocus();
+    }
+
+    public OdiseeClient getClient() {
+        return client;
     }
 
     @FXML
     private void loginButtonPressed(ActionEvent event) {
-        System.out.printf("%s.loginButtonPressed(%s) loginUsername=%s%n", this, event, loginUsername.getText());
+        final String url = serviceUrl == null ? "" : serviceUrl.getText().trim();
+        final String token = bearerToken == null ? "" : bearerToken.getText().trim();
+        if (!url.isEmpty() && !token.isEmpty()) {
+            client = DesktopClient.open(url, token);
+        }
         odiseeMaskottchenPositiv.setOpacity(0.0);
         odiseeMaskottchenPositiv.setVisible(true);
         FXHelper.fadeIn(odiseeMaskottchenPositiv, 500);
-        /*
-        odiseeMaskottchenNegativ.setOpacity(0.0);
-        odiseeMaskottchenNegativ.setVisible(true);
-        FXHelper.fadeIn(odiseeMaskottchenNegativ, 1500);
-        */
         FXHelper.fadeOut(loginPane, 3000);
     }
 
