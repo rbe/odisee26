@@ -26,45 +26,71 @@ set -o nounset
 #
 # ---------------------------------------------------------------------------
 
+is_watchdog_running() {
+    local inst=$1
+    local self=$$
+    local raw pid ppid args
+    raw=$(ps axww -o pid=,ppid=,args= 2>/dev/null || true)
+    while read -r pid ppid args
+    do
+        [ -z "${pid}" ] && continue
+        [ "${pid}" = "${self}" ] && continue
+        [ "${ppid}" = "${self}" ] && continue
+        case " ${args} " in
+            *odiwatchdog*" -i ${inst} "*|*odiwatchdog*" -i ${inst},"*|*odiwatchdog*",${inst} "*|*odiwatchdog*",${inst},"*)
+                return 0
+                ;;
+        esac
+    done <<< "${raw}"
+    return 1
+}
+
 #
 # Watch OpenOffice instance on certain port.
 #
 watch_instance() {
     local inst=$1
-    get_inst_cfg ${inst}
-    # Watchdog running?
-    case "${ODISEE_OS}" in
-        FreeBSD)
-            watchdog_running=$(ps axww | grep -v grep | grep -c "odiwatchdog -i ${inst}")
-        ;;
-        *)
-            watchdog_running=$(ps -e | grep -v grep | grep -c "odiwatchdog -i ${inst}")
-        ;;
-    esac
-    if [ ${watchdog_running} -eq 0 ]; then
+    get_inst_cfg "${inst}"
+    local port=${INSTCFG[port]}
+    local timeout=${ODISEE_WD_TIMEOUT}
+    local port_open=0
+    local ctl
+    ctl=$(command -v odictl 2>/dev/null || true)
+    [ -n "${ctl}" ] || ctl="${SCRIPT_DIR}/odictl"
+    if ! is_watchdog_running "${inst}"; then
         echo "Start watching instance '${inst}'."
-        while [ true ]
+        while true
         do
             # TCP/IP port open and process running?
             case "${ODISEE_OS}" in
+                Darwin)
+                    local ns raw
+                    ns=$(command -v netstat 2>/dev/null || true)
+                    if [ -z "${ns}" ] && [ -x /usr/sbin/netstat ]
+                    then
+                        ns=/usr/sbin/netstat
+                    fi
+                    raw=$("${ns}" -an -p tcp 2>/dev/null || true)
+                    port_open=$(printf '%s\n' "${raw}" | grep -E "[^0-9]${port}([^0-9]|$)" | grep -c LIST || true)
+                ;;
                 FreeBSD)
-                    port_open=$(sockstat -46l | grep -c ${port}) # | grep LISTEN
+                    port_open=$(sockstat -46l -p "${port}" 2>/dev/null | grep -vc USER || true)
                 ;;
                 Linux)
-                    port_open=$(proc_tcp_count ${port} 0A) # LISTEN in /proc/net/tcp
+                    port_open=$(proc_tcp_count "${port}" 0A) # LISTEN in /proc/net/tcp
                 ;;
                 *)
-                    port_open=$(netstat -nlt | grep -c ${port}) # | grep LISTEN
+                    port_open=$(netstat -nlt 2>/dev/null | grep -E "[^0-9]${port}([^0-9]|$)" | grep -c LIST || true)
                 ;;
             esac
             # TCP/IP port not open, so instance should be restarted
-            if [ ${port_open} -eq 0 ]; then
+            if [ "${port_open}" -eq 0 ]; then
                 echo "Odisee: Port ${port} closed, restarting instance '${inst}'."
-                # Restart instance
-                odictl -q start -i ${inst}
+                # Restart instance only, not the application server
+                "${ctl}" -q start-inst -i "${inst}"
             fi
             # Wait some time before check
-            sleep ${WD_TIMEOUT}
+            sleep "${timeout}"
         done
     else
         echo "Odisee: There is a watchdog for instance '${inst}' already."
@@ -96,7 +122,7 @@ exec_cmdopt() {
 # Execute commands local.
 #
 _exec_local() {
-    if [ ${#cmdopt[*]} -gt 0 ]
+    if [ "${#cmdopt[@]}" -gt 0 ]
     then
         check_cmdopt
         if [ $BADENV = false -a $CMDOK = true ]
@@ -159,10 +185,11 @@ declare -A cmdopt
 CMDOK=true
 
 # Parse command line
-while getopts ":i:" opt
+while getopts ":hi:" opt
 do
     case "${opt}" in
-        i) _acceptopt i $OPTARG ;;
+        h) show_help; exit 0 ;;
+        i) _acceptopt i "$OPTARG" ;;
         \?)
             echo "Odisee: Unknown option -$OPTARG"
         ;;

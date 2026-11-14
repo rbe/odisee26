@@ -76,9 +76,11 @@ exec_cmdopt() {
     # Watch instance(s)
     if [ x"$(is_cmdopt w i)" = x"true" ]
     then
+        mkdir -p "${ODISEE_LOG}"
         for i in $(_splitcmdopt i)
         do
-            nohup $0 watch_instance $i 1>${ODISEE_LOG}/watchdog_$i.log 2>&1 &
+            exit_inst_does_not_exist "${i}"
+            nohup "${SCRIPT_DIR}/odiwatchdog" -i "${i}" 1>"${ODISEE_LOG}/watchdog_${i}.log" 2>&1 &
         done
     fi
     # Remove instance(s)
@@ -115,7 +117,7 @@ exec_cmdopt() {
         # If no instance(s) were given with -i, look for autostart instance(s)
         if [ x"$(is_cmdopt i)" = x"false" ]
         then
-            cmdopt[i]=$(grep "true$" ${ODISEE_INST} | awk -F\| '{print $1}')
+            cmdopt[i]=$(awk -F\| '$1 !~ /^[[:space:]]*(#|$)/ && $7 ~ /^[[:space:]]*true[[:space:]]*$/ { out = (out ? out "," $1 : $1) } END { printf "%s", out }' "${ODISEE_INST}")
             if [ ${#cmdopt[i]} -eq 0 ]
             then
                 echo "Odisee: No instances configured for autostart."
@@ -211,6 +213,7 @@ Modes
   -e                                    Enable something.
   -r                                    Remove something.
   -s                                    Show Odisee status.
+  -w                                    Watch instance(s).
 
   Depending on operation
   -t <type>                             Type of an operation.
@@ -354,12 +357,36 @@ odictl_require_user_name() {
     printf '%s' "$trimmed"
 }
 
+odictl_oidc_value() {
+    local file="$1" key="$2" fallback="$3"
+    local line trimmed k rest
+    if [[ -f "$file" ]]
+    then
+        while IFS= read -r line || [[ -n "$line" ]]
+        do
+            trimmed=$(odictl_trim "$line")
+            [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
+            k="${trimmed%%[[:space:]]*}"
+            if [[ "$k" == "$key" ]]
+            then
+                rest=$(odictl_trim "${trimmed#"$k"}")
+                if [[ -n "$rest" ]]
+                then
+                    printf '%s' "$rest"
+                    return 0
+                fi
+            fi
+        done < "$file"
+    fi
+    printf '%s' "$fallback"
+}
+
 odictl_cmd_user() {
     if [[ $# -ne 1 ]]
     then
         odictl_fail "usage: odictl user <name>"
     fi
-    local name issuer admin password base realm token secret file
+    local name issuer admin password base realm token secret file audience ui_client
     name=$(odictl_require_user_name "$1") || exit 1
     if [[ "$name" == "odisee-ui" ]]
     then
@@ -374,6 +401,13 @@ odictl_cmd_user() {
     fi
     command -v curl >/dev/null 2>&1 || odictl_fail "curl is required"
     odictl_lock
+    file="${ODISEE_HOME}/etc/oidc"
+    audience=$(odictl_oidc_value "$file" audience odisee)
+    ui_client=$(odictl_oidc_value "$file" ui-client odisee-ui)
+    if [[ "$name" == "$ui_client" ]]
+    then
+        odictl_fail "Invalid user '${name}'"
+    fi
     if [[ -d "${ODISEE_HOME}/var/user/${name}" ]]
     then
         odictl_fail "User '${name}' already exists"
@@ -382,7 +416,7 @@ odictl_cmd_user() {
     realm="${issuer##*/}"
     token=$(odictl_keycloak_admin_token "$base" "$admin" "$password") || exit 1
     secret=$(odictl_client_secret) || exit 1
-    odictl_keycloak_create_client "$base" "$realm" "$token" "$name" "$secret" || exit 1
+    odictl_keycloak_create_client "$base" "$realm" "$token" "$name" "$secret" "$audience" || exit 1
     if ! odictl_keycloak_create_user "$base" "$realm" "$token" "$name"
     then
         odictl_keycloak_delete_client "$base" "$realm" "$token" "$name" || true
@@ -397,12 +431,11 @@ odictl_cmd_user() {
         odictl_keycloak_delete_client "$base" "$realm" "$token" "$name" || true
         odictl_fail "could not create directories for '${name}'"
     fi
-    file="${ODISEE_HOME}/etc/oidc"
     odictl_write_private "$file" \
         '# Odisee OpenID Connect. The server reads this file on use.' \
         "issuer ${issuer}" \
-        'audience odisee' \
-        'ui-client odisee-ui'
+        "audience ${audience}" \
+        "ui-client ${ui_client}"
     echo "Odisee: User '${name}' created."
     echo "client_id=${name}"
     echo "client_secret=${secret}"
@@ -451,7 +484,7 @@ odictl_keycloak_code() {
 }
 
 odictl_keycloak_create_client() {
-    local base="$1" realm="$2" token="$3" name="$4" secret="$5" json code
+    local base="$1" realm="$2" token="$3" name="$4" secret="$5" audience="${6:-odisee}" json code
     json=$(printf '%s' \
         "{\"clientId\":\"${name}\",\"enabled\":true,\"protocol\":\"openid-connect\"," \
         "\"publicClient\":false,\"secret\":\"${secret}\",\"clientAuthenticatorType\":\"client-secret\"," \
@@ -459,7 +492,7 @@ odictl_keycloak_create_client() {
         "\"directAccessGrantsEnabled\":false,\"fullScopeAllowed\":true," \
         "\"protocolMappers\":[{\"name\":\"odisee-audience\",\"protocol\":\"openid-connect\"," \
         "\"protocolMapper\":\"oidc-audience-mapper\",\"consentRequired\":false," \
-        "\"config\":{\"included.custom.audience\":\"odisee\",\"access.token.claim\":\"true\",\"id.token.claim\":\"false\"}}]}")
+        "\"config\":{\"included.custom.audience\":\"${audience}\",\"access.token.claim\":\"true\",\"id.token.claim\":\"false\"}}]}")
     code=$(odictl_keycloak_code POST "${base}/admin/realms/${realm}/clients" "$token" "$json") || exit 1
     if [[ "$code" == "201" || "$code" == "204" ]]
     then
@@ -764,8 +797,9 @@ CMD_DEPENDENCY_AND[m]="i"
 CMD_DEPENDENCY_AND[o]="i m"
 CMD_DEPENDENCY_AND[p]="i m"
 CMD_DEPENDENCY_AND[r]="i"
+CMD_DEPENDENCY_AND[w]="i"
 # Command line option no-goes
-CMD_DEPENDENCY_OR[i]="c f l m o p q r x"
+CMD_DEPENDENCY_OR[i]="c f l m o p q r w x"
 # Command line option no-goes
 #   -c, -d, -e and -r are mutually exclusive
 CMD_NOGO[c]="d e r"
@@ -786,7 +820,7 @@ then
 fi
 
 # Parse parameters
-while getopts ":cdehHmLrszf:i:l:o:p:q:t:u:x:y:" opt
+while getopts ":cdehHmLrswzf:i:l:o:p:q:t:u:x:y:" opt
 do
     case $opt in
         c) cmdopt[c]=true ;;
@@ -810,6 +844,7 @@ do
         s) cmdopt[s]=true ;;
         t) _acceptopt t $OPTARG ;;
         u) _acceptopt u $OPTARG ;;
+        w) cmdopt[w]=true ;;
         x) _acceptopt x $OPTARG ;;
         y) _acceptopt y $OPTARG ;;
         z) cmdopt[z]=true ;;

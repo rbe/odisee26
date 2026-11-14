@@ -263,7 +263,12 @@ tasks.register<Copy>("prepareOdiseeImage") {
     group = "Odisee"
     description = "Stage the service image context"
     dependsOn(tasks.named("bootJar"))
-    from("src/main/container")
+    doFirst {
+        imageBuildDir.get().asFile.resolve("var").deleteRecursively()
+    }
+    from("src/main/container") {
+        exclude("var/**")
+    }
     from(tasks.named("bootJar"))
     into(imageBuildDir)
 }

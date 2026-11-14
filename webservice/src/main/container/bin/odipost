@@ -27,69 +27,94 @@ declare outputfile
 declare host
 declare port
 declare user
+declare bearer
+declare authtype
 declare trace
+declare compress
 
 _odipost_do() {
-    # curl options
-    local curlopts
-    curlopts="-s"
+    local -a curlargs=(-v -s)
+    local gzfile=""
     # Trace file
     if [ "${trace}" = "true" ]
     then
-        tracefile="output/${requestfile}_trace.log"
-        curlopts="${curlopts} --trace-ascii ${tracefile}"
+        mkdir -p output
+        tracefile="output/$(basename "${requestfile}")_trace.log"
+        curlargs+=(--trace-ascii "${tracefile}")
     fi
-    # Request XML file
-    if [ -n "${requestfile}" ];
+    # Request file
+    if [ -n "${requestfile}" ]
     then
         local rf
-        if [ "${requestfile}" != ^/* ]
+        if [[ "${requestfile}" != /* ]]
         then
-            rf=${ODISEE_HOME}/var/test/${requestfile}
+            if [[ -f "${ODISEE_HOME}/var/request/${requestfile}" ]]
+            then
+                rf="${ODISEE_HOME}/var/request/${requestfile}"
+            elif [[ -f "${requestfile}" ]]
+            then
+                rf="${requestfile}"
+            else
+                rf="${ODISEE_HOME}/var/request/${requestfile}"
+            fi
         else
-            rf=${requestfile}
+            rf="${requestfile}"
         fi
-        if [ ! -f ${rf} ]
+        if [[ ! -f "${rf}" ]]
         then
-            echo "Request file ${rf} does not exist!"
+            echo "Request file ${rf} does not exist!" >&2
             exit 1
         fi
         if [ "${compress}" = "true" ]
         then
-            gzip -c ${rf} > ${rf}.gz
-            rf=${rf}.gz
-            curlopts="${curlopts} -H \"Content-Encoding: gzip\" --data-binary @${rf}"
+            gzfile=$(mktemp)
+            gzip -c "${rf}" > "${gzfile}"
+            curlargs+=(-H "Content-Encoding: gzip" --data-binary "@${gzfile}")
         else
-            curlopts="${curlopts} -d @${rf}"
+            curlargs+=(--data-binary "@${rf}")
+        fi
+        if [[ "${rf}" == *.json ]]
+        then
+            curlargs+=(-H "Content-Type: application/json")
+        else
+            curlargs+=(-H "Content-Type: text/xml")
         fi
     fi
     # Output
-    [ -n "${outputfile}" ] && curlopts="${curlopts} -o ${outputfile}"
-    # Host, port, URL, authentication
-    if [ -n "${user}" ];
+    [ -n "${outputfile}" ] && curlargs+=(-o "${outputfile}")
+    # Authentication: Bearer token wins; legacy basic/digest requires explicit -u/-a
+    if [ -n "${bearer}" ]
     then
-        [ "${authtype}" = "basic"  ] && curlopts="${curlopts} --basic -u \"${user}\""
-        [ "${authtype}" = "digest" ] && curlopts="${curlopts} --digest -u \"${user}\""
+        curlargs+=(-H "Authorization: Bearer ${bearer}")
+    elif [ -n "${user}" ]
+    then
+        [ "${authtype}" = "basic"  ] && curlargs+=(--basic -u "${user}")
+        [ "${authtype}" = "digest" ] && curlargs+=(--digest -u "${user}")
     fi
-    local url="${host}:${port}/odisee/document/generate"
-    curlopts="${curlopts} -H \"Content-Type: text/xml\""
-    curlopts="${curlopts} -X POST ${url}"
-    # Execute curl
-    eval curl -v ${curlopts}
+    local url
+    if [[ "${host}" == http://* || "${host}" == https://* ]]
+    then
+        url="${host}:${port}/odisee/document/generate"
+    else
+        url="http://${host}:${port}/odisee/document/generate"
+    fi
+    curlargs+=(-X POST "${url}")
+    set +e
+    curl "${curlargs[@]}"
     curlrv=$?
+    [ -n "${gzfile}" ] && rm -f "${gzfile}"
 }
 
 _odipost_usage() {
-    echo "usage: $0 [-h <host>] [-p <port>] [-t] [-a <basic|digest>] [-u <user:password>] -f <requestfile.xml> [-o <outputfile>] [-z]"
+    echo "usage: $0 [-h <host>] [-p <port>] [-t] [--bearer <token> | -b <token>] -f <requestfile.xml> [-o <outputfile>] [-z]"
     echo ""
     echo "       defaults:"
-    echo "       -a authtype = basic"
+    echo "       --bearer / ODISEE_TOKEN sends Authorization: Bearer <token>"
     echo "       -f uses file from \$ODISEE_HOME/var/request when path does not start with slash"
     echo "       -h host = 127.0.0.1"
     echo "       -p port = 8080"
-    echo "       -u user = odisee:odisee"
     echo "       -t trace = false"
-    echo "       -o outputfile = <resultfile.xml>.bin"
+    echo "       -o outputfile = <requestfile>.bin"
     echo "       -z compress = false"
     exit 1
 }
@@ -99,28 +124,78 @@ compress=false
 trace=false
 host=127.0.0.1
 port=8080
-authtype=basic
-user="odisee:odisee"
+authtype=bearer
+user=""
+bearer="${ODISEE_TOKEN:-}"
 requestfile=
 outputfile=
 tracefile=
 
 # Parse command line options
-while getopts "a:f:h:o:p:tu:z" opt
+while [[ $# -gt 0 ]]
 do
-    case "$opt" in
-        a) authtype=${OPTARG} ;;
-        f) requestfile=${OPTARG} ;;
-        h) host=${OPTARG} ;;
-        o) outputfile=${OPTARG} ;;
-        p) port=${OPTARG} ;;
-        t) trace=true ;;
-        u) user=${OPTARG} ;;
-        z) compress=true ;;
+    case "$1" in
+        --bearer)
+            [[ $# -ge 2 && -n "${2}" ]] || { echo "$0: --bearer requires a token" >&2; exit 1; }
+            bearer="$2"
+            authtype="bearer"
+            shift 2
+            ;;
+        --bearer=*)
+            bearer="${1#--bearer=}"
+            [[ -n "${bearer}" ]] || { echo "$0: --bearer requires a token" >&2; exit 1; }
+            authtype="bearer"
+            shift
+            ;;
+        -b)
+            [[ $# -ge 2 && -n "${2}" ]] || { echo "$0: -b requires a token" >&2; exit 1; }
+            bearer="$2"
+            authtype="bearer"
+            shift 2
+            ;;
+        -a)
+            [[ $# -ge 2 ]] || _odipost_usage
+            authtype="$2"
+            shift 2
+            ;;
+        -f)
+            [[ $# -ge 2 ]] || _odipost_usage
+            requestfile="$2"
+            shift 2
+            ;;
+        -h)
+            [[ $# -ge 2 ]] || _odipost_usage
+            host="$2"
+            shift 2
+            ;;
+        -o)
+            [[ $# -ge 2 ]] || _odipost_usage
+            outputfile="$2"
+            shift 2
+            ;;
+        -p)
+            [[ $# -ge 2 ]] || _odipost_usage
+            port="$2"
+            shift 2
+            ;;
+        -t)
+            trace=true
+            shift
+            ;;
+        -u)
+            [[ $# -ge 2 ]] || _odipost_usage
+            user="$2"
+            [[ "${authtype}" == "bearer" ]] && authtype="basic"
+            shift 2
+            ;;
+        -z)
+            compress=true
+            shift
+            ;;
         *)
-            echo "$0: unknown option ${OPTARG}"
+            echo "$0: unknown option $1" >&2
             exit 1
-        ;;
+            ;;
     esac
 done
 

@@ -101,6 +101,7 @@ jobs:
           esac
 
       - name: Keep the current image tag and one former version
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -114,9 +115,8 @@ jobs:
           else
             root="users/${owner}"
           fi
-          deletions=$(gh api --paginate "/${root}/packages/container/${package}/versions" \
-            --jq '.[] | [.id, ((.metadata.container.tags // []) | join(","))] | @tsv' \
-            | bash .github/scripts/published-versions.sh images "$version")
+          deletions=$(bash .github/scripts/published-versions.sh gh-images "$root" "$package" \
+            | bash .github/scripts/published-versions.sh images "$version" "$GITHUB_REF")
           for id in $deletions; do
             gh api --method DELETE "/${root}/packages/container/${package}/versions/${id}" >/dev/null
           done

@@ -24,34 +24,41 @@ case "${osname}" in
     "Darwin")
         LO_HOME=/Applications/LibreOffice.app/Contents/MacOS
     ;;
-    "GNU/Linux")
-        soffice="$(readlink $(which soffice))"
-        LO_HOME="$(dirname ${soffice})"
+    "Linux"|"GNU/Linux")
+        soffice_bin=$(command -v soffice || true)
+        if [[ -z "${soffice_bin}" ]]
+        then
+            echo "$0: soffice not found on PATH" >&2
+            exit 1
+        fi
+        soffice=$(readlink -f "${soffice_bin}" 2>/dev/null || printf '%s' "${soffice_bin}")
+        LO_HOME=$(dirname "${soffice}")
     ;;
     *)
-        echo "$0: unsupported operating system ${osname}"
+        echo "$0: unsupported operating system ${osname}" >&2
+        exit 1
     ;;
 esac
 
 mode=${1:-}
 case "${mode}" in
     start)
-        pushd ${LO_HOME} >/dev/null
+        pushd "${LO_HOME}" >/dev/null
         for port in 2001 2002
         do
             userinst="${HOME}/odisee${port}"
-            mkdir -p ${userinst}
-            abstmpdir="$(pushd ${userinst} >/dev/null ; pwd ; popd >/dev/null)"
+            mkdir -p "${userinst}"
             echo "Starting soffice at ${host}:${port}, UserInstallation=${userinst}, soffice=${LO_HOME}"
             nohup ./soffice \
                 --accept="socket,host=${host},port=${port};urp;StarOffice.ServiceManager" \
-                -env:UserInstallation="file:///${userinst}" \
-                >${userinst}/soffice.log 2>&1 &
+                -env:UserInstallation="file:///${userinst#/}" \
+                >"${userinst}/soffice.log" 2>&1 &
         done
         popd >/dev/null
     ;;
     *)
-        echo "Unknown mode ${mode}"
+        echo "Unknown mode ${mode}" >&2
+        exit 1
     ;;
 esac
 
