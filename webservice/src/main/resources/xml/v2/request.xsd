@@ -388,7 +388,7 @@
             <xs:attribute name="filename" use="required" type="xs:string">
                 <xs:annotation>
                     <xs:documentation>
-                        A relative path, interpreted as $ODISEE_HOME/var/USERNAME/pdf/FILENAME
+                        A relative path, interpreted as $ODISEE_HOME/var/user/USERNAME/work/FILENAME
                     </xs:documentation>
                 </xs:annotation>
             </xs:attribute>
@@ -459,7 +459,7 @@
         <xs:attribute name="type" use="required" type="xs:string">
             <xs:annotation>
                 <xs:documentation>
-                    merge-all-results: Merge result of all requests or previous instruction into one file.
+                    merge-results: Merge result of all requests or previous instruction into one file.
                     merge-with: Merge result of request or previous instruction with another file (PDF).
                 </xs:documentation>
             </xs:annotation>

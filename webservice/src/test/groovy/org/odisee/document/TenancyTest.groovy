@@ -129,7 +129,7 @@ class TenancyTest extends GroovyTestCase {
         service.templateService = new TemplateService()
         service.requestService = new RequestService()
         try {
-            service.generateDocument(principal('cara'), request())
+            service.generateDocument(principal('cara'), archivedRequest())
             fail('missing template')
         } catch (OdiseeException e) {
             assertEquals(OdiseeException.NOT_FOUND, e.httpStatus)
@@ -151,6 +151,15 @@ class TenancyTest extends GroovyTestCase {
         DOMBuilder.parse(new StringReader('''<odisee>
   <request name="One">
     <template name="Letter" outputFormat="pdf"/>
+  </request>
+</odisee>''')).documentElement
+    }
+
+    private static Element archivedRequest() {
+        DOMBuilder.parse(new StringReader('''<odisee>
+  <request name="One">
+    <template name="Letter" outputFormat="pdf"/>
+    <archive files="true"/>
   </request>
 </odisee>''')).documentElement
     }

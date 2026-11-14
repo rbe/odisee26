@@ -38,7 +38,9 @@ class JobService {
 
     Executor executor
 
-    Closure poster = { URI uri, String body -> CallbackPoster.post(uri, body) }
+    CallbackPoster.Resolver callbackResolver = CallbackPoster.SYSTEM_RESOLVER
+
+    Closure poster = { URI uri, String body -> CallbackPoster.post(uri, body, callbackResolver) }
 
     private final ExecutorService pool = Executors.newCachedThreadPool({ Runnable runnable ->
         Thread thread = new Thread(runnable, 'odisee-job')
@@ -133,9 +135,11 @@ class JobService {
     private static String writeFile(String user, String id, Document document) {
         String filename = SafePaths.requireSimpleName(document.filename ?: 'document.bin', 'document name')
         Path dir = TenantPaths.outputDir(user).resolve(id)
-        Files.createDirectories(dir)
         Path dest = dir.resolve(filename)
-        Files.write(dest, document.bytes)
+        if (!Files.isRegularFile(dest)) {
+            Files.createDirectories(dir)
+            Files.write(dest, document.bytes)
+        }
         "output/${id}/${filename}"
     }
 

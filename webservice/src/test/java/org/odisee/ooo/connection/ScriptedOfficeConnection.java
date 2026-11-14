@@ -15,6 +15,8 @@ public final class ScriptedOfficeConnection extends OfficeConnection {
 
     private boolean hangProbe;
 
+    private int closeCount;
+
     public ScriptedOfficeConnection(final boolean failConnect) {
         this(failConnect, "127.0.0.1", 9);
     }
@@ -70,9 +72,14 @@ public final class ScriptedOfficeConnection extends OfficeConnection {
         }
     }
 
+    public int closeCount() {
+        return closeCount;
+    }
+
     @Override
     public void close() {
         connected = false;
+        closeCount++;
     }
 
     @Override
