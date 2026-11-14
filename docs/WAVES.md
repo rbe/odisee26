@@ -59,6 +59,9 @@ Status: **landed**.
 Status: **landed**.
 
 - `POST /document/generate` requires a logged-in user. No login is HTTP 401. The hardcoded `odisee` principal is gone (B21, B22).
+
+The next three bullets are superseded by wave 6 F9, which is OpenID Connect with no password file.
+
 - Spring Security reads bcrypt hashes from `$ODISEE_HOME/etc/users`. Embedded Tomcat stays. `java -jar` does not read `odisee-users.xml`.
 - The first admin is created only when that file is missing and both `ODISEE_BOOTSTRAP_USER` and `ODISEE_BOOTSTRAP_PASSWORD` are set. Otherwise there are no users.
 - `odictl user NAME PASSWORD` writes a password-file line and creates `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. A bad name fails. An existing user fails. There is no default password. The person who runs `odictl` is the admin. `POST /user` is gone.

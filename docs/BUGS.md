@@ -50,7 +50,7 @@ Severity: **blocker** (wrong document, leak, or the service cannot do what it cl
 
 | ID | Severity | Status | Bug |
 |---|---|---|---|
-| B21 | blocker | fixed in wave 4 | The Grails app had no authentication. `java -jar` does not load Tomcat's `odisee-users.xml`. Spring Security now reads bcrypt hashes from `$ODISEE_HOME/etc/users`. Any authenticated user may run a macro. |
+| B21 | blocker | fixed in wave 4 | The Grails app had no authentication. `java -jar` does not load Tomcat's `odisee-users.xml`. Spring Security now reads bcrypt hashes from `$ODISEE_HOME/etc/users`. Any authenticated user may run a macro. The wave 4 fix was a password file, and F9 removed it. |
 | B22 | major | fixed in wave 4 | `DocumentController` fell back to a hardcoded user named `odisee`. No login is HTTP 401 and does not generate a document. |
 | B23 | major | fixed in wave 1 | Template names were joined onto the template directory with `Path.resolve`. A name containing `..` or a separator could escape that directory. Merge `input/@filename` accepted an absolute path because `Path.resolve` replaces the base. A client-supplied `outputPath` is overwritten with the request directory. |
 | B24 | major | fixed in wave 1 | Post-process `action/@type` was turned into a method name (`process${Type}`). An unexpected type failed at runtime or could hit an existing method. Instruction tag names were dispatched the same way. |
