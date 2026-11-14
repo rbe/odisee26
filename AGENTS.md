@@ -1,17 +1,18 @@
 # Agent instructions
 
-Keep the local checkout fast-forwarded to `origin/master`. Do not merge feature branches into it.
+Read the skill for the task before planning, editing, testing, or releasing.
 
-Document decisions in the existing product docs: `docs/WAVES.md`, `docs/FEATURES.md`, `docs/BUGS.md`, and the AsciiDoc guides under `documentation/`. Do not add a second wave log.
+- Planning, grilling, and architecture: `.cursor/skills/plan/SKILL.md`
+- Develop: `.cursor/skills/develop/SKILL.md`
+- Test and review: `.cursor/skills/review/SKILL.md`
+- Release: `.cursor/skills/release/SKILL.md`
 
-Write tests for code changes. Run them. Report a failure with the test name and the error. Do not weaken a test to skip it.
+Standing constraints, one line each. The skill has the detail.
 
-Write in concise, pinpointed language.
-
-The book under `documentation/` stays AsciiDoc. `README.md` is the GitHub landing page and the file `packageDistribution` copies into the zip.
-
-Management is `odictl` only. `odictl` stays bash. Bash is always installed in the Odisee service image. Product HTTP stays: generate, jobs, templates, and `/ready`. `odictl user NAME` creates the Keycloak user, a confidential client whose id is `NAME`, and `var/user/NAME/template`, `var/user/NAME/work`, and `var/user/NAME/output`. It prints the client id and secret. There is no password file. The API client sends `Authorization: Bearer`. The client id is the Odisee user. `odictl callback-host USER HOST` appends a host for that user to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. `odictl bucket USERNAME ENDPOINT REGION BUCKET ACCESSKEY SECRET` writes `$ODISEE_HOME/etc/buckets`. The server reads those files on use. There is no second config channel.
-
-Configuration the server reads stays in `$ODISEE_HOME/etc`, one directory mounted into every replica. The server does not grow a second config channel.
-
-Do not add agent-only files beyond `AGENTS.md` and `.cursor/rules/odisee.mdc`.
+- Fast-forward the checkout to `origin/master`. Do not merge feature branches into it.
+- Record decisions in `docs/WAVES.md`, `docs/FEATURES.md`, `docs/BUGS.md`, and the AsciiDoc book under `documentation/`. Do not add a second wave log.
+- The book stays AsciiDoc. `README.md` stays the GitHub landing page.
+- Write tests for code changes. Run them. Report a failure with the test name and the error. Do not weaken a test to skip it.
+- Write in concise, pinpointed language.
+- Management is `odictl` only. Product HTTP stays generate, jobs, templates, and `/ready`. The server reads `$ODISEE_HOME/etc` only. There is no second config channel and no password file.
+- Agent-only files are this file, `.cursor/rules/odisee.mdc`, and `.cursor/skills/<name>/SKILL.md`.
