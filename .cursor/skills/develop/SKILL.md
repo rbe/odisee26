@@ -9,7 +9,7 @@ Fast-forward the checkout to `origin/master` before new work. Do not merge a fea
 
 JDK 21, Gradle 8.14.5, Grails 7.2.4. `./gradlew build` compiles, runs the unit tests, writes the zip, and does not start a container.
 
-The root `Makefile` is the frontend. Read its header. Run `make help`. Do not invent a second how-to.
+The root `Makefile` is the frontend. Read its header. Run `make help`. Do not invent a second how-to. CI jobs call that Makefile. `make test` does not start a container.
 
 Write in concise, pinpointed language.
 

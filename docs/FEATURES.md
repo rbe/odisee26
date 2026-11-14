@@ -104,4 +104,4 @@ The JavaFX client is `clients/client-javafx`. It keeps the login pane, the main 
 
 One fixture `.ott`, one XML request, one assertion on the PDF text (PDFBox is already a dependency). Run it in CI against the Podman image. Wave 1 tests the helpers without starting office; they do not prove a document was filled in.
 
-Wave 5 proves that request through the Java client against a local server (`:clients:client-java:javaClientOfficeTest`). The GitHub Actions job `java-client-office` has Podman and runs that task. `./gradlew build` does not start a container.
+Wave 5 proves that request through the Java client against a local server (`:clients:client-java:javaClientOfficeTest`). CI job `test-java` runs `make test-java`. It does not gate publish. `./gradlew build` does not start a container.
