@@ -284,6 +284,7 @@ There is no `darwin` image.
 The published version is the nearest `vMAJOR.MINOR.PATCH` tag plus the Actions run number.
 The default branch also pushes `latest`.
 A manual run from any other ref pushes that version only.
+A manual run of another ref does not delete published versions.
 It does not move `latest`, and it does not delete published versions.
 A tag push does not publish.
 On the default branch, a publish keeps that run and the next-lower run on the same version line.
