@@ -68,6 +68,8 @@ For `stream` and `both`, the HTTP response is the generated document.
 For `store`, the body is JSON `bucket` and `key`, and the file is only in the user's bucket.
 `both` stores a copy, identified by the `X-Odisee-Object` header (`bucket/key`).
 A request cannot name the bucket.
+A synchronous generate deletes `var/user/{name}/output/{uuid}/` unless `archive/@files` is `true`.
+A job keeps that directory.
 `$ODISEE_HOME/etc/buckets` and the `minio` compose service are in the administrators guide, <<object-storage>>.
 It validates XML against the v2 request schema (`http://xmlns.odisee.de/v2/request`).
 A document with no namespace is that same shape.
@@ -90,6 +92,7 @@ Either limit is HTTP 400.
 422 is an instruction the schema allowed and the office process could not run.
 404 is a missing template.
 503 is an office pool that could not take the call.
+500 is an unexpected server error.
 
 === Jobs
 
@@ -103,11 +106,13 @@ Odisee POSTs the status only when that host is listed for that user in `$ODISEE_
 `odictl callback-host USER HOST` appends a line.
 A host listed for one user does not allow another user's callback.
 A URL whose host is off that user's list does not get a POST.
+The host must be a public external host. Loopback, link-local, private, and internal names are rejected.
 
 === Instructions
 
 Writer, Calc, and Impress have separate instruction sets.
 Writer keeps `Userfield`, `Texttable`, `Image`, `Autotext`, `Bookmark`, and `Macro`.
+`image/@url` is `http` or `https` on a public host. `file://` and an internal host are HTTP 422.
 Calc uses `cell`.
 `cell` requires `sheet` and `coordinate`.
 Impress uses `shape`.

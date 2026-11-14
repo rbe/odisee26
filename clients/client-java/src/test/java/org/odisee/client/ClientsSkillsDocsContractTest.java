@@ -201,6 +201,48 @@ public class ClientsSkillsDocsContractTest {
         }
     }
 
+    @Test
+    public void productDocsMatchMergedOfficeCallbackAndSingleBugRows() throws Exception {
+        final Path root = repoRoot();
+        final String admin = read(root.resolve("documentation/src/docs/asciidoc/AdministratorsGuide.adoc"));
+        assertTrue(admin.contains("libreoffice-writer libreoffice-calc libreoffice-impress"));
+        assertTrue(admin.contains("headless LibreOffice Writer, Calc, and Impress"));
+        assertTrue(admin.contains("The host must be a public external host."));
+        assertTrue(admin.contains("A manual run of another ref does not delete published versions."));
+
+        final String users = read(root.resolve("documentation/src/docs/asciidoc/UsersGuide.adoc"));
+        assertTrue(users.contains("archive/@files"));
+        assertTrue(users.contains("500 is an unexpected server error."));
+        assertTrue(users.contains("The host must be a public external host."));
+        assertTrue(users.contains("`image/@url` is `http` or `https` on a public host."));
+
+        final String tenancy = read(root.resolve("documentation/src/docs/asciidoc/Multitenancy.adoc"));
+        assertTrue(tenancy.contains("The host must be a public external host."));
+
+        final String features = read(root.resolve("docs/FEATURES.md"));
+        assertTrue(features.contains("OdiseeClient.bearer(serviceUrl, accessToken)"));
+        assertFalse(features.contains("new OdiseeClient(serviceUrl, username, password)"));
+        assertTrue(features.contains("public external host"));
+
+        final String readme = read(root.resolve("README.md"));
+        assertTrue(readme.contains("headless LibreOffice Writer, Calc, and Impress"));
+        assertTrue(readme.contains("A manual run of another ref does not delete published versions."));
+
+        final String waves = read(root.resolve("docs/WAVES.md"));
+        assertFalse(waves.contains("headless LibreOffice Writer)"));
+        assertTrue(waves.contains("headless LibreOffice Writer, Calc, and Impress"));
+        assertTrue(waves.contains("public external host"));
+
+        final String bugs = read(root.resolve("docs/BUGS.md"));
+        assertTrue(bugs.contains("| B25 | major | partial in wave 4 |"));
+        for (int n = 40; n <= 61; n++) {
+            final String row = "| B" + n + " |";
+            final int first = bugs.indexOf(row);
+            assertTrue("Missing " + row, first >= 0);
+            assertTrue("Duplicate " + row, bugs.indexOf(row, first + row.length()) < 0);
+        }
+    }
+
     private static String read(final Path file) throws Exception {
         return Files.readString(file, StandardCharsets.UTF_8);
     }

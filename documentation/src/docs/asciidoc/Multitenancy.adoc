@@ -56,4 +56,5 @@ One line is `username host`.
 `odictl callback-host USER HOST` appends a line.
 A host listed for one user does not allow another user's callback.
 A URL whose host is off that user's list does not get a POST.
+The host must be a public external host. Loopback, link-local, private, and internal names are rejected.
 `POST /odisee/document/generate` does not read a callback.

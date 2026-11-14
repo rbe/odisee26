@@ -62,7 +62,7 @@ The v2 request (`http://xmlns.odisee.de/v2/request`) carries `odisee/@delivery`:
 
 The store is S3-compatible. Endpoint, region, bucket, access key, and secret come from that user's line, so MinIO works in development. Odisee does not expire, delete, or set a lifecycle on the object. The server chooses the object key. The key stays inside that user's bucket.
 
-`POST /document/jobs` uses the same choice. The job record in `var/user/{name}/jobs.json` stores the bucket and the key. A callback still goes only to a host listed for that user in `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous. Jobs stay private to the user.
+`POST /document/jobs` uses the same choice. The job record in `var/user/{name}/jobs.json` stores the bucket and the key. A callback still goes only to a public external host listed for that user in `$ODISEE_HOME/etc/callback-hosts`. `GET /ready` stays anonymous. Jobs stay private to the user.
 
 Depends on: B1 (done — the heap leak made this worse).
 
@@ -70,7 +70,7 @@ Depends on: B1 (done — the heap leak made this worse).
 
 Status: **landed in wave 6**.
 
-The callback belongs on the job, not on `POST /document/generate`. `POST /document/jobs?callback=https://host/path` stores that URL on the job. When the job finishes, Odisee POSTs JSON (`id`, `status`, `failedInstruction`, and `file` set to `/odisee/document/jobs/{id}`) only if the URL's host is listed for that user. `odictl callback-host USER HOST` appends `username host` to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. A URL whose host is off that user's list does not get a POST. The synchronous generate route does not read a callback.
+The callback belongs on the job, not on `POST /document/generate`. `POST /document/jobs?callback=https://host/path` stores that URL on the job. When the job finishes, Odisee POSTs JSON (`id`, `status`, `failedInstruction`, and `file` set to `/odisee/document/jobs/{id}`) only if the URL's host is listed for that user. `odictl callback-host USER HOST` appends `username host` to `$ODISEE_HOME/etc/callback-hosts`. A host listed for one user does not allow another user's callback. A URL whose host is off that user's list does not get a POST. The host must be a public external host. Loopback, link-local, private, and internal names are rejected. The synchronous generate route does not read a callback.
 
 ## Operations
 
@@ -98,7 +98,7 @@ A failed health check drops a remote host from the pool and does not signal a lo
 
 Done in wave 2. The server and the Java client use v2. Wave 6 adds `output/format` to that same namespace. The schema is `webservice/src/main/resources/xml/v2/request.xsd`, copied to `clients/client-java/src/main/schema/request.xsd`. The v3 and v2.6 request schemas stay deleted. A v3 namespace is still HTTP 400. PHP, VB.NET, and the Oracle package still build the v2 shape; their examples under `webservice/src/main/container/var/request` are unchanged.
 
-The JavaFX client is `clients/client-javafx`. It keeps the login pane, the main frame, and the FXML. It depends on `:clients:client-java` (`org.odisee.client`). `DesktopClient.open` is `new OdiseeClient(serviceUrl, username, password)`. `DesktopClient.preparePdf` calls `createRequest(template, OutputFormat.PDF)` and `setUserfield`. The screens leave `archive` off the request. `./gradlew :clients:client-javafx:run` puts JavaFX on the module path and opens the window. `packageDistribution` packs the service, the Java client jar, the extension, and the docs.
+The JavaFX client is `clients/client-javafx`. It keeps the login pane, the main frame, and the FXML. It depends on `:clients:client-java` (`org.odisee.client`). `DesktopClient.open` is `OdiseeClient.bearer(serviceUrl, accessToken)`. `DesktopClient.preparePdf` calls `createRequest(template, OutputFormat.PDF)` and `setUserfield`. The screens leave `archive` off the request. `./gradlew :clients:client-javafx:run` puts JavaFX on the module path and opens the window. `packageDistribution` packs the service, the Java client jar, the extension, and the docs.
 
 ### F12. Integration suite with a headless LibreOffice
 
