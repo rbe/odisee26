@@ -1,9 +1,12 @@
 package org.odisee.document
 
+import groovy.json.JsonSlurper
 import groovy.test.GroovyTestCase
 import groovy.xml.dom.DOMCategory
 import org.odisee.api.OdiseeException
 import org.odisee.json.JsonRequest
+import org.odisee.shared.OdiseeConstant
+import org.springframework.mock.web.MockHttpServletResponse
 
 /**
  * The server validates the v2 request schema and rejects the other request namespaces.
@@ -96,6 +99,8 @@ class RequestSchemaTest extends GroovyTestCase {
   </request>
 </odisee>''')
         assertTrue(error.message.contains('v3'))
+        assertTrue(error.message.contains('output/format/@type'))
+        assertTrue(error.message.contains('template/@outputFormat'))
     }
 
     void testV2OutputFormatIsAccepted() {
@@ -197,6 +202,44 @@ class RequestSchemaTest extends GroovyTestCase {
         OdiseeException error = reject(xml)
         assertTrue(error.message.toLowerCase().contains('doctype'))
         assertFalse(error.message.contains('root:'))
+    }
+
+    void testJsonSchemaDefinesTopLevelDeliveryModes() {
+        InputStream stream = RequestSchema.class.getResourceAsStream('/json/request.schema.json')
+        assertNotNull(stream)
+        Map schema = (Map) new JsonSlurper().parseText(stream.getText('UTF-8'))
+        assertEquals(Boolean.FALSE, schema.additionalProperties)
+        Map props = (Map) schema.properties
+        Map delivery = (Map) props.delivery
+        assertNotNull(delivery)
+        assertEquals('string', delivery.type)
+        assertEquals(['stream', 'store', 'both'], delivery.enum)
+    }
+
+    void testRequestXsdDocumentsPerUserWorkPathAndMergeResults() {
+        InputStream stream = RequestSchema.class.getResourceAsStream('/xml/v2/request.xsd')
+        assertNotNull(stream)
+        String xsd = stream.getText('UTF-8')
+        assertTrue(xsd.contains('$ODISEE_HOME/var/user/USERNAME/work/FILENAME'))
+        assertTrue(xsd.contains('merge-results:'))
+        assertFalse(xsd.contains('$ODISEE_HOME/var/USERNAME/pdf/FILENAME'))
+        assertFalse(xsd.contains('merge-all-results:'))
+    }
+
+    void testDocumentStreamerFallbackFilenameAndWord97MimeConstant() {
+        assertEquals('application/msword', OdiseeConstant.MIME_TYPE_WORD97)
+        for (int i = 0; i < 20; i++) {
+            Document doc = new Document()
+            doc.filename = null
+            doc.bytes = 'abc'.getBytes('UTF-8')
+            MockHttpServletResponse response = new MockHttpServletResponse()
+            DocumentStreamer.stream(response, doc)
+            String disposition = response.getHeader('Content-Disposition')
+            assertNotNull(disposition)
+            assertTrue(disposition, disposition.startsWith('inline; filename=Odisee_'))
+            assertEquals('application/octet-stream', response.contentType)
+            assertEquals('abc', response.contentAsString)
+        }
     }
 
     private static OdiseeException reject(String xml) {

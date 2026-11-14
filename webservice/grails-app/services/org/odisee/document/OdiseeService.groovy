@@ -62,6 +62,7 @@ class OdiseeService {
         arg.principal = principal
         arg.xml = xml
         Path scratch = null
+        boolean cleanupRequestDir = !dryRun && requestId == null && !archiveFiles(xml)
         try {
             if (dryRun) {
                 scratch = Files.createTempDirectory('odisee-dry-run')
@@ -96,7 +97,43 @@ class OdiseeService {
             dryRun ? [] : arg.document
         } finally {
             if (scratch != null) {
-                scratch.toFile().deleteDir()
+                deleteTree(scratch)
+            } else if (cleanupRequestDir && arg.requestDir instanceof Path) {
+                deleteTree((Path) arg.requestDir)
+            }
+        }
+    }
+
+    static boolean archiveFiles(final Element xml) {
+        if (xml == null) {
+            return false
+        }
+        org.w3c.dom.Node req = xml.firstChild
+        while (req != null) {
+            if (req instanceof Element && ('request' == req.localName || 'request' == req.nodeName)) {
+                org.w3c.dom.Node child = req.firstChild
+                while (child != null) {
+                    if (child instanceof Element && ('archive' == child.localName || 'archive' == child.nodeName)) {
+                        String files = ((Element) child).getAttribute('files')?.trim()
+                        if ('true'.equalsIgnoreCase(files) || '1' == files) {
+                            return true
+                        }
+                    }
+                    child = child.nextSibling
+                }
+            }
+            req = req.nextSibling
+        }
+        false
+    }
+
+    private static void deleteTree(final Path root) {
+        if (root == null || !Files.exists(root)) {
+            return
+        }
+        Files.walk(root).withCloseable { stream ->
+            stream.sorted(Comparator.reverseOrder()).each { Path p ->
+                Files.deleteIfExists(p)
             }
         }
     }

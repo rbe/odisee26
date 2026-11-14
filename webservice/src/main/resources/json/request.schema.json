@@ -7,6 +7,12 @@
   "additionalProperties": false,
   "required": ["request"],
   "properties": {
+    "delivery": {
+      "type": "string",
+      "enum": ["stream", "store", "both"],
+      "default": "stream",
+      "description": "How the generated file is delivered: stream, store, or both."
+    },
     "request": {
       "oneOf": [
         { "$ref": "#/definitions/request" },

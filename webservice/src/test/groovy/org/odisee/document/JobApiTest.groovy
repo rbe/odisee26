@@ -149,20 +149,66 @@ class JobApiTest extends GroovyTestCase {
         }
         server.start()
         try {
-            CallbackAllowList.add(ada, '127.0.0.1')
+            CallbackAllowList.add(ada, 'hooks.example')
             JobService jobs = service(ada) { Document document ->
                 document.filename = 'Letter.pdf'
                 document.bytes = 'pdf'.getBytes('UTF-8')
                 [document]
             }
             jobs.executor = inline()
-            String id = jobs.submit(principal(ada), request(), "http://127.0.0.1:${server.address.port}/done")
+            jobs.callbackResolver = CallbackPoster.loopbackResolverForTest('hooks.example')
+            String id = jobs.submit(principal(ada), request(), "http://hooks.example:${server.address.port}/done")
 
             assertEquals(['POST'], methods)
             assertTrue(bodies[0].contains('"status":"succeeded"'))
             assertTrue(bodies[0].contains("/odisee/document/jobs/${id}"))
         } finally {
             server.stop(0)
+        }
+    }
+
+    void testAsyncJobPreservesOutputDirectoryAndSkipsDuplicateWrite() {
+        String ada = user('jobnodup')
+        byte[] payload = '%PDF-job-once'.getBytes('UTF-8')
+        JobService jobs = new JobService()
+        jobs.executor = inline()
+        jobs.odiseeService = new OdiseeService() {
+            @Override
+            List<Document> generateDocument(Principal principal, Element xml, boolean dryRun, String requestId) {
+                assertNotNull(requestId)
+                Path dir = TenantPaths.outputDir(principal.name).resolve(requestId)
+                Files.createDirectories(dir)
+                Path saved = dir.resolve('Letter.pdf')
+                Files.write(saved, payload)
+                try {
+                    Files.setPosixFilePermissions(
+                            saved,
+                            java.nio.file.attribute.PosixFilePermissions.fromString('r--------'))
+                } catch (UnsupportedOperationException ignored) {
+                }
+                Document doc = new Document()
+                doc.filename = 'Letter.pdf'
+                doc.bytes = payload
+                [doc]
+            }
+        }
+        String id = jobs.submit(principal(ada), request(), null)
+
+        Path saved = TenantPaths.outputDir(ada).resolve(id).resolve('Letter.pdf')
+        try {
+            Map job = JobStore.require(ada, id)
+            assertEquals('succeeded', job.status)
+            assertTrue(Files.isRegularFile(saved))
+            assertEquals('%PDF-job-once', new String(JobStore.fileBytes(ada, job), 'UTF-8'))
+        } finally {
+            try {
+                if (Files.exists(saved)) {
+                    Files.setPosixFilePermissions(
+                            saved,
+                            java.nio.file.attribute.PosixFilePermissions.fromString('rw-------'))
+                }
+            } catch (UnsupportedOperationException ignored) {
+            }
         }
     }
 

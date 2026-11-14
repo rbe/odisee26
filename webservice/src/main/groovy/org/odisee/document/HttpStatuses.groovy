@@ -11,6 +11,7 @@ package org.odisee.document
 import groovy.json.JsonException
 import org.odisee.api.OdiseeException
 import org.odisee.ooo.connection.OdiseeServerException
+import org.odisee.ooo.connection.OdiseeServerRuntimeException
 import org.xml.sax.SAXException
 
 import java.util.zip.ZipException
@@ -19,7 +20,8 @@ import java.util.zip.ZipException
  * HTTP status and body for a failed request.
  * 400 is a bad request. 401 is no login. 403 is a logged-in user who is not an admin.
  * 404 is a missing template. 409 is an existing user. 422 is an instruction the schema allowed.
- * 503 is the office pool. This is the only place that chooses the status.
+ * 500 is an unexpected server error. 503 is the office pool.
+ * This is the only place that chooses the status.
  */
 final class HttpStatuses {
 
@@ -29,7 +31,7 @@ final class HttpStatuses {
     static int statusFor(Throwable throwable) {
         Throwable current = throwable
         while (current != null) {
-            if (current instanceof OdiseeServerException) {
+            if (current instanceof OdiseeServerException || current instanceof OdiseeServerRuntimeException) {
                 return 503
             }
             if (current instanceof OdiseeException) {
@@ -40,7 +42,7 @@ final class HttpStatuses {
             }
             current = current.cause
         }
-        return OdiseeException.BAD_REQUEST
+        return OdiseeException.SERVER_ERROR
     }
 
     static void apply(Object response, Throwable throwable) {

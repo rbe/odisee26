@@ -71,7 +71,7 @@ final class RequestSchema {
         }
         final String namespace = root.namespaceURI
         if (V3 == namespace) {
-            throw new OdiseeException('The v3 request schema is not accepted. Set template/@outputFormat (v2).', OdiseeException.BAD_REQUEST)
+            throw new OdiseeException('The v3 request schema is not accepted. Use the v2 request schema (output/format/@type or template/@outputFormat).', OdiseeException.BAD_REQUEST)
         }
         if (V26 == namespace) {
             throw new OdiseeException('The v2.6 request schema is not accepted. Use the v2 request schema.', OdiseeException.BAD_REQUEST)

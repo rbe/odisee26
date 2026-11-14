@@ -15,17 +15,17 @@ import java.security.SecureRandom
 
 final class DocumentStreamer {
 
+    private static final SecureRandom RANDOM = new SecureRandom()
+
     /**
      * Stream a Document or just bytes to client.
      */
     static void stream(final HttpServletResponse response, final Document document) {
         String contentFilename = document.filename
-        if (contentFilename) {
-            response.contentType = DocumentAnalyzer.guessContentType(contentFilename)
-        } else {
-            int nextInt = new SecureRandom().nextInt((int) System.currentTimeMillis())
-            contentFilename = String.format('Odisee_%s', nextInt)
+        if (!contentFilename) {
+            contentFilename = String.format('Odisee_%d', RANDOM.nextInt(Integer.MAX_VALUE))
         }
+        response.contentType = DocumentAnalyzer.guessContentType(contentFilename)
         response.setHeader('Content-Disposition', "inline; filename=${contentFilename}")
         if (document.size) {
             response.contentLength = document.size

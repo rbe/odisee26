@@ -249,4 +249,106 @@ public class OfficeConnectionPoolTest {
                 gauges.toJson(true));
     }
 
+    @Test
+    public void hotReloadClosesRetiredIdleAndLetsInFlightRepositWithout503() throws OdiseeServerException {
+        ScriptedOfficeConnection inFlight = new ScriptedOfficeConnection(false, "127.0.0.1", 2001);
+        ScriptedOfficeConnection idle = new ScriptedOfficeConnection(false, "127.0.0.1", 2002);
+        OfficeConnectionFactory factory = OfficeConnectionFactory.forTest(Arrays.asList(inFlight, idle));
+
+        OfficeConnection checkedOut = factory.fetchConnection(false);
+        assertSame(inFlight, checkedOut);
+        assertEquals(1, factory.inUse());
+        assertEquals(1, factory.waiting());
+
+        ScriptedOfficeConnection nextA = new ScriptedOfficeConnection(false, "127.0.0.1", 2011);
+        ScriptedOfficeConnection nextB = new ScriptedOfficeConnection(false, "127.0.0.1", 2012);
+        Map<String, List<OfficeConnection>> reloaded = new LinkedHashMap<>();
+        reloaded.put("group0", Arrays.asList(nextA, nextB));
+
+        factory.reloadConnections(reloaded);
+
+        assertEquals(1, idle.closeCount());
+        assertEquals(0, inFlight.closeCount());
+        assertEquals(2, factory.poolSize());
+        assertEquals(2, factory.waiting());
+        assertEquals(1, factory.inUse());
+
+        factory.repositConnection(checkedOut);
+
+        assertEquals(1, inFlight.closeCount());
+        assertEquals(0, factory.inUse());
+        assertEquals(2, factory.waiting());
+
+        OfficeConnection firstNew = factory.fetchConnection("group0", false);
+        OfficeConnection secondNew = factory.fetchConnection("group0", false);
+        assertSame(nextA, firstNew);
+        assertSame(nextB, secondNew);
+        factory.repositConnection(firstNew);
+        factory.repositConnection(secondNew);
+    }
+
+    @Test
+    public void multiGroupFetchWaitsForBusyGroupWhileOtherGroupIsIdle() throws Exception {
+        ScriptedOfficeConnection g0a = new ScriptedOfficeConnection(false, "127.0.0.1", 2001);
+        ScriptedOfficeConnection g0b = new ScriptedOfficeConnection(false, "127.0.0.1", 2002);
+        ScriptedOfficeConnection writer = new ScriptedOfficeConnection(false, "10.1.0.5", 2010);
+        OfficeConnectionFactory factory = OfficeConnectionFactory.forTest(Collections.singletonList(g0a));
+        Map<String, List<OfficeConnection>> groups = new LinkedHashMap<>();
+        groups.put("group0", Arrays.asList(g0a, g0b));
+        groups.put("writers", Collections.singletonList(writer));
+        factory.reloadConnections(groups);
+
+        OfficeConnection held = factory.fetchConnection("writers", false);
+        assertSame(writer, held);
+        assertEquals(2, factory.waiting());
+
+        Thread releaser = new Thread(() -> {
+            try {
+                Thread.sleep(120);
+                factory.repositConnection(held);
+            } catch (Exception ignored) {
+            }
+        });
+        releaser.setDaemon(true);
+        long startNanos = System.nanoTime();
+        releaser.start();
+
+        OfficeConnection acquired = factory.fetchConnection("writers", false);
+        long elapsedMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+
+        assertSame(writer, acquired);
+        assertTrue("elapsedMs=" + elapsedMs, elapsedMs >= 80);
+        factory.repositConnection(acquired);
+        releaser.join(2_000);
+    }
+
+    @Test
+    public void multiGroupFetchHonorsPollTimeoutWhenRequestedGroupStaysBusy() throws OdiseeServerException {
+        ScriptedOfficeConnection g0 = new ScriptedOfficeConnection(false, "127.0.0.1", 2001);
+        ScriptedOfficeConnection writer = new ScriptedOfficeConnection(false, "10.1.0.5", 2010);
+        OfficeConnectionFactory factory = OfficeConnectionFactory.forTest(Collections.singletonList(g0));
+        Map<String, List<OfficeConnection>> groups = new LinkedHashMap<>();
+        groups.put("group0", Collections.singletonList(g0));
+        groups.put("writers", Collections.singletonList(writer));
+        factory.reloadConnections(groups);
+
+        OfficeConnection held = factory.fetchConnection("writers", false);
+        assertSame(writer, held);
+        System.setProperty(OfficeConnectionFactory.POLL_TIMEOUT_PROPERTY, "120");
+        try {
+            long startNanos = System.nanoTime();
+            try {
+                factory.fetchConnection("writers", false);
+                fail("writers slot remained busy");
+            } catch (OdiseeServerException e) {
+                long elapsedMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+                assertTrue("elapsedMs=" + elapsedMs, elapsedMs >= 90);
+                assertTrue(e.getMessage().contains("writers"));
+            }
+        } finally {
+            System.clearProperty(OfficeConnectionFactory.POLL_TIMEOUT_PROPERTY);
+            factory.repositConnection(held);
+        }
+    }
+
 }

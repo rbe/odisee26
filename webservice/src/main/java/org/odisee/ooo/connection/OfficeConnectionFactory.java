@@ -38,25 +38,33 @@ import java.util.concurrent.atomic.LongAdder;
 @Singleton
 public class OfficeConnectionFactory {
 
+    public static final String POLL_TIMEOUT_PROPERTY = "odisee.pool.poll.timeout.ms";
+
     private static final Logger LOGGER = LoggerFactory.getLogger(OfficeConnectionFactory.class);
-
-    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
-
-    private String groupname;
 
     private static final int QUEUE_POLL_TIMEOUT = 5;
 
     private static final TimeUnit QUEUE_POLL_TIMEUNIT = TimeUnit.SECONDS;
 
-    private List<InetSocketAddress> addresses;
+    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
-    private List<String> addressGroups;
+    private volatile String groupname;
+
+    private volatile boolean groupedPool;
+
+    private volatile List<InetSocketAddress> addresses;
+
+    private volatile List<String> addressGroups;
+
+    private final Map<String, LinkedBlockingQueue<OfficeConnection>> queuesByGroup = new ConcurrentHashMap<>();
+
+    private final Map<String, Integer> groupCapacities = new ConcurrentHashMap<>();
 
     private final Map<OfficeConnection, String> connectionGroup = new ConcurrentHashMap<>();
 
-    private LinkedBlockingQueue<OfficeConnection> connections;
-
     private final Set<OfficeConnection> checkedOut = ConcurrentHashMap.newKeySet();
+
+    private final Set<OfficeConnection> retired = ConcurrentHashMap.newKeySet();
 
     private final Set<OfficeConnection> dropped = new CopyOnWriteArraySet<>();
 
@@ -84,12 +92,13 @@ public class OfficeConnectionFactory {
     }
 
     public static OfficeConnectionFactory getInstance(final String groupname, final String host, final int basePort, final int count) {
-        OFFICE_CONNECTION_FACTORY.groupname = groupname;
-        OFFICE_CONNECTION_FACTORY.addresses = new ArrayList<>();
-        OFFICE_CONNECTION_FACTORY.addressGroups = null;
-        OFFICE_CONNECTION_FACTORY.addConnections(host, basePort, count);
-        OFFICE_CONNECTION_FACTORY.initializeConnections();
-        return OFFICE_CONNECTION_FACTORY;
+        List<InetSocketAddress> list = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            list.add(new InetSocketAddress(host, basePort + i));
+        }
+        Map<String, List<InetSocketAddress>> grouped = new LinkedHashMap<>();
+        grouped.put(groupname, list);
+        return load(grouped);
     }
 
     private OfficeConnectionFactory() {
@@ -101,23 +110,37 @@ public class OfficeConnectionFactory {
     public static OfficeConnectionFactory forTest(final List<OfficeConnection> ready) {
         OfficeConnectionFactory factory = new OfficeConnectionFactory();
         factory.groupname = "test";
+        factory.groupedPool = false;
         factory.addresses = new ArrayList<>();
-        factory.connections = new LinkedBlockingQueue<>(Math.max(1, ready.size()));
+        int capacity = Math.max(1, ready.size());
+        LinkedBlockingQueue<OfficeConnection> queue = new LinkedBlockingQueue<>(capacity);
         factory.shuttingDown.set(false);
         for (OfficeConnection connection : ready) {
-            factory.addresses.add(new InetSocketAddress("127.0.0.1", 9));
-            if (!factory.connections.offer(connection)) {
+            factory.addresses.add(connection.socketAddress() == null
+                    ? new InetSocketAddress("127.0.0.1", 9)
+                    : connection.socketAddress());
+            factory.connectionGroup.put(connection, "test");
+            if (!queue.offer(connection)) {
                 throw new OdiseeServerRuntimeException("test pool rejected a connection");
             }
         }
+        factory.queuesByGroup.put("test", queue);
+        factory.groupCapacities.put("test", capacity);
         return factory;
     }
 
     int waiting() {
-        return connections == null ? 0 : connections.size();
+        int sum = 0;
+        for (LinkedBlockingQueue<OfficeConnection> queue : queuesByGroup.values()) {
+            sum += queue.size();
+        }
+        return sum;
     }
 
-    public void addConnections(final String host, final int basePort, final int count) {
+    public synchronized void addConnections(final String host, final int basePort, final int count) {
+        if (addresses == null) {
+            addresses = new ArrayList<>();
+        }
         for (int i = 0; i < count; i++) {
             addresses.add(new InetSocketAddress(host, basePort + i));
         }
@@ -127,7 +150,7 @@ public class OfficeConnectionFactory {
      * Take a slot from the named group. A test pool with no groups uses every slot.
      */
     public OfficeConnection fetchConnection(final String group, final boolean waitForever) throws OdiseeServerException {
-        if (connectionGroup.isEmpty()) {
+        if (!groupedPool) {
             return fetchConnection(waitForever);
         }
         if (shuttingDown.get()) {
@@ -135,60 +158,12 @@ public class OfficeConnectionFactory {
         }
         recoverDropped();
         String wanted = group == null || group.isBlank() ? "group0" : group;
-        int poolSize = addresses == null ? 1 : Math.max(1, addresses.size());
-        Set<OfficeConnection> seen = Collections.newSetFromMap(new IdentityHashMap<>());
-        OdiseeServerException lastFailure = null;
-        boolean sawGroup = false;
-        for (int attempt = 0; attempt < poolSize; attempt++) {
-            OfficeConnection officeConnection = pollConnection(waitForever && attempt == 0);
-            if (officeConnection == null) {
-                break;
-            }
-            if (!seen.add(officeConnection)) {
-                offerQuietly(officeConnection);
-                break;
-            }
-            if (!wanted.equals(connectionGroup.get(officeConnection))) {
-                offerQuietly(officeConnection);
-                continue;
-            }
-            sawGroup = true;
-            try {
-                officeConnection.connect();
-                if (officeConnection.isConnected()) {
-                    checkedOut.add(officeConnection);
-                    return officeConnection;
-                }
-                repositConnection(officeConnection);
-            } catch (OdiseeServerException e) {
-                lastFailure = e;
-                officeConnection.setFaulted(true);
-                repositConnection(officeConnection);
-            } catch (RuntimeException e) {
-                lastFailure = new OdiseeServerException("Office connection failed", e);
-                officeConnection.setFaulted(true);
-                repositConnection(officeConnection);
-            }
-        }
-        if (lastFailure != null) {
-            throw lastFailure;
-        }
-        if (!sawGroup && !groupConfigured(wanted)) {
+        LinkedBlockingQueue<OfficeConnection> queue = queuesByGroup.get(wanted);
+        if (queue == null) {
             throw new OdiseeServerException(String.format("[group=%s] No office instances configured", wanted));
         }
-        throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", wanted));
-    }
-
-    private boolean groupConfigured(final String group) {
-        if (addressGroups == null) {
-            return false;
-        }
-        for (String name : addressGroups) {
-            if (group.equals(name)) {
-                return true;
-            }
-        }
-        return false;
+        int capacity = groupCapacities.getOrDefault(wanted, 1);
+        return fetchFromQueue(wanted, queue, capacity, waitForever);
     }
 
     public OfficeConnection fetchConnection(final boolean waitForever) throws OdiseeServerException {
@@ -196,46 +171,109 @@ public class OfficeConnectionFactory {
             throw new OdiseeServerException("Shutdown in progress");
         }
         recoverDropped();
-        int poolSize = addresses == null ? 1 : Math.max(1, addresses.size());
+        String target = groupname == null || groupname.isBlank() ? "group0" : groupname;
+        LinkedBlockingQueue<OfficeConnection> queue = queuesByGroup.get(target);
+        if (queue == null && !queuesByGroup.isEmpty()) {
+            Map.Entry<String, LinkedBlockingQueue<OfficeConnection>> first = queuesByGroup.entrySet().iterator().next();
+            target = first.getKey();
+            queue = first.getValue();
+        }
+        if (queue == null) {
+            throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", target));
+        }
+        int capacity = groupCapacities.getOrDefault(target, addresses == null ? 1 : Math.max(1, addresses.size()));
+        return fetchFromQueue(target, queue, capacity, waitForever);
+    }
+
+    private OfficeConnection fetchFromQueue(
+            final String label,
+            final LinkedBlockingQueue<OfficeConnection> queue,
+            final int groupSize,
+            final boolean waitForever) throws OdiseeServerException {
+        int maxAttempts = Math.max(1, groupSize);
+        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(pollTimeoutMillis());
+        List<OfficeConnection> failed = new ArrayList<>();
         OdiseeServerException lastFailure = null;
-        for (int attempt = 0; attempt < poolSize; attempt++) {
-            OfficeConnection officeConnection = pollConnection(waitForever && attempt == 0);
-            if (officeConnection == null) {
-                break;
-            }
-            try {
-                officeConnection.connect();
-                if (officeConnection.isConnected()) {
-                    checkedOut.add(officeConnection);
-                    return officeConnection;
+        try {
+            for (int attempt = 0; attempt < maxAttempts; attempt++) {
+                OfficeConnection officeConnection;
+                if (waitForever && attempt == 0) {
+                    officeConnection = takeConnection(queue);
+                } else {
+                    long remainingNanos = deadlineNanos - System.nanoTime();
+                    officeConnection = remainingNanos <= 0L
+                            ? queue.poll()
+                            : pollConnection(queue, remainingNanos);
                 }
-                repositConnection(officeConnection);
-            } catch (OdiseeServerException e) {
-                lastFailure = e;
-                officeConnection.setFaulted(true);
-                repositConnection(officeConnection);
-            } catch (RuntimeException e) {
-                lastFailure = new OdiseeServerException("Office connection failed", e);
-                officeConnection.setFaulted(true);
-                repositConnection(officeConnection);
+                if (officeConnection == null) {
+                    break;
+                }
+                if (retired.remove(officeConnection)) {
+                    closeQuietly(officeConnection);
+                    attempt--;
+                    continue;
+                }
+                try {
+                    officeConnection.connect();
+                    if (officeConnection.isConnected()) {
+                        checkedOut.add(officeConnection);
+                        return officeConnection;
+                    }
+                    failed.add(officeConnection);
+                } catch (OdiseeServerException e) {
+                    lastFailure = e;
+                    officeConnection.setFaulted(true);
+                    failed.add(officeConnection);
+                } catch (RuntimeException e) {
+                    lastFailure = new OdiseeServerException("Office connection failed", e);
+                    officeConnection.setFaulted(true);
+                    failed.add(officeConnection);
+                }
+            }
+        } finally {
+            for (OfficeConnection failedConnection : failed) {
+                offerQuietly(failedConnection);
             }
         }
         if (lastFailure != null) {
             throw lastFailure;
         }
-        throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", groupname));
+        throw new OdiseeServerException(String.format("[group=%s] Could not fetch connection from pool, sorry.", label));
     }
 
-    private OfficeConnection pollConnection(final boolean waitForever) throws OdiseeServerException {
+    private static OfficeConnection takeConnection(final LinkedBlockingQueue<OfficeConnection> queue)
+            throws OdiseeServerException {
         try {
-            if (!waitForever) {
-                return connections.poll(QUEUE_POLL_TIMEOUT, QUEUE_POLL_TIMEUNIT);
-            }
-            return connections.take();
+            return queue.take();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new OdiseeServerException("Interrupted while waiting for an office connection", e);
         }
+    }
+
+    private static OfficeConnection pollConnection(
+            final LinkedBlockingQueue<OfficeConnection> queue,
+            final long timeoutNanos) throws OdiseeServerException {
+        try {
+            return queue.poll(timeoutNanos, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new OdiseeServerException("Interrupted while waiting for an office connection", e);
+        }
+    }
+
+    static long pollTimeoutMillis() {
+        String raw = System.getProperty(POLL_TIMEOUT_PROPERTY);
+        if (raw != null && !raw.isBlank()) {
+            try {
+                long parsed = Long.parseLong(raw.trim());
+                if (parsed > 0L) {
+                    return parsed;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return QUEUE_POLL_TIMEUNIT.toMillis(QUEUE_POLL_TIMEOUT);
     }
 
     public void repositConnection(final OfficeConnection officeConnection) throws OdiseeServerException {
@@ -243,17 +281,26 @@ public class OfficeConnectionFactory {
             return;
         }
         checkedOut.remove(officeConnection);
+        if (retired.remove(officeConnection)) {
+            closeQuietly(officeConnection);
+            return;
+        }
         if (officeConnection.wasDropped()) {
             return;
         }
-        // Check state
         if (shuttingDown.get()) {
+            closeQuietly(officeConnection);
             throw new OdiseeServerException("Shutdown in progress");
+        }
+        LinkedBlockingQueue<OfficeConnection> queue = queueFor(officeConnection);
+        if (queue == null) {
+            closeQuietly(officeConnection);
+            return;
         }
         boolean connectionWasPutBack = false;
         int i = 0;
         while (i++ < 3 && !connectionWasPutBack) {
-            connectionWasPutBack = connections.offer(officeConnection);
+            connectionWasPutBack = queue.offer(officeConnection);
         }
         if (!connectionWasPutBack) {
             throw new OdiseeServerException(String.format("[group=%s] Could not reposit connection, I tried it more than once, sorry.", groupname));
@@ -265,11 +312,23 @@ public class OfficeConnectionFactory {
      * The local soffice is stopped so {@code odiwatchdog} restarts it.
      */
     public void dropSlot(final OfficeConnection officeConnection) {
-        if (officeConnection == null || !dropped.add(officeConnection)) {
+        if (officeConnection == null) {
             return;
         }
         checkedOut.remove(officeConnection);
+        if (retired.remove(officeConnection)) {
+            officeConnection.markDropped();
+            signalLocalIfNeeded(officeConnection);
+            return;
+        }
+        if (!dropped.add(officeConnection)) {
+            return;
+        }
         officeConnection.markDropped();
+        signalLocalIfNeeded(officeConnection);
+    }
+
+    private void signalLocalIfNeeded(final OfficeConnection officeConnection) {
         boolean signaled = false;
         if (officeConnection.isLocal()) {
             try {
@@ -291,11 +350,22 @@ public class OfficeConnectionFactory {
      * @return how many slots rejoined the queue
      */
     public int recoverDropped() {
-        if (connections == null || dropped.isEmpty()) {
+        if (queuesByGroup.isEmpty() || dropped.isEmpty()) {
             return 0;
         }
         int recovered = 0;
         for (OfficeConnection connection : dropped) {
+            if (retired.remove(connection)) {
+                dropped.remove(connection);
+                closeQuietly(connection);
+                continue;
+            }
+            LinkedBlockingQueue<OfficeConnection> queue = queueFor(connection);
+            if (queue == null) {
+                dropped.remove(connection);
+                closeQuietly(connection);
+                continue;
+            }
             try {
                 UnoCall.within("recover", UnoCall.recoverDeadlineMillis(), () -> {
                     connection.connect();
@@ -308,7 +378,7 @@ public class OfficeConnectionFactory {
                 continue;
             }
             connection.clearDropped();
-            if (connections.offer(connection)) {
+            if (queue.offer(connection)) {
                 dropped.remove(connection);
                 recovered++;
             } else {
@@ -323,7 +393,7 @@ public class OfficeConnectionFactory {
      * A slot that is checked out already did. Otherwise an idle slot is probed.
      */
     public boolean acceptsUnoConnection() {
-        if (shuttingDown.get() || connections == null) {
+        if (shuttingDown.get() || queuesByGroup.isEmpty()) {
             return false;
         }
         try {
@@ -331,36 +401,43 @@ public class OfficeConnectionFactory {
         } catch (RuntimeException e) {
             LOGGER.error("Could not recover a dropped office slot", e);
         }
-        int slots = addresses == null ? 0 : addresses.size();
         Set<OfficeConnection> seen = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (int i = 0; i < slots; i++) {
-            OfficeConnection connection = connections.poll();
-            if (connection == null) {
-                break;
-            }
-            if (!seen.add(connection)) {
-                offerQuietly(connection);
-                break;
-            }
-            boolean accepted = false;
-            try {
-                accepted = UnoCall.within("probe", UnoCall.recoverDeadlineMillis(), connection::responds);
-            } catch (UnoDeadlineExceeded e) {
-                dropSlot(connection);
-            } catch (OdiseeServerException | RuntimeException e) {
-                if (connection.isLocal()) {
-                    connection.setFaulted(true);
-                } else {
-                    dropSlot(connection);
+        for (Map.Entry<String, LinkedBlockingQueue<OfficeConnection>> entry : queuesByGroup.entrySet()) {
+            LinkedBlockingQueue<OfficeConnection> queue = entry.getValue();
+            int slots = groupCapacities.getOrDefault(entry.getKey(), Math.max(1, queue.size()));
+            for (int i = 0; i < slots; i++) {
+                OfficeConnection connection = queue.poll();
+                if (connection == null) {
+                    break;
                 }
-            } finally {
-                if (!accepted && !connection.isLocal() && !connection.wasDropped()) {
-                    dropSlot(connection);
+                if (retired.remove(connection)) {
+                    closeQuietly(connection);
+                    continue;
                 }
-                offerQuietly(connection);
-            }
-            if (accepted) {
-                return true;
+                if (!seen.add(connection)) {
+                    offerQuietly(connection);
+                    break;
+                }
+                boolean accepted = false;
+                try {
+                    accepted = UnoCall.within("probe", UnoCall.recoverDeadlineMillis(), connection::responds);
+                } catch (UnoDeadlineExceeded e) {
+                    dropSlot(connection);
+                } catch (OdiseeServerException | RuntimeException e) {
+                    if (connection.isLocal()) {
+                        connection.setFaulted(true);
+                    } else {
+                        dropSlot(connection);
+                    }
+                } finally {
+                    if (!accepted && !connection.isLocal() && !connection.wasDropped()) {
+                        dropSlot(connection);
+                    }
+                    offerQuietly(connection);
+                }
+                if (accepted) {
+                    return true;
+                }
             }
         }
         return !checkedOut.isEmpty();
@@ -379,7 +456,8 @@ public class OfficeConnectionFactory {
     }
 
     public int poolSize() {
-        return addresses == null ? 0 : addresses.size();
+        List<InetSocketAddress> current = addresses;
+        return current == null ? 0 : current.size();
     }
 
     public int inUse() {
@@ -390,9 +468,44 @@ public class OfficeConnectionFactory {
         return dropped.size();
     }
 
+    private LinkedBlockingQueue<OfficeConnection> queueFor(final OfficeConnection connection) {
+        if (connection == null) {
+            return null;
+        }
+        String group = connectionGroup.get(connection);
+        if (group != null) {
+            return queuesByGroup.get(group);
+        }
+        if (!groupedPool) {
+            return queuesByGroup.get("test");
+        }
+        return null;
+    }
+
     private void offerQuietly(final OfficeConnection connection) {
-        if (connection != null && connections != null && !connection.wasDropped()) {
-            connections.offer(connection);
+        if (connection == null || connection.wasDropped()) {
+            return;
+        }
+        if (retired.remove(connection)) {
+            closeQuietly(connection);
+            return;
+        }
+        LinkedBlockingQueue<OfficeConnection> queue = queueFor(connection);
+        if (queue != null) {
+            queue.offer(connection);
+        } else {
+            closeQuietly(connection);
+        }
+    }
+
+    private static void closeQuietly(final OfficeConnection connection) {
+        if (connection == null) {
+            return;
+        }
+        try {
+            connection.close();
+        } catch (Exception e) {
+            LOGGER.debug("Could not close retired office connection {}", connection, e);
         }
     }
 
@@ -400,17 +513,19 @@ public class OfficeConnectionFactory {
      * Shutdown all connections and the factory.
      * @param cleanup If false, OfficeConnection objects remain in the pool, otherwise they are removed.
      */
-    public void shutdown(final boolean cleanup) {
+    public synchronized void shutdown(final boolean cleanup) {
         shuttingDown.getAndSet(true);
-        Iterator<OfficeConnection> iter = connections.iterator();
-        while (iter.hasNext()) {
-            try {
-                iter.next().close();
-                if (cleanup) {
-                    iter.remove();
+        for (LinkedBlockingQueue<OfficeConnection> queue : queuesByGroup.values()) {
+            Iterator<OfficeConnection> iter = queue.iterator();
+            while (iter.hasNext()) {
+                try {
+                    iter.next().close();
+                    if (cleanup) {
+                        iter.remove();
+                    }
+                } catch (OdiseeServerException e) {
+                    // ignore
                 }
-            } catch (OdiseeServerException e) {
-                // ignore
             }
         }
     }
@@ -437,10 +552,7 @@ public class OfficeConnectionFactory {
         if (nextAddresses.isEmpty()) {
             throw new OdiseeServerRuntimeException("Initialization error");
         }
-        groupname = firstGroup == null ? "group0" : firstGroup;
-        addresses = nextAddresses;
-        addressGroups = nextGroups;
-        initializeConnections();
+        initializeConnections(firstGroup == null ? "group0" : firstGroup, nextAddresses, nextGroups);
     }
 
     /**
@@ -451,77 +563,143 @@ public class OfficeConnectionFactory {
         if (byGroup == null || byGroup.isEmpty()) {
             throw new OdiseeServerRuntimeException("Initialization error");
         }
-        shuttingDown.set(false);
-        checkedOut.clear();
-        dropped.clear();
-        connectionGroup.clear();
-        addresses = new ArrayList<>();
-        addressGroups = new ArrayList<>();
-        int count = 0;
+        Set<OfficeConnection> keep = Collections.newSetFromMap(new IdentityHashMap<>());
+        int totalCount = 0;
         for (List<OfficeConnection> ready : byGroup.values()) {
             if (ready != null) {
-                count += ready.size();
-            }
-        }
-        connections = new LinkedBlockingQueue<>(Math.max(1, count));
-        String firstGroup = null;
-        for (Map.Entry<String, List<OfficeConnection>> entry : byGroup.entrySet()) {
-            if (firstGroup == null) {
-                firstGroup = entry.getKey();
-            }
-            if (entry.getValue() == null) {
-                continue;
-            }
-            for (OfficeConnection connection : entry.getValue()) {
-                addresses.add(connection.socketAddress() == null
-                        ? new InetSocketAddress("127.0.0.1", 9)
-                        : connection.socketAddress());
-                addressGroups.add(entry.getKey());
-                connectionGroup.put(connection, entry.getKey());
-                if (!connections.offer(connection)) {
-                    throw new OdiseeServerRuntimeException("reload rejected a connection");
+                for (OfficeConnection conn : ready) {
+                    if (conn != null) {
+                        keep.add(conn);
+                        totalCount++;
+                    }
                 }
             }
         }
-        groupname = firstGroup == null ? "test" : firstGroup;
-    }
-
-    private synchronized void initializeConnections() {
-        shuttingDown.set(false);
-        checkedOut.clear();
-        dropped.clear();
-        connectionGroup.clear();
-        // Check state
-        if (null == addresses || addresses.isEmpty()) {
+        if (totalCount == 0) {
             throw new OdiseeServerRuntimeException("Initialization error");
         }
-        // Setup queue for connections
-        connections = new LinkedBlockingQueue<>(addresses.size());
-        // Process all TCP/IP addresses
-        for (int index = 0; index < addresses.size(); index++) {
-            final InetSocketAddress socketAddress = addresses.get(index);
-            final String slotGroup = addressGroups != null && index < addressGroups.size()
-                    ? addressGroups.get(index)
-                    : groupname;
+        Map<String, LinkedBlockingQueue<OfficeConnection>> nextQueues = new LinkedHashMap<>();
+        Map<String, Integer> nextCapacities = new LinkedHashMap<>();
+        Map<OfficeConnection, String> nextConnectionGroup = new IdentityHashMap<>();
+        List<InetSocketAddress> nextAddresses = new ArrayList<>();
+        List<String> nextGroups = new ArrayList<>();
+        String firstGroup = null;
+        for (Map.Entry<String, List<OfficeConnection>> entry : byGroup.entrySet()) {
+            String key = entry.getKey() == null || entry.getKey().isBlank() ? "group0" : entry.getKey();
+            if (firstGroup == null) {
+                firstGroup = key;
+            }
+            List<OfficeConnection> groupList = entry.getValue();
+            if (groupList == null || groupList.isEmpty()) {
+                continue;
+            }
+            int cap = groupList.size();
+            LinkedBlockingQueue<OfficeConnection> queue = new LinkedBlockingQueue<>(cap);
+            for (OfficeConnection connection : groupList) {
+                nextAddresses.add(connection.socketAddress() == null
+                        ? new InetSocketAddress("127.0.0.1", 9)
+                        : connection.socketAddress());
+                nextGroups.add(key);
+                nextConnectionGroup.put(connection, key);
+                if (!checkedOut.contains(connection)) {
+                    if (!queue.offer(connection)) {
+                        throw new OdiseeServerRuntimeException("reload rejected a connection");
+                    }
+                }
+            }
+            nextQueues.put(key, queue);
+            nextCapacities.put(key, cap);
+        }
+        retirePreviousPool(keep);
+        installPool(firstGroup == null ? "test" : firstGroup, true, nextAddresses, nextGroups,
+                nextQueues, nextCapacities, nextConnectionGroup);
+    }
+
+    private synchronized void initializeConnections(
+            final String defaultGroup,
+            final List<InetSocketAddress> nextAddresses,
+            final List<String> nextGroups) {
+        if (nextAddresses == null || nextAddresses.isEmpty()) {
+            throw new OdiseeServerRuntimeException("Initialization error");
+        }
+        Map<String, List<OfficeConnection>> bootstrappedByGroup = new LinkedHashMap<>();
+        for (int index = 0; index < nextAddresses.size(); index++) {
+            final InetSocketAddress socketAddress = nextAddresses.get(index);
+            final String rawGroup = nextGroups != null && index < nextGroups.size()
+                    ? nextGroups.get(index)
+                    : defaultGroup;
+            final String slotGroup = rawGroup == null || rawGroup.isBlank() ? "group0" : rawGroup;
             final OfficeConnection officeConnection = new OfficeConnection(socketAddress);
             try {
                 officeConnection.bootstrap(false);
-                connectionGroup.put(officeConnection, slotGroup == null ? "group0" : slotGroup);
-                final boolean offer = connections.offer(officeConnection);
-                if (offer) {
-                    LOGGER.info("Added connection {} to queue", officeConnection);
-                } else {
-                    LOGGER.error("Could not add connection {} to queue", officeConnection);
-                }
+                bootstrappedByGroup.computeIfAbsent(slotGroup, k -> new ArrayList<>()).add(officeConnection);
+                LOGGER.info("Added connection {} to queue", officeConnection);
             } catch (OdiseeServerException e) {
                 LOGGER.error("[group={}] Could not bootstrap connection to {}: {}",
                         slotGroup, socketAddress, e.getLocalizedMessage());
             }
         }
-        if (connections.isEmpty()) {
+        if (bootstrappedByGroup.isEmpty()) {
             throw new OdiseeServerRuntimeException(String.format(
-                    "[group=%s] No office connections could be bootstrapped", groupname));
+                    "[group=%s] No office connections could be bootstrapped", defaultGroup));
         }
+        Map<String, LinkedBlockingQueue<OfficeConnection>> nextQueues = new LinkedHashMap<>();
+        Map<String, Integer> nextCapacities = new LinkedHashMap<>();
+        Map<OfficeConnection, String> nextConnectionGroup = new IdentityHashMap<>();
+        for (Map.Entry<String, List<OfficeConnection>> entry : bootstrappedByGroup.entrySet()) {
+            String key = entry.getKey();
+            List<OfficeConnection> list = entry.getValue();
+            LinkedBlockingQueue<OfficeConnection> queue = new LinkedBlockingQueue<>(list.size());
+            for (OfficeConnection conn : list) {
+                nextConnectionGroup.put(conn, key);
+                if (!queue.offer(conn)) {
+                    LOGGER.error("Could not add connection {} to queue", conn);
+                }
+            }
+            nextQueues.put(key, queue);
+            nextCapacities.put(key, list.size());
+        }
+        retirePreviousPool(Collections.emptySet());
+        installPool(defaultGroup, true, nextAddresses, nextGroups, nextQueues, nextCapacities, nextConnectionGroup);
+    }
+
+    private void retirePreviousPool(final Set<OfficeConnection> keep) {
+        List<OfficeConnection> oldIdle = new ArrayList<>();
+        for (LinkedBlockingQueue<OfficeConnection> oldQueue : queuesByGroup.values()) {
+            oldQueue.drainTo(oldIdle);
+        }
+        for (OfficeConnection inFlight : checkedOut) {
+            if (!keep.contains(inFlight)) {
+                retired.add(inFlight);
+            }
+        }
+        dropped.removeIf(conn -> !keep.contains(conn));
+        for (OfficeConnection conn : oldIdle) {
+            if (!keep.contains(conn) && !checkedOut.contains(conn)) {
+                closeQuietly(conn);
+            }
+        }
+    }
+
+    private void installPool(
+            final String nextGroupName,
+            final boolean nextGrouped,
+            final List<InetSocketAddress> nextAddresses,
+            final List<String> nextGroups,
+            final Map<String, LinkedBlockingQueue<OfficeConnection>> nextQueues,
+            final Map<String, Integer> nextCapacities,
+            final Map<OfficeConnection, String> nextConnectionGroup) {
+        shuttingDown.set(false);
+        queuesByGroup.clear();
+        queuesByGroup.putAll(nextQueues);
+        groupCapacities.clear();
+        groupCapacities.putAll(nextCapacities);
+        connectionGroup.clear();
+        connectionGroup.putAll(nextConnectionGroup);
+        addresses = nextAddresses;
+        addressGroups = nextGroups;
+        groupname = nextGroupName;
+        groupedPool = nextGrouped;
     }
 
 }

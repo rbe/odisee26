@@ -10,6 +10,7 @@ import org.springframework.mock.web.MockHttpServletResponse
 import org.w3c.dom.Element
 
 import java.nio.file.Files
+import java.nio.file.Path
 import java.security.Principal
 import java.util.concurrent.Executor
 
@@ -213,6 +214,80 @@ class DeliveryTest extends GroovyTestCase {
         assertEquals('failed', job.status)
         assertNull(job.bucket)
         assertEquals(0, storage.puts.size())
+    }
+
+    void testSynchronousGenerateCleansUpEphemeralOutputForStreamStoreAndBoth() {
+        String ada = user('sync-clean')
+        configure(ada, 'ada-docs')
+        Files.createDirectories(TenantPaths.templateDir(ada))
+        Files.writeString(TenantPaths.templateDir(ada).resolve('Letter.ott'), 'ott')
+        OdiseeService odiseeService = fakeOdiseeService('%PDF-sync'.getBytes('UTF-8'))
+        RecordingStorage storage = new RecordingStorage()
+
+        [null, 'store', 'both'].each { String mode ->
+            Element xml = requestWithArchive(mode, false)
+            List<Document> docs = odiseeService.generateDocument(principal(ada), xml)
+            assertEquals(1, docs.size())
+            MockHttpServletResponse response = new MockHttpServletResponse()
+            Delivery.respond(response, ada, xml, docs.last(), storage)
+            assertEquals(200, response.status)
+            Path outDir = TenantPaths.outputDir(ada)
+            if (Files.isDirectory(outDir)) {
+                Files.newDirectoryStream(outDir).withCloseable { stream ->
+                    assertFalse("leftover output directory for mode=${mode}", stream.iterator().hasNext())
+                }
+            }
+        }
+        assertEquals(2, storage.puts.size())
+    }
+
+    void testSynchronousGeneratePreservesOutputWhenArchiveFilesIsTrue() {
+        String ada = user('sync-archive')
+        Files.createDirectories(TenantPaths.templateDir(ada))
+        Files.writeString(TenantPaths.templateDir(ada).resolve('Letter.ott'), 'ott')
+        OdiseeService odiseeService = fakeOdiseeService('%PDF-archived'.getBytes('UTF-8'))
+
+        Element xml = requestWithArchive(null, true)
+        List<Document> docs = odiseeService.generateDocument(principal(ada), xml)
+        assertEquals(1, docs.size())
+
+        List<java.nio.file.Path> saved = []
+        Files.walk(TenantPaths.outputDir(ada)).withCloseable { stream ->
+            stream.filter { Files.isRegularFile(it) && it.fileName.toString() == 'Letter.pdf' }
+                    .forEach { saved << it }
+        }
+        assertEquals(1, saved.size())
+        assertBytes('%PDF-archived'.getBytes('UTF-8'), Files.readAllBytes(saved[0]))
+    }
+
+    private static OdiseeService fakeOdiseeService(byte[] pdfBytes) {
+        OdiseeService service = new OdiseeService()
+        service.templateService = new TemplateService()
+        service.storageService = new StorageService()
+        PostProcessService post = new PostProcessService()
+        post.storageService = service.storageService
+        service.postProcessService = post
+        service.requestService = new RequestService() {
+            @Override
+            void processSingleRequest(Map arg) {
+                extractRequestAndSaveToDisk(arg, (int) arg.activeIndex)
+                java.nio.file.Path out = ((java.nio.file.Path) arg.documentDir).resolve('Letter.pdf')
+                Files.write(out, pdfBytes)
+                arg.result = [output: [out], retries: 0, wallTime: 1]
+            }
+        }
+        service
+    }
+
+    private static Element requestWithArchive(String delivery, boolean archiveFiles) {
+        String attr = delivery ? " delivery=\"${delivery}\"" : ''
+        RequestSchema.parse("""<odisee${attr}>
+  <request name="Letter">
+    <template name="Letter" outputFormat="pdf"/>
+    <archive files="${archiveFiles}"/>
+    <instructions><userfield name="Hallo">x</userfield></instructions>
+  </request>
+</odisee>""".getBytes('UTF-8'))
     }
 
     private static void assertBytes(byte[] expected, byte[] actual) {
