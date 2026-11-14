@@ -91,18 +91,15 @@ tasks.register<Zip>("packageDistribution") {
     val packageLayout = layout.buildDirectory.dir("package-layout")
     val varDirs = listOf(
         "var/deploy/fonts",
-        "var/document",
-        "var/image",
         "var/log",
-        "var/merge",
         "var/profile",
-        "var/request",
-        "var/template",
         "var/tmp",
     )
     doFirst {
+        val root = packageLayout.get().asFile
+        root.deleteRecursively()
         varDirs.forEach { rel ->
-            val dir = packageLayout.get().asFile.resolve(rel)
+            val dir = root.resolve(rel)
             dir.mkdirs()
             dir.resolve(".keep").writeText("")
         }

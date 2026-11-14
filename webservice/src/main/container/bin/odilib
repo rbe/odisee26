@@ -51,7 +51,7 @@ odisee_internal_paths() {
     ODISEE_FQHN=$(uname -n)
     ODISEE_OS=$(uname -s)
     ODISEE_ARCH=$(uname -m)
-    ODISEE_WD_TIMEOUT=5
+    ODISEE_WD_TIMEOUT=${ODISEE_WD_TIMEOUT:-5}
     ODISEE_EXT_VND="vnd.artofcoding.odisee.Odisee"
     SED=${SED:-$(command -v sed || true)}
     export -n ODISEE_LIBEXEC ODISEE_ETC ODISEE_INST ODISEE_VAR ODISEE_LOG \
@@ -105,7 +105,7 @@ is_cmdopt() {
     local ok=true
     for o in $*
     do
-        [ -z "${cmdopt[$o]}" ] && ok=false
+        [ -z "${cmdopt[$o]:-}" ] && ok=false
     done
     echo $ok
 }
@@ -117,7 +117,7 @@ isnot_cmdopt() {
     local ok=true
     for o in $*
     do
-        [ -n "${cmdopt[$o]}" ] && ok=false
+        [ -n "${cmdopt[$o]:-}" ] && ok=false
     done
     echo $ok
 }
@@ -126,21 +126,22 @@ isnot_cmdopt() {
 # Set default value for an option, if not given through command line.
 #
 def_cmdopt() {
-    [ -z "${cmdopt[$1]}" ] && cmdopt[$1]=$2
+    [ -z "${cmdopt[$1]:-}" ] && cmdopt[$1]=$2
 }
 
 #
 # Set default value for an -o option, if not given through command line.
 #
 def_option() {
-    [ -z "${option[$1]}" ] && option[$1]=$2
+    [ -z "${option[$1]:-}" ] && option[$1]=$2
 }
 
 #
 # Replace comma by space in value of an option for use with for-loops.
 #
 _splitcmdopt() {
-    echo ${cmdopt[$1]//,/ }
+    local val=${cmdopt[$1]:-}
+    echo ${val//,/ }
 }
 
 #
@@ -149,14 +150,14 @@ _splitcmdopt() {
 check_cmdopt() {
     # Check needed parameters
     local needed
-    for c in ${!cmdopt[*]}
+    for c in "${!cmdopt[@]}"
     do
-        needed=${CMD_DEPENDENCY_AND[$c]}
+        needed=${CMD_DEPENDENCY_AND[$c]:-}
         if [ -n "$needed" ]
         then
             for n in $needed
             do
-                if [ -z "${cmdopt[$n]}" ]
+                if [ -z "${cmdopt[$n]:-}" ]
                 then
                     echo "Odisee: Option -$c needs -$needed."
                     CMDOK=false
@@ -167,20 +168,20 @@ check_cmdopt() {
     # Check needed parameters
     local orcount=0
     local orfound=0
-    for c in ${!cmdopt[*]}
+    for c in "${!cmdopt[@]}"
     do
-        needed=${CMD_DEPENDENCY_OR[$c]}
+        needed=${CMD_DEPENDENCY_OR[$c]:-}
         if [ -n "$needed" ]
         then
             for n in $needed
             do
                 orcount=$((orcount + 1))
-                [ -n "${cmdopt[$n]}" ] && orfound=$((orfound + 1))
+                [ -n "${cmdopt[$n]:-}" ] && orfound=$((orfound + 1))
             done
             if [ $orfound -eq 0 ]
             then
                 echo -n "Odisee: Option -$c needs one of the following options: "
-                for o in ${CMD_DEPENDENCY_OR[$c]}
+                for o in ${CMD_DEPENDENCY_OR[$c]:-}
                 do
                     echo -n "-$o "
                 done
@@ -191,14 +192,14 @@ check_cmdopt() {
     done
     # Check no-goes
     local nogo
-    for c in ${!cmdopt[*]}
+    for c in "${!cmdopt[@]}"
     do
-        nogo=${CMD_NOGO[$c]}
+        nogo=${CMD_NOGO[$c]:-}
         if [ -n "$nogo" ]
         then
             for n in $nogo
             do
-                if [ -n "${cmdopt[$n]}" ]
+                if [ -n "${cmdopt[$n]:-}" ]
                 then
                     echo "Odisee: Option -$c cannot be used with -$n."
                     CMDOK=false
@@ -241,7 +242,8 @@ find_installation() {
             do
                 if [ -d "${i}" -a -d "${i}/Contents" -a -d "${i}/Contents/program" ]
                 then
-                    FOUND_HOME="${FOUND_HOME} ${i}"
+                    FOUND_HOME="${i}"
+                    break
                 fi
             done
         ;;
@@ -250,21 +252,22 @@ find_installation() {
             do
                 if [ -d "${i}" -a -d "${i}/program" ]
                 then
-                    FOUND_HOME="${FOUND_HOME} ${i}"
+                    FOUND_HOME="${i}"
+                    break
                 fi
             done
         ;;
         SunOS | Linux)
-            for i in /opt/openoffice.org3
+            for i in ${ODISEE_LO_SEARCH_PATHS:-/usr/lib/libreoffice /usr/lib64/libreoffice /usr/local/lib/libreoffice /opt/libreoffice /opt/openoffice.org3}
             do
                 if [ -d "${i}" -a -d "${i}/program" ]
                 then
-                    FOUND_HOME="${FOUND_HOME} ${i}"
+                    FOUND_HOME="${i}"
+                    break
                 fi
             done
         ;;
     esac
-    FOUND_HOME=${FOUND_HOME:1}
 }
 
 #
@@ -307,7 +310,11 @@ get_port() {
 # Calculate next free TCP/IP port
 #
 get_free_port() {
-    local highest_port=$(cat ${ODISEE_INST} | awk -F\| '{print $3}' | sort | tail -1)
+    local highest_port=""
+    if [ -f "${ODISEE_INST}" ]
+    then
+        highest_port=$(awk -F\| '$1 !~ /^[[:space:]]*(#|$)/ && $3 ~ /^[0-9]+$/ {print $3}' "${ODISEE_INST}" | sort -n | tail -n 1)
+    fi
     [ -z "${highest_port}" ] && highest_port=2000
     echo $((highest_port + 1))
 }
@@ -342,8 +349,12 @@ count_process() {
 #
 inst_exists() {
     local inst=$1
-    local exists=$(grep -c "^${inst}|" ${ODISEE_INST})
-    if [ ${exists} -gt 0 ]
+    local exists=0
+    if [ -f "${ODISEE_INST}" ]
+    then
+        exists=$(awk -F\| -v inst="${inst}" '$1 == inst { c++ } END { print c+0 }' "${ODISEE_INST}")
+    fi
+    if [ "${exists}" -gt 0 ]
     then
         echo "true"
     else
@@ -390,20 +401,23 @@ get_names_of_uniq_inst_home() {
 get_inst_cfg() {
     local inst=$1
     # Check if instance exists
-    exit_inst_does_not_exist ${inst}
+    exit_inst_does_not_exist "${inst}"
     # Get configuration data
-    INSTCFG[ip]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $2}')
-    INSTCFG[port]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $3}')
-    INSTCFG[ipport]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $2":"$3}')
-    INSTCFG[home]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $4}')
-    INSTCFG[data]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $5}')
+    local row
+    row=$(awk -F\| -v inst="${inst}" '$1 == inst { print; exit }' "${ODISEE_INST}")
+    INSTCFG[ip]=$(printf '%s\n' "${row}" | awk -F\| '{print $2}')
+    INSTCFG[port]=$(printf '%s\n' "${row}" | awk -F\| '{print $3}')
+    INSTCFG[ipport]=$(printf '%s\n' "${row}" | awk -F\| '{print $2":"$3}')
+    INSTCFG[home]=$(printf '%s\n' "${row}" | awk -F\| '{print $4}')
+    INSTCFG[data]=$(printf '%s\n' "${row}" | awk -F\| '{print $5}')
     # Default data directory
     if [ x"${INSTCFG[data]}" = x"" ]
     then
         INSTCFG[data]="${ODISEE_USER_PROFILE}/${inst}"
     fi
-    INSTCFG[options]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $6}')
-    INSTCFG[autostart]=$(cat ${ODISEE_INST} | grep "^${inst}|" | awk -F\| '{print $7}')
+    INSTCFG[options]=$(printf '%s\n' "${row}" | awk -F\| '{print $6}')
+    INSTCFG[autostart]=$(printf '%s\n' "${row}" | awk -F\| '{print $7}')
+    INSTCFG[group]=$(printf '%s\n' "${row}" | awk -F\| '{print $8}')
 }
 
 #
@@ -630,50 +644,55 @@ add_instance() {
 manage_instance() {
     local inst=$1
     #
-    if [ x"$(inst_exists ${inst})" = x"true" ]
+    if [ x"$(inst_exists "${inst}")" = x"true" ]
     then
-        # Get configuration
-        # TODO Use INSTCFG[], see below
-        get_inst_cfg ${inst}
-        #
-        local cfg=$(grep ${inst} ${ODISEE_INST})
-        local ipport=$(echo ${cfg} | awk -F\| '{print $2":"$3}' )
-        local ip=$(get_ip ${ipport})
-        local port=$(get_port ${ipport})
+        get_inst_cfg "${inst}"
+        local cfg
+        cfg=$(awk -F\| -v inst="${inst}" '$1 == inst { print; exit }' "${ODISEE_INST}")
+        local ipport=$(printf '%s\n' "${cfg}" | awk -F\| '{print $2":"$3}')
+        local ip=$(get_ip "${ipport}")
+        local port=$(get_port "${ipport}")
         if [ x"$(is_cmdopt p)" = x"true" ]
         then
-            local ip2=$(get_ip ${cmdopt[p]}); [ -n "${ip2}" ] && ip=${ip2}
-            local port2=$(get_port ${cmdopt[p]}); [ -n "${port2}" ] && port=${port2}
+            local ip2=$(get_ip "${cmdopt[p]}"); [ -n "${ip2}" ] && ip=${ip2}
+            local port2=$(get_port "${cmdopt[p]}"); [ -n "${port2}" ] && port=${port2}
         fi
-        local falt=$(echo ${cfg} | awk -F\| '{print $4}')
+        local falt=$(printf '%s\n' "${cfg}" | awk -F\| '{print $4}')
         local home=${cmdopt[f]:-${falt}}
-        local yalt=$(echo ${cfg} | awk -F\| '{print $5}')
-        local data=${cmdopt[y]:-yalt}
+        local yalt=$(printf '%s\n' "${cfg}" | awk -F\| '{print $5}')
+        local data=${cmdopt[y]:-${yalt}}
         # Build options
-        opts=$(echo ${cfg} | awk -F\| '{print $6}')
+        local opts
+        opts=$(printf '%s\n' "${cfg}" | awk -F\| '{print $6}')
         # Add option=true, remove option=false
-        local autostart
-        for o in ${!option[*]}
+        local autostart=$(printf '%s\n' "${cfg}" | awk -F\| '{print $7}')
+        local group=$(printf '%s\n' "${cfg}" | awk -F\| '{print $8}')
+        for o in "${!option[@]}"
         do
-            if [ x"${option[$o]}" = x"true" ]
+            if [ x"${o}" = x"autostart" ]
             then
-                if [ x"${o}" = x"autostart" ]
-                then
-                    autostart=${option[$o]}
-                else
-                    [[ x${opts} != x*${o}* ]] && opts="${opts} $o"
-                fi
+                autostart=${option[$o]}
+            elif [ x"${option[$o]}" = x"true" ]
+            then
+                [[ " ${opts} " != *" ${o} "* ]] && opts="${opts} ${o}"
             else
-                opts=${opts/${o}/}
+                opts=" ${opts} "
+                opts=${opts//" ${o} "/ }
             fi
         done
-        opts=${opts/# /}; opts=${opts/% /}
-        # Re-create entry in odiinst
-        $SED -i'' -e "/^${inst}[|]/c\
-${inst}|${ip}|${port}|${home}|${data}|${opts}|${autostart}" ${ODISEE_INST}
+        opts="${opts#"${opts%%[![:space:]]*}"}"
+        opts="${opts%"${opts##*[![:space:]]}"}"
+        # Re-create entry in odiinst portably without sed -i
+        local row="${inst}|${ip}|${port}|${home}|${data}|${opts}|${autostart}"
+        [ -n "${group}" ] && row="${row}|${group}"
+        local tmp
+        tmp=$(mktemp "${ODISEE_ETC}/.odiinst.XXXXXX")
+        awk -F\| -v inst="${inst}" -v row="${row}" '$1 == inst { print row; next } { print }' "${ODISEE_INST}" > "${tmp}"
+        cat "${tmp}" > "${ODISEE_INST}"
+        rm -f "${tmp}"
         echo "Instance '${inst}' modified."
         #
-        get_inst_status ${inst}
+        get_inst_status "${inst}"
         if [[ x"${INSTSTAT[status]}" == xONLINE,* ]]
         then
             echo "Instance '${inst}' has status ${INSTSTAT[status]}, please restart it."
@@ -689,10 +708,14 @@ ${inst}|${ip}|${port}|${home}|${data}|${opts}|${autostart}" ${ODISEE_INST}
 remove_instance() {
     local inst=$1
     # First stop it
-    stop_instance ${inst}
-    # Remove from odiinst
-    $SED -i'' -e "/^${inst}[|]/d" ${ODISEE_INST}
-    if [ $(grep -c "${inst}|" ${ODISEE_INST}) -eq 0 ]
+    stop_instance "${inst}"
+    # Remove from odiinst portably without sed -i
+    local tmp
+    tmp=$(mktemp "${ODISEE_ETC}/.odiinst.XXXXXX")
+    awk -F\| -v inst="${inst}" '$1 != inst { print }' "${ODISEE_INST}" > "${tmp}"
+    cat "${tmp}" > "${ODISEE_INST}"
+    rm -f "${tmp}"
+    if [ x"$(inst_exists "${inst}")" = x"false" ]
     then
         echo "Instance '${inst}' removed."
     else
@@ -786,14 +809,14 @@ stop_instance() {
     get_inst_cfg ${inst}
     get_inst_status ${inst}
     echo -n "Stopping OpenOffice instance '${inst}'"
-    [ x"${force}" = x"true" ] && echo -n " (FORCED)"
+    [ x"${cmdopt[z]:-}" = x"true" ] && echo -n " (FORCED)"
     echo -n ":"
     if [ x"${INSTSTAT[status]}" = x"OFFLINE" ]
     then
         echo " Odisee: Instance '${inst}' already stopped."
         return
     fi
-    if [ x"${cmdopt[z]}" =  x"true" ]
+    if [ x"${cmdopt[z]:-}" = x"true" ]
     then
         kill_instance ${inst} true
     elif [ x"${INSTSTAT[status]}" = x"ONLINE, READY" ]
@@ -833,7 +856,7 @@ show_instance() {
 # List all instances.
 #
 list_instances() {
-    cat ${ODISEE_INST} | awk -F\| '{print $1}'
+    awk -F\| '$1 !~ /^[[:space:]]*(#|$)/ {print $1}' "${ODISEE_INST}"
 }
 
 #
@@ -841,7 +864,7 @@ list_instances() {
 #
 get_extension_cfg() {
     # List of extension identifier
-    local identifier=$(sudo ${OOO_UNOPKG} | grep Identifier | ${SED} "s/Identifier: //g")
+    local identifier=$(sudo ${OOO_UNOPKG} | grep Identifier | ${SED} "s/Identifier: //g")
     for ident in ${identifier}
     do
         local tmp=OOO_UNOPKG$$
@@ -854,14 +877,13 @@ get_extension_cfg() {
 #
 remove_extension() {
     local ident=$1
-    local shared=$2
+    local shared=${2:-}
+    local opts=""
     if [ x"${shared}" != x"" ]
     then
         opts="--shared"
-    else
-        opts=""
     fi
-    echo "Removing extension ${oxt} (options: ${opts})"
+    echo "Removing extension ${ident} (options: ${opts})"
     echo sudo ${OOO_UNOPKG} remove ${opts} ${ident}
 }
 
@@ -870,12 +892,11 @@ remove_extension() {
 #
 install_extension() {
     local oxt=$1
-    local shared=$2
+    local shared=${2:-}
+    local opts=""
     if [ x"${shared}" != x"" ]
     then
         opts="--shared"
-    else
-        opts=""
     fi
     echo "Installing extension ${oxt} (options: ${opts})"
     echo sudo ${OOO_UNOPKG} add ${opts} ${oxt}

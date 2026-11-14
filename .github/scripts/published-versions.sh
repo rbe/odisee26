@@ -4,7 +4,39 @@
 set -eu
 
 mode=${1:?}
+
+if [ "$mode" = "gh-images" ]; then
+  target=${2:?}
+  package=${3:?}
+  case "$target" in
+    orgs/*|users/*)
+      root="$target"
+      ;;
+    *)
+      kind=$(gh api "users/${target}" --jq .type)
+      if [ "$kind" = "Organization" ]; then
+        root="orgs/${target}"
+      else
+        root="users/${target}"
+      fi
+      ;;
+  esac
+  err=$(mktemp)
+  trap 'rm -f "$err"' EXIT
+  if out=$(gh api --paginate "/${root}/packages/container/${package}/versions" \
+    --jq '.[] | [.id, ((.metadata.container.tags // []) | join(","))] | @tsv' 2>"$err"); then
+    [ -z "$out" ] || printf '%s\n' "$out"
+    exit 0
+  fi
+  if grep -Eq 'HTTP 404|404 Not Found|"status":[[:space:]]*"404"' "$err"; then
+    exit 0
+  fi
+  cat "$err" >&2
+  exit 1
+fi
+
 current=${2:?}
+ref=${3:-}
 
 lines=()
 while IFS= read -r line || [ -n "${line:-}" ]; do
@@ -13,6 +45,13 @@ while IFS= read -r line || [ -n "${line:-}" ]; do
   esac
   lines+=("$line")
 done
+
+if [ -n "$ref" ]; then
+  case "$ref" in
+    refs/heads/master|refs/tags/v*) ;;
+    *) exit 0 ;;
+  esac
+fi
 
 if [[ ! "$current" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)$ ]]; then
   exit 0

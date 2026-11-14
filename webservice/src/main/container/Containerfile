@@ -5,8 +5,8 @@ ENV TZ=Europe/Berlin \
     ODISEE_HOME=/home/odisee \
     PATH="/home/odisee/.local/bin:${PATH}"
 
-# Headless Writer and the service JRE. Calc and Impress are not installed.
-# Docs, package indexes, and Writer files that conversion does not read are
+# Headless Writer, Calc, Impress, and the service JRE.
+# Docs, package indexes, and LibreOffice files that conversion does not read are
 # removed in this same layer so the runtime stage does not contain them.
 # entrypoint.sh uses a 1g heap, so the non-compressed CDS archive stays unused.
 # This layer stays cached. Files that change are copied below it.
@@ -15,6 +15,8 @@ RUN apt-get update \
         openjdk-21-jre-headless \
         curl \
         libreoffice-writer \
+        libreoffice-calc \
+        libreoffice-impress \
         fonts-liberation \
         ca-certificates \
     && rm -f /usr/lib/jvm/java-21-openjdk-*/lib/server/classes_nocoops.jsa \
@@ -44,11 +46,8 @@ RUN apt-get update \
         ${ODISEE_HOME}/bin \
         ${ODISEE_HOME}/etc \
         ${ODISEE_HOME}/var/deploy/fonts \
-        ${ODISEE_HOME}/var/document \
-        ${ODISEE_HOME}/var/image \
-        ${ODISEE_HOME}/var/merge \
-        ${ODISEE_HOME}/var/request \
-        ${ODISEE_HOME}/var/template \
+        ${ODISEE_HOME}/var/log \
+        ${ODISEE_HOME}/var/profile \
         ${ODISEE_HOME}/var/tmp \
         ${ODISEE_HOME}/.local/bin \
     && chmod 750 \

@@ -122,6 +122,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(packaged.contains('actions: write'))
         assertTrue(packaged.contains('contents: write'))
         assertTrue(packaged.contains('published-versions.sh artifacts'))
+        assertTrue(packaged.contains('"$GITHUB_REF"'))
         assertTrue(packaged.indexOf('Upload distribution') < packaged.indexOf('published-versions.sh artifacts'))
 
         String image = jobs['image']
@@ -152,7 +153,9 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(imageWorkflow.contains('cache_repo="ghcr.io/${repo}/cache"'))
         assertTrue(imageWorkflow.contains('--cache-from "${cache_repo}"'))
         assertFalse(imageWorkflow.contains('--cache-to'))
-        assertTrue(imageWorkflow.contains('published-versions.sh images'))
+        assertTrue(imageWorkflow.contains('published-versions.sh gh-images'))
+        assertTrue(imageWorkflow.contains('published-versions.sh images "$version" "$GITHUB_REF"'))
+        assertTrue(imageWorkflow.contains("if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')"))
         assertFalse(imageWorkflow.contains('${image}:cache'))
         assertTrue(imageWorkflow.contains('podman manifest rm "${image}:${version}"'))
         int versionPush = imageWorkflow.indexOf('podman manifest push --all "${image}:${version}"' + "\n")
@@ -240,6 +243,66 @@ class BuildPipelineTest extends GroovyTestCase {
 
         String properties = new File(root, 'gradle.properties').text
         assertFalse(properties.contains('--add-exports'))
+    }
+
+    void testServiceAndTestContainerfilesInstallWriterCalcAndImpress() {
+        File root = repoRoot()
+        String serviceContainerfile = new File(root, 'webservice/src/main/container/Containerfile').getText('UTF-8')
+        String testContainerfile = new File(root, 'webservice/src/test/container/libreoffice/Containerfile').getText('UTF-8')
+
+        [serviceContainerfile, testContainerfile].each { String containerfile ->
+            int copyIndex = containerfile.indexOf('COPY ')
+            assertTrue(copyIndex > 0)
+            ['libreoffice-writer', 'libreoffice-calc', 'libreoffice-impress'].each { String pkg ->
+                int pkgIndex = containerfile.indexOf(pkg)
+                assertTrue("Missing ${pkg}", pkgIndex > 0 && pkgIndex < copyIndex)
+            }
+            assertFalse(containerfile.contains('Calc and Impress are not installed'))
+            assertFalse(containerfile.contains('Headless Writer only'))
+        }
+    }
+
+    void testDistributionAndContainerOmitLegacySharedVarDirectories() {
+        File root = repoRoot()
+        String rootGradle = new File(root, 'build.gradle.kts').getText('UTF-8')
+        String webGradle = new File(root, 'webservice/build.gradle.kts').getText('UTF-8')
+        String containerfile = new File(root, 'webservice/src/main/container/Containerfile').getText('UTF-8')
+        List<String> legacyDirs = ['var/template', 'var/document', 'var/merge', 'var/image', 'var/request']
+        List<String> runtimeDirs = ['var/deploy/fonts', 'var/log', 'var/profile', 'var/tmp']
+
+        runtimeDirs.each { String dir ->
+            assertTrue("build.gradle.kts missing ${dir}", rootGradle.contains("\"${dir}\""))
+            assertTrue("Containerfile missing ${dir}", containerfile.contains("\${ODISEE_HOME}/${dir}"))
+        }
+        legacyDirs.each { String dir ->
+            assertFalse("build.gradle.kts still creates ${dir}", rootGradle.contains("\"${dir}\""))
+            assertFalse("Containerfile still creates ${dir}", containerfile.contains("\${ODISEE_HOME}/${dir}"))
+        }
+        int stageTask = webGradle.indexOf('tasks.register<Copy>("prepareOdiseeImage")')
+        assertTrue(stageTask > 0)
+        String stageBlock = webGradle.substring(stageTask, webGradle.indexOf('\n}', stageTask) + 2)
+        assertTrue(stageBlock, stageBlock.contains('exclude("var/**")'))
+        File stagedContext = new File(root, 'webservice/build/container/odisee')
+        if (stagedContext.isDirectory()) {
+            assertFalse('prepareOdiseeImage staged var/', new File(stagedContext, 'var').exists())
+        }
+
+        File distDir = new File(root, 'build/distributions')
+        File[] zips = distDir.isDirectory() ? distDir.listFiles({ File d, String name -> name.endsWith('.zip') } as FilenameFilter) : null
+        if (zips != null && zips.length > 0) {
+            java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zips[0])
+            try {
+                Set<String> entries = zip.entries().collect { it.name } as Set
+                runtimeDirs.each { String dir ->
+                    assertTrue("Zip missing ${dir}/.keep", entries.contains("${dir}/.keep".toString()))
+                }
+                legacyDirs.each { String dir ->
+                    assertFalse("Zip still contains ${dir}", entries.any { it == dir || it.startsWith("${dir}/") })
+                }
+            } finally {
+                zip.close()
+            }
+        }
     }
 
     private static String workflow() {

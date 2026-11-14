@@ -29,6 +29,8 @@ class OdictlTest extends GroovyTestCase {
 
     private String issuer
 
+    private final List<String> createdClients = Collections.synchronizedList([])
+
     @Override
     protected void setUp() {
         Files.deleteIfExists(OidcFile.location())
@@ -36,7 +38,8 @@ class OdictlTest extends GroovyTestCase {
         Files.deleteIfExists(BucketFile.location())
         deleteUser('ctlada')
         deleteUser('ctlbucket')
-        keycloak = fakeKeycloak()
+        createdClients.clear()
+        keycloak = fakeKeycloak(createdClients)
         issuer = "http://127.0.0.1:${keycloak.address.port}/realms/odisee"
     }
 
@@ -510,6 +513,449 @@ class OdictlTest extends GroovyTestCase {
         debugShell(true)
     }
 
+    void testWatchdogRestartsClosedPortWithStartInstUnderNounset() {
+        Path tree = Files.createTempDirectory('odisee-watchdog-restart')
+        Process watchdog = null
+        try {
+            int closedPort
+            new ServerSocket(0, 50, InetAddress.getByName('127.0.0.1')).withCloseable { ServerSocket s ->
+                closedPort = s.localPort
+            }
+            Path home = tree.resolve('odisee')
+            Path shim = tree.resolve('shim')
+            Path calls = tree.resolve('odictl.calls')
+            Files.createDirectories(home.resolve('etc'))
+            Files.createDirectories(shim)
+            Files.writeString(home.resolve('etc/odiinst'),
+                    "odi1|127.0.0.1|${closedPort}|/usr/lib/libreoffice||nologo|true|group0\n")
+            writeExe(shim.resolve('odictl'), [
+                    '#!/usr/bin/env bash',
+                    "printf '%s\\n' \"\$*\" >> '${calls}'",
+                    'exit 0',
+                    '',
+            ].join('\n'))
+
+            ProcessBuilder builder = new ProcessBuilder([bash4(), watchdogScriptPath(), '-i', 'odi1'])
+            builder.environment().put('ODISEE_HOME', home.toString())
+            builder.environment().put('HOME', home.toString())
+            builder.environment().put('ODISEE_WD_TIMEOUT', '0.1')
+            builder.environment().put('PATH', (shim.toString() + ':/usr/bin:/bin:/usr/sbin:/sbin'))
+            builder.redirectErrorStream(true)
+            watchdog = builder.start()
+
+            String out = readUntil(watchdog, "restarting instance 'odi1'", 10000)
+            for (int i = 0; i < 100 && !Files.exists(calls); i++) {
+                Thread.sleep(50)
+            }
+            assertTrue(out, out.contains("Start watching instance 'odi1'."))
+            assertTrue(out, out.contains("Port ${closedPort} closed, restarting instance 'odi1'."))
+            assertFalse(out, out.contains('unbound variable'))
+            assertTrue(out, Files.isRegularFile(calls))
+            List<String> lines = Files.readAllLines(calls)
+            assertFalse(lines.isEmpty())
+            assertEquals('-q start-inst -i odi1', lines[0].trim())
+        } finally {
+            terminateProcessTree(watchdog)
+            PathTree.delete(tree)
+        }
+    }
+
+    void testWatchdogDetectsAlreadyRunningInstanceAndSupportsHelp() {
+        Path tree = Files.createTempDirectory('odisee-watchdog-dup')
+        ServerSocket listener = new ServerSocket(0, 50, InetAddress.getByName('127.0.0.1'))
+        Process first = null
+        try {
+            Path home = tree.resolve('odisee')
+            Files.createDirectories(home.resolve('etc'))
+            String inst = 'odidupcheck'
+            Files.writeString(home.resolve('etc/odiinst'),
+                    "${inst}|127.0.0.1|${listener.localPort}|/usr/lib/libreoffice||nologo|true\n")
+
+            String help = launch(true, [bash4(), watchdogScriptPath(), '-h'], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: '/usr/bin:/bin',
+            ])
+            assertTrue(help, help.contains('-i <instance>'))
+
+            ProcessBuilder builder = new ProcessBuilder([bash4(), watchdogScriptPath(), '-i', inst])
+            builder.environment().put('ODISEE_HOME', home.toString())
+            builder.environment().put('HOME', home.toString())
+            builder.environment().put('ODISEE_WD_TIMEOUT', '0.2')
+            builder.environment().put('PATH', '/usr/bin:/bin:/usr/sbin:/sbin')
+            builder.redirectErrorStream(true)
+            first = builder.start()
+
+            String started = readUntil(first, "Start watching instance '${inst}'.", 10000)
+            assertTrue(started, started.contains("Start watching instance '${inst}'."))
+            assertTrue(started, first.isAlive())
+
+            String second = launch(true, [bash4(), watchdogScriptPath(), '-i', inst], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    ODISEE_WD_TIMEOUT: '0.2',
+                    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+            ])
+            assertTrue(second, second.contains("There is a watchdog for instance '${inst}' already."))
+        } finally {
+            terminateProcessTree(first)
+            listener.close()
+            PathTree.delete(tree)
+        }
+    }
+
+    void testOdictlWatchFlagLaunchesWatchdogAndRequiresInstance() {
+        Path tree = Files.createTempDirectory('odisee-ctl-watch')
+        ServerSocket listener = new ServerSocket(0, 50, InetAddress.getByName('127.0.0.1'))
+        String inst = 'odiwatchflag'
+        try {
+            Path home = tree.resolve('odisee')
+            Files.createDirectories(home.resolve('etc'))
+            Files.writeString(home.resolve('etc/odiinst'),
+                    "${inst}|127.0.0.1|${listener.localPort}|/usr/lib/libreoffice||nologo|true\n")
+
+            String missingInst = launch(true, [bash4(), scriptPath(), '-w'], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: '/usr/bin:/bin',
+            ])
+            assertTrue(missingInst, missingInst.contains('Option -w needs -i.'))
+            assertFalse(missingInst, missingInst.contains('Unknown option -w'))
+
+            String launched = launch(true, [bash4(), scriptPath(), '-w', '-i', inst], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    ODISEE_WD_TIMEOUT: '0.2',
+                    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+            ])
+            assertFalse(launched, launched.contains('Unknown option'))
+            assertFalse(launched, launched.contains('needs one of the following options'))
+
+            Path logFile = home.resolve("var/log/watchdog_${inst}.log")
+            for (int i = 0; i < 100 && (!Files.isRegularFile(logFile) || !Files.readString(logFile).contains("Start watching instance '${inst}'.")); i++) {
+                Thread.sleep(50)
+            }
+            assertTrue(Files.isRegularFile(logFile))
+            assertTrue(Files.readString(logFile), Files.readString(logFile).contains("Start watching instance '${inst}'."))
+        } finally {
+            killMatchingCommandLine(inst)
+            listener.close()
+            PathTree.delete(tree)
+        }
+    }
+
+    void testAutostartFindsInstancesWithEighthGroupColumn() {
+        Path tree = Files.createTempDirectory('odisee-autostart-group')
+        try {
+            Path home = tree.resolve('odisee')
+            Path loHome = tree.resolve('lo')
+            Path started = tree.resolve('started.txt')
+            Files.createDirectories(home.resolve('etc'))
+            Files.createDirectories(loHome.resolve('program'))
+            Files.createDirectories(loHome.resolve('Contents/MacOS'))
+            String sofficeStub = [
+                    '#!/usr/bin/env bash',
+                    "printf '%s\\n' \"\$*\" >> '${started}'",
+                    'exit 0',
+                    '',
+            ].join('\n')
+            writeExe(loHome.resolve('program/soffice'), sofficeStub)
+            writeExe(loHome.resolve('Contents/MacOS/soffice'), sofficeStub)
+
+            Files.writeString(home.resolve('etc/odiinst'), [
+                    '# instances with and without group column',
+                    "odi1|127.0.0.1|29101|${loHome}||nologo|true|writers",
+                    "odi2|127.0.0.1|29102|${loHome}||nologo|false|writers",
+                    "odi3|127.0.0.1|29103|${loHome}||nologo|true",
+                    '',
+            ].join('\n'))
+
+            String out = launch(true, [bash4(), scriptPath(), '-q', 'start-inst'], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+            ])
+            for (int i = 0; i < 60 && (!Files.isRegularFile(started) || Files.readAllLines(started).size() < 2); i++) {
+                Thread.sleep(50)
+            }
+            assertFalse(out, out.contains('No instances configured for autostart.'))
+            assertTrue(out, Files.isRegularFile(started))
+            String log = Files.readString(started)
+            assertTrue(log, log.contains('port=29101'))
+            assertTrue(log, log.contains('port=29103'))
+            assertFalse(log, log.contains('port=29102'))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
+    void testUserPreservesExistingAudienceAndUiClientInOidcFile() {
+        Files.createDirectories(OidcFile.location().parent)
+        Files.writeString(OidcFile.location(), [
+                '# Custom OIDC settings',
+                'issuer http://previous.example/realms/odisee',
+                'audience custom-aud',
+                'ui-client custom-portal',
+                '',
+        ].join('\n'))
+
+        String reserved = denied('user', 'custom-portal')
+        assertTrue(reserved, reserved.contains('Invalid user'))
+
+        succeed('user', 'ctlada')
+
+        OidcFile.Record record = OidcFile.read(OidcFile.location())
+        assertEquals(issuer, record.issuer)
+        assertEquals('custom-aud', record.audience)
+        assertEquals('custom-portal', record.uiClient)
+        assertFalse(createdClients.isEmpty())
+        assertTrue(createdClients.last(), createdClients.last().contains('"included.custom.audience":"custom-aud"'))
+    }
+
+    void testManageAndRemoveInstanceKeepDataPathGroupAndAnchoredMatch() {
+        Path tree = Files.createTempDirectory('odisee-manage-inst')
+        try {
+            Path home = tree.resolve('odisee')
+            Path instFile = home.resolve('etc/odiinst')
+            Files.createDirectories(home.resolve('etc'))
+            Files.writeString(instFile, [
+                    'odi10|127.0.0.1|29210|/opt/lo|/custom/odi10|nologo|true|writers',
+                    'odi1|127.0.0.1|29201|/opt/lo|/custom/odi1|nologo nodefault|true|group0',
+                    '',
+            ].join('\n'))
+
+            String modOut = launch(true, [bash4(), scriptPath(), '-m', '-i', 'odi1', '-p', '127.0.0.1:29215', '-o', 'nodefault=false'], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+            ])
+            assertTrue(modOut, modOut.contains("Instance 'odi1' modified."))
+            List<String> rows = Files.readAllLines(instFile).findAll { it.trim() }
+            assertEquals('odi10|127.0.0.1|29210|/opt/lo|/custom/odi10|nologo|true|writers', rows[0])
+            assertEquals('odi1|127.0.0.1|29215|/opt/lo|/custom/odi1|nologo|true|group0', rows[1])
+            assertFalse(Files.readString(instFile).contains('yalt'))
+            Files.list(home.resolve('etc')).withCloseable { stream ->
+                assertEquals(['odiinst'], stream.collect { it.fileName.toString() })
+            }
+
+            String rmOut = launch(true, [bash4(), scriptPath(), '-r', '-i', 'odi1'], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+            ])
+            assertTrue(rmOut, rmOut.contains("Instance 'odi1' removed."))
+            List<String> remaining = Files.readAllLines(instFile).findAll { it.trim() }
+            assertEquals(['odi10|127.0.0.1|29210|/opt/lo|/custom/odi10|nologo|true|writers'], remaining)
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
+    void testGetFreePortSortsNumericallyAndFindInstallationChecksUsrLibLibreOffice() {
+        Path tree = Files.createTempDirectory('odisee-odilib-helpers')
+        try {
+            Path home = tree.resolve('odisee')
+            Path fakeRoot = tree.resolve('usr/lib/libreoffice')
+            Files.createDirectories(home.resolve('etc'))
+            Files.createDirectories(fakeRoot.resolve('program'))
+            Files.writeString(home.resolve('etc/odiinst'), [
+                    '# comment',
+                    'odi1|127.0.0.1|2009|/usr/lib/libreoffice||nologo|true',
+                    'odi2|127.0.0.1|10000|/usr/lib/libreoffice||nologo|true',
+                    '',
+            ].join('\n'))
+
+            String script = [
+                    '. "$ODILIB"',
+                    'set -o nounset',
+                    'echo "next_port=$(get_free_port)"',
+                    'ODISEE_OS=Linux',
+                    'find_installation',
+                    'echo "found=${FOUND_HOME}"',
+                    'OOO_UNOPKG=/bin/echo',
+                    'echo "rm_ext=$(remove_extension vnd.artofcoding.Ext shared | head -n 1)"',
+            ].join('\n')
+
+            String out = launch(true, [bash4(), '-c', script], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: '/usr/bin:/bin',
+                    ODILIB: new File('src/main/container/bin/odilib').absolutePath,
+                    ODISEE_LO_SEARCH_PATHS: "${tree.resolve('missing')} ${fakeRoot}",
+            ])
+            assertEquals(out, '10001', value(out, 'next_port'))
+            assertEquals(out, fakeRoot.toString(), value(out, 'found'))
+            assertEquals(out, 'Removing extension vnd.artofcoding.Ext (options: --shared)', value(out, 'rm_ext'))
+
+            byte[] odilibBytes = Files.readAllBytes(Path.of('src/main/container/bin/odilib'))
+            for (int i = 0; i < odilibBytes.length - 1; i++) {
+                assertFalse("NBSP at byte ${i}", (odilibBytes[i] & 0xFF) == 0xC2 && (odilibBytes[i + 1] & 0xFF) == 0xA0)
+            }
+            String odilibText = new String(odilibBytes, StandardCharsets.UTF_8)
+            assertTrue(odilibText.contains('/usr/lib/libreoffice'))
+            assertFalse(odilibText.contains('$SED -i'))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
+    void testOdipostBearerAndVarRequestFallbackWithoutEval() {
+        Path tree = Files.createTempDirectory('odisee-odipost-bearer')
+        Map<String, Object> received = Collections.synchronizedMap([:])
+        HttpServer server = HttpServer.create(new InetSocketAddress('127.0.0.1', 0), 0)
+        server.createContext('/odisee/document/generate', { HttpExchange exchange ->
+            received.method = exchange.requestMethod
+            received.auth = exchange.requestHeaders.getFirst('Authorization')
+            received.contentType = exchange.requestHeaders.getFirst('Content-Type')
+            received.body = new String(exchange.requestBody.readAllBytes(), StandardCharsets.UTF_8)
+            byte[] pdf = '%PDF-1.4 bearer'.getBytes(StandardCharsets.UTF_8)
+            exchange.sendResponseHeaders(200, pdf.length)
+            exchange.responseBody.withCloseable { it.write(pdf) }
+        } as HttpHandler)
+        server.start()
+        try {
+            Path home = tree.resolve('odisee')
+            Files.createDirectories(home.resolve('var/request'))
+            Files.writeString(home.resolve('var/request/sample.xml'), '<odisee><request/></odisee>')
+            Path sentinel = tree.resolve('pwned')
+            Path outFile = tree.resolve('out $(touch pwned).pdf')
+
+            ProcessBuilder pb = new ProcessBuilder([
+                    bash4(), odipostScriptPath(),
+                    '-h', '127.0.0.1',
+                    '-p', Integer.toString(server.address.port),
+                    '--bearer', 'jwt-token-123',
+                    '-f', 'sample.xml',
+                    '-o', outFile.toString(),
+            ])
+            pb.directory(tree.toFile())
+            pb.environment().put('ODISEE_HOME', home.toString())
+            pb.environment().put('HOME', home.toString())
+            pb.environment().put('PATH', '/usr/bin:/bin')
+            pb.redirectErrorStream(true)
+            Process proc = pb.start()
+            String postOut = proc.inputStream.getText('UTF-8')
+            assertTrue(postOut, proc.waitFor(30, TimeUnit.SECONDS))
+            assertEquals(postOut, 0, proc.exitValue())
+
+            assertFalse('eval executed shell metacharacters', Files.exists(sentinel))
+            assertTrue(Files.isRegularFile(outFile))
+            assertEquals('%PDF-1.4 bearer', Files.readString(outFile))
+            assertEquals('POST', received.method)
+            assertEquals('Bearer jwt-token-123', received.auth)
+            assertEquals('text/xml', received.contentType)
+            assertEquals('<odisee><request/></odisee>', received.body)
+
+            String missing = launch(false, [
+                    bash4(), odipostScriptPath(),
+                    '-h', '127.0.0.1',
+                    '-p', Integer.toString(server.address.port),
+                    '-f', 'does-not-exist.xml',
+            ], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    PATH: '/usr/bin:/bin',
+            ])
+            assertTrue(missing, missing.contains(home.resolve('var/request/does-not-exist.xml').toString()))
+            assertFalse(missing, missing.contains('var/test'))
+        } finally {
+            server.stop(0)
+            PathTree.delete(tree)
+        }
+    }
+
+    void testOdipostEnvTokenGzipAndAbsoluteJsonRequest() {
+        Path tree = Files.createTempDirectory('odisee-odipost-gzip')
+        Map<String, Object> received = Collections.synchronizedMap([:])
+        HttpServer server = HttpServer.create(new InetSocketAddress('127.0.0.1', 0), 0)
+        server.createContext('/odisee/document/generate', { HttpExchange exchange ->
+            received.auth = exchange.requestHeaders.getFirst('Authorization')
+            received.contentType = exchange.requestHeaders.getFirst('Content-Type')
+            received.encoding = exchange.requestHeaders.getFirst('Content-Encoding')
+            received.raw = exchange.requestBody.readAllBytes()
+            byte[] pdf = '%PDF-1.4 gzip'.getBytes(StandardCharsets.UTF_8)
+            exchange.sendResponseHeaders(200, pdf.length)
+            exchange.responseBody.withCloseable { it.write(pdf) }
+        } as HttpHandler)
+        server.start()
+        try {
+            Path home = tree.resolve('odisee')
+            Files.createDirectories(home)
+            Path reqJson = tree.resolve('abs-request.json')
+            String payload = '{"request":{"template":{"name":"Letter"}}}'
+            Files.writeString(reqJson, payload)
+            Path outFile = tree.resolve('result.pdf')
+
+            launch(true, [
+                    bash4(), odipostScriptPath(),
+                    '-h', '127.0.0.1',
+                    '-p', Integer.toString(server.address.port),
+                    '-z',
+                    '-f', reqJson.toString(),
+                    '-o', outFile.toString(),
+            ], [
+                    ODISEE_HOME: home.toString(),
+                    HOME: home.toString(),
+                    ODISEE_TOKEN: 'env-token-456',
+                    PATH: '/usr/bin:/bin',
+            ])
+
+            assertEquals('Bearer env-token-456', received.auth)
+            assertEquals('application/json', received.contentType)
+            assertEquals('gzip', received.encoding)
+            String unpacked = new java.util.zip.GZIPInputStream(new ByteArrayInputStream((byte[]) received.raw)).getText('UTF-8')
+            assertEquals(payload, unpacked)
+            assertFalse(Files.exists(tree.resolve('abs-request.json.gz')))
+            assertEquals('%PDF-1.4 gzip', Files.readString(outFile))
+        } finally {
+            server.stop(0)
+            PathTree.delete(tree)
+        }
+    }
+
+    void testOdidevRecognizesLinuxAndStartsSoffice() {
+        Path tree = Files.createTempDirectory('odisee-odidev')
+        try {
+            Path home = tree.resolve('home')
+            Path bin = tree.resolve('bin')
+            Path loDir = tree.resolve('libreoffice/program')
+            Path calls = tree.resolve('soffice.calls')
+            Files.createDirectories(home)
+            Files.createDirectories(bin)
+            Files.createDirectories(loDir)
+            writeExe(loDir.resolve('soffice'), [
+                    '#!/usr/bin/env bash',
+                    "printf '%s|%s\\n' \"\$PWD\" \"\$*\" >> '${calls}'",
+                    'exit 0',
+                    '',
+            ].join('\n'))
+            Files.createSymbolicLink(bin.resolve('soffice'), Path.of('../libreoffice/program/soffice'))
+            writeExe(bin.resolve('uname'), "#!/bin/sh\nprintf 'Linux\\n'\n")
+
+            String out = launch(true, [bash4(), odidevScriptPath(), 'start'], [
+                    HOME: home.toString(),
+                    PATH: "${bin}:/usr/bin:/bin",
+            ])
+            for (int i = 0; i < 60 && (!Files.isRegularFile(calls) || Files.readAllLines(calls).size() < 2); i++) {
+                Thread.sleep(50)
+            }
+            assertFalse(out, out.contains('unsupported operating system'))
+            assertTrue(out, Files.isRegularFile(calls))
+            String log = Files.readString(calls)
+            assertTrue(log, log.contains("${loDir.toRealPath()}|"))
+            assertTrue(log, log.contains('port=2001'))
+            assertTrue(log, log.contains('port=2002'))
+
+            String badMode = launch(false, [bash4(), odidevScriptPath(), 'unknown'], [
+                    HOME: home.toString(),
+                    PATH: "${bin}:/usr/bin:/bin",
+            ])
+            assertTrue(badMode, badMode.contains('Unknown mode'))
+        } finally {
+            PathTree.delete(tree)
+        }
+    }
+
     private void debugShell(boolean sigterm) {
         Path tree = Files.createTempDirectory(sigterm ? 'odisee-term' : 'odisee-exit')
         EntrypointRun run = null
@@ -767,6 +1213,43 @@ class OdictlTest extends GroovyTestCase {
         script.absolutePath
     }
 
+    private static String watchdogScriptPath() {
+        File script = new File('src/main/container/bin/odiwatchdog')
+        assertTrue(script.file)
+        script.absolutePath
+    }
+
+    private static String odipostScriptPath() {
+        File script = new File('src/main/container/bin/odipost')
+        assertTrue(script.file)
+        script.absolutePath
+    }
+
+    private static String odidevScriptPath() {
+        File script = new File('../bin/odidev')
+        assertTrue(script.file)
+        script.absolutePath
+    }
+
+    private static void terminateProcessTree(Process process) {
+        if (process == null) {
+            return
+        }
+        process.descendants().forEach { ProcessHandle child -> child.destroyForcibly() }
+        process.destroyForcibly()
+        process.waitFor(5, TimeUnit.SECONDS)
+    }
+
+    private static void killMatchingCommandLine(String token) {
+        ProcessHandle.allProcesses().forEach { ProcessHandle handle ->
+            String cmd = handle.info().commandLine().orElse('')
+            if (cmd.contains(token) && handle.pid() != ProcessHandle.current().pid()) {
+                handle.descendants().forEach { ProcessHandle child -> child.destroyForcibly() }
+                handle.destroyForcibly()
+            }
+        }
+    }
+
     private String launch(boolean ok, List<String> command, Map<String, String> env) {
         ProcessBuilder builder = new ProcessBuilder(command)
         env.each { String key, String value ->
@@ -792,10 +1275,17 @@ class OdictlTest extends GroovyTestCase {
         output
     }
 
-    private static HttpServer fakeKeycloak() {
+    private static HttpServer fakeKeycloak(List<String> createdClients = []) {
         HttpServer server = HttpServer.create(new InetSocketAddress('127.0.0.1', 0), 0)
         server.createContext('/realms/master/protocol/openid-connect/token', json('{"access_token":"admin-token"}'))
-        server.createContext('/admin/realms/odisee/clients', empty(201))
+        server.createContext('/admin/realms/odisee/clients', new HttpHandler() {
+            @Override
+            void handle(HttpExchange exchange) {
+                createdClients << new String(exchange.requestBody.readAllBytes(), StandardCharsets.UTF_8)
+                exchange.sendResponseHeaders(201, -1)
+                exchange.close()
+            }
+        })
         server.createContext('/admin/realms/odisee/users', empty(201))
         server.start()
         server
