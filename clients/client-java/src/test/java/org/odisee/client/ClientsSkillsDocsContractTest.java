@@ -141,7 +141,10 @@ public class ClientsSkillsDocsContractTest {
     public void skillsDocsReadmesAndHttpFixturesMatchBearerAndReleaseContract() throws Exception {
         final Path root = repoRoot();
         final String releaseSkill = read(root.resolve(".cursor/skills/release/SKILL.md"));
-        assertTrue(releaseSkill.contains("${GITHUB_REF_NAME}"));
+        assertTrue(releaseSkill.contains("A missing tag fails the publish."));
+        assertTrue(releaseSkill.contains("A tag push does not publish."));
+        assertTrue(releaseSkill.contains("does not create a git tag."));
+        assertFalse(releaseSkill.contains("${GITHUB_REF_NAME}"));
 
         final String usersGuide = read(root.resolve("documentation/src/docs/asciidoc/UsersGuide.adoc"));
         assertTrue(usersGuide.contains("OdiseeClient.bearer("));

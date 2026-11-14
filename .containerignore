@@ -1,0 +1,13 @@
+.git
+.github
+.claude/
+.cursor/
+AGENTS.md
+CLAUDE.md
+docs/
+build/
+node_modules
+data/
+.env
+.env.*
+*.tar
