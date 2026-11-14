@@ -73,4 +73,52 @@ class CoordinateTestCase extends GroovyTestCase {
                 Coordinate.'Sheet1!AA$54')
     }
 
+    void testBase26MultiLetterColumns() {
+        assertEquals(0, Coordinate.'A1'.columnIndex)
+        assertEquals(25, Coordinate.'Z1'.columnIndex)
+        assertEquals(26, Coordinate.'AA1'.columnIndex)
+        assertEquals(27, Coordinate.'AB1'.columnIndex)
+        assertEquals(51, Coordinate.'AZ1'.columnIndex)
+        assertEquals(52, Coordinate.'BA1'.columnIndex)
+        assertEquals(77, Coordinate.'BZ1'.columnIndex)
+        assertEquals(701, Coordinate.'ZZ1'.columnIndex)
+        assertEquals(702, Coordinate.'AAA1'.columnIndex)
+        assertEquals('A1', Coordinate.createCoordinate(0, 0))
+        assertEquals('Z1', Coordinate.createCoordinate(0, 25))
+        assertEquals('AA1', Coordinate.createCoordinate(0, 26))
+        assertEquals('BA4', Coordinate.createCoordinate(3, 52))
+        assertEquals('AAA10', Coordinate.createCoordinate(9, 702))
+    }
+
+    void testLowercaseAndMixedCaseCoordinatesNormalizeColumn() {
+        assertEquals([table: null, sheet: null,
+                      column: 'BA', columnIndex: 52,
+                      row: 12, rowIndex: 11,
+                      coord: 'ba12'],
+                Coordinate.parseCoordinate('ba12'))
+        assertEquals([table: 'Sheet1', sheet: 'Sheet1',
+                      column: 'AAA', columnIndex: 702,
+                      row: 3, rowIndex: 2,
+                      coord: 'Sheet1!aAa$3'],
+                Coordinate.parseCoordinate('Sheet1!aAa$3'))
+    }
+
+    void testTableOnlyAndDigitlessCoordinatesDoNotThrowNumberFormatException() {
+        assertEquals([table: 'Tabelle', sheet: 'Tabelle'], Coordinate.parseCoordinate('Tabelle'))
+        ['', '   ', 'Sheet1!ABC', '!ABC', '$ABC', '123', 'A0', 'A1B2'].each { String invalid ->
+            try {
+                Coordinate.parseCoordinate(invalid)
+                fail("Expected OdiseeException for '${invalid}'")
+            } catch (org.odisee.api.OdiseeException e) {
+                assertEquals(org.odisee.api.OdiseeException.BAD_REQUEST, e.httpStatus)
+            }
+        }
+        try {
+            Coordinate.requireCellCoordinate('Tabelle')
+            fail('Expected requireCellCoordinate to reject table-only coordinate')
+        } catch (org.odisee.api.OdiseeException e) {
+            assertEquals(org.odisee.api.OdiseeException.BAD_REQUEST, e.httpStatus)
+        }
+    }
+
 }

@@ -11,6 +11,11 @@
  */
 package org.odisee.writer
 
+import com.sun.star.container.NoSuchElementException
+import com.sun.star.text.XBookmarksSupplier
+import com.sun.star.text.XTextContent
+import com.sun.star.uno.Any
+import org.odisee.api.OdiseeException
 import org.odisee.uno.UnoCategory
 
 /**
@@ -18,11 +23,17 @@ import org.odisee.uno.UnoCategory
  */
 class OOoBookmarkCategory {
 
+    private static Object unwrapAny(Object value) {
+        value instanceof Any ? ((Any) value).object : value
+    }
+
     /**
      * Insert a graphic at a bookmark.
      */
     def static insertGraphicAtBookmark(com.sun.star.lang.XComponent component, String bookmark, java.io.File url) {
-        component.executeOdiseeMacro("Graphic.insertGraphicAtBookmarkUsingDispatcher", [bookmark, url])
+        use(OOoDocumentCategory) {
+            component.executeOdiseeMacro("Graphic.insertGraphicAtBookmarkUsingDispatcher", [bookmark, url] as Object[])
+        }
     }
 
     /**
@@ -30,8 +41,23 @@ class OOoBookmarkCategory {
      */
     def static setTextAtBookmark(com.sun.star.lang.XComponent component, String bookmark, String text) {
         use(UnoCategory) {
-            def bm = component.uno(com.sun.star.text.XBookmarksSupplier).getBookmarks().getByName(bookmark)
-            bm.uno(com.sun.star.text.XTextContent).getAnchor().setString(text)
+            def bookmarks = component?.uno(XBookmarksSupplier)?.getBookmarks()
+            if (bookmarks == null) {
+                throw new OdiseeException("Bookmark '${bookmark}' was not found", OdiseeException.UNPROCESSABLE)
+            }
+            Object raw
+            try {
+                raw = unwrapAny(bookmarks.getByName(bookmark))
+            } catch (NoSuchElementException e) {
+                OdiseeException ex = new OdiseeException("Bookmark '${bookmark}' was not found", e)
+                ex.httpStatus = OdiseeException.UNPROCESSABLE
+                throw ex
+            }
+            XTextContent content = raw == null ? null : (XTextContent) raw.uno(XTextContent)
+            if (content?.anchor == null) {
+                throw new OdiseeException("Bookmark '${bookmark}' was not found", OdiseeException.UNPROCESSABLE)
+            }
+            content.getAnchor().setString(text)
         }
     }
 
@@ -40,20 +66,35 @@ class OOoBookmarkCategory {
      */
     def static getParagraphAtBookmark(com.sun.star.lang.XComponent component, String bookmark) {
         use(UnoCategory) {
-            def bm = component.uno(com.sun.star.text.XBookmarksSupplier).getBookmarks().getByName(bookmark)
-            bm.uno(com.sun.star.text.XTextContent).getAnchor().getString()
+            def bookmarks = component?.uno(XBookmarksSupplier)?.getBookmarks()
+            if (bookmarks == null) {
+                throw new OdiseeException("Bookmark '${bookmark}' was not found", OdiseeException.UNPROCESSABLE)
+            }
+            Object raw
+            try {
+                raw = unwrapAny(bookmarks.getByName(bookmark))
+            } catch (NoSuchElementException e) {
+                OdiseeException ex = new OdiseeException("Bookmark '${bookmark}' was not found", e)
+                ex.httpStatus = OdiseeException.UNPROCESSABLE
+                throw ex
+            }
+            XTextContent content = raw == null ? null : (XTextContent) raw.uno(XTextContent)
+            if (content?.anchor == null) {
+                throw new OdiseeException("Bookmark '${bookmark}' was not found", OdiseeException.UNPROCESSABLE)
+            }
+            content.getAnchor().getString()
         }
     }
 
     def static get(com.sun.star.lang.XComponent component, String name) {
-        component.getParagraphAtBookmark(name)
+        getParagraphAtBookmark(component, name)
     }
 
     /**
      * Set text at bookmark.
      */
     def static set(com.sun.star.lang.XComponent component, String name, Object value) {
-        component.setTextAtBookmark(name, value)
+        setTextAtBookmark(component, name, (value ?: '') as String)
     }
 
 }

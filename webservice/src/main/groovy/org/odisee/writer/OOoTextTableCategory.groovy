@@ -65,12 +65,26 @@ class OOoTextTableCategory {
     static XTextTable getTextTable(XComponent component, String name) {
         Profile.time("OOoTextTableCategory.getTextTable(name=${name})", {
             use(UnoCategory) {
-                XTextTablesSupplier xTextTablesSupplier = (XTextTablesSupplier) component.uno(XTextTablesSupplier)
+                if (!name) {
+                    return null
+                }
+                XTextTablesSupplier xTextTablesSupplier = component == null ? null : (XTextTablesSupplier) component.uno(XTextTablesSupplier)
+                def tables = xTextTablesSupplier?.textTables
+                if (tables == null) {
+                    return null
+                }
                 try {
-                    Any any = (Any) xTextTablesSupplier?.textTables?.getByName(name)
-                    (XTextTable) any.object
+                    Object raw = tables.getByName(name)
+                    if (raw instanceof Any) {
+                        raw = ((Any) raw).object
+                    }
+                    if (raw instanceof XTextTable) {
+                        return (XTextTable) raw
+                    }
+                    raw == null ? null : (XTextTable) raw.uno(XTextTable)
                 } catch (NoSuchElementException e) {
                     log.warning "Cannot find ${name}"
+                    return null
                 }
             }
         }) as XTextTable
@@ -195,6 +209,9 @@ class OOoTextTableCategory {
     static void setTextTableCellContent(XComponent component, String textTable, Integer row, Integer column, Object content) {
         Profile.time "OOoTextTableCategory.setTextTableCellContent(component=$component, textTable=$textTable, row=$row, column=$column, content=$content)", {
             XTextTable xTextTable = getTextTable(component, textTable)
+            if (xTextTable == null) {
+                throw new OdiseeException("Text table '${textTable}' was not found", OdiseeException.UNPROCESSABLE)
+            }
             setTextTableCellContent(xTextTable, row, column, content)
         }
     }
@@ -286,12 +303,14 @@ class OOoTextTableCategory {
     static Object get(XComponent component, String name) {
         Profile.time "OOoTextTableCategory.get(component=$component, name=$name)", {
             Map m = Coordinate.parseCoordinate(name)
-            // Return cell content or whole table?
+            XTextTable xTextTable = getTextTable(component, m.table as String)
+            if (xTextTable == null) {
+                throw new OdiseeException("Text table '${m.table ?: name}' was not found", OdiseeException.UNPROCESSABLE)
+            }
             if (m.containsKey('coord')) {
-                XTextTable xTextTable = getTextTable(component, m.table)
-                getTextTableCellContent(xTextTable, m.coord)
+                getTextTableCellContent(xTextTable, m.coord as String)
             } else {
-                getTextTable(component, m.table)
+                xTextTable
             }
         }
     }
@@ -308,18 +327,20 @@ class OOoTextTableCategory {
      */
     static void set(XTextTable textTable, String name, Object value) {
         Profile.time "OOoTextTableCategory.set(textTable=$textTable, name=$name, value=$value)", {
+            if (textTable == null) {
+                throw new OdiseeException("Text table '${name}' was not found", OdiseeException.UNPROCESSABLE)
+            }
             Map m = Coordinate.parseCoordinate(name)
             switch (value) {
-            // Set simple value, coordinates must be a cell
-                case { it.getClass() in [Number, String, GString] }:
-                    //textTable.setTextTableCellContent(m.coord, value)
-                    setTextTableCellContent(textTable, m.rowIndex, m.columnIndex, value)
+                case { it != null && it.getClass() in [Number, String, GString] || it instanceof Number || it instanceof CharSequence }:
+                    if (m.rowIndex == null || m.columnIndex == null) {
+                        throw new OdiseeException("Invalid table coordinate '${name}'", OdiseeException.UNPROCESSABLE)
+                    }
+                    setTextTableCellContent(textTable, m.rowIndex as Integer, m.columnIndex as Integer, value)
                     break
-            // Set whole table from list
                 case { it instanceof List || it instanceof String[][] }:
                     setTextTableContent(textTable, value as String[][])
                     break
-            // Set whole table from map
                 case { it instanceof Map }:
                     setTextTableContent(textTable, value as Map)
                     break
@@ -334,11 +355,13 @@ class OOoTextTableCategory {
     static void set(XComponent component, String name, Object value) {
         Profile.time "OOoTextTableCategory.set(component=$component, name=$name, value=$value)", {
             Map m = Coordinate.parseCoordinate(name)
-            XTextTable xTextTable = getTextTable(component, m.table)
+            String tableName = m.table as String
+            XTextTable xTextTable = getTextTable(component, tableName)
             if (null != xTextTable) {
                 set(xTextTable, name, value)
             } else {
                 log.warning "Coordinate ${name} did not resolve to a table"
+                throw new OdiseeException("Text table '${tableName ?: name}' was not found", OdiseeException.UNPROCESSABLE)
             }
         }
     }

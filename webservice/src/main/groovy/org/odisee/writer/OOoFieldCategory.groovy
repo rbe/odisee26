@@ -22,6 +22,7 @@ import com.sun.star.text.XTextFieldsSupplier
 import com.sun.star.uno.Any
 import com.sun.star.util.XRefreshable
 import groovy.util.logging.Log
+import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
 import org.odisee.uno.UnoCategory
 
@@ -84,14 +85,25 @@ class OOoFieldCategory {
      */
     static XPropertySet getUserField(XComponent component, String name) {
         use(OOoFieldCategory) {
-            name = toFqufn(name)
-            try {
-                XTextFieldsSupplier textFieldsSupplier = component.textFieldsSupplier()
-                XNameAccess textFieldMasters = textFieldsSupplier.textFieldMasters
-                Any/*XPropertySet*/ any = textFieldMasters.getByName(name) ?: null
-                return any ? (XPropertySet) any.object : null
-            } catch (com.sun.star.container.NoSuchElementException e) {
-                return null
+            use(UnoCategory) {
+                name = toFqufn(name)
+                try {
+                    XTextFieldsSupplier textFieldsSupplier = component == null ? null : component.textFieldsSupplier()
+                    XNameAccess textFieldMasters = textFieldsSupplier?.textFieldMasters
+                    if (textFieldMasters == null) {
+                        return null
+                    }
+                    Object raw = textFieldMasters.getByName(name)
+                    if (raw instanceof Any) {
+                        raw = ((Any) raw).object
+                    }
+                    if (raw instanceof XPropertySet) {
+                        return (XPropertySet) raw
+                    }
+                    return raw == null ? null : (XPropertySet) raw.uno(XPropertySet)
+                } catch (com.sun.star.container.NoSuchElementException e) {
+                    return null
+                }
             }
         }
     }
@@ -100,9 +112,13 @@ class OOoFieldCategory {
      * Get content of userfield (prefix com.sun.star.text.FieldMaster.User)
      */
     static String getUserFieldContent(XComponent component, String name) {
+        String rawName = name
         name = toFqufn(name)
         use(UnoCategory) {
-            XPropertySet userField = component.getUserField(name)
+            XPropertySet userField = getUserField(component, name)
+            if (userField == null) {
+                throw new OdiseeException("Userfield '${rawName}' was not found", OdiseeException.UNPROCESSABLE)
+            }
             userField.getPropertyValue("Content")
         }
     }
@@ -133,41 +149,40 @@ class OOoFieldCategory {
     static void setUserFieldContent(XComponent component, String name, Object content) {
         Profile.time "OOoFieldCategory.setUserFieldContent($name)", {
             use(UnoCategory) {
+                XPropertySet uf = getUserField(component, name)
+                if (uf == null) {
+                    throw new OdiseeException("Userfield '${name}' was not found", OdiseeException.UNPROCESSABLE)
+                }
                 try {
-                    // Get userfield and set its content
-                    XPropertySet uf = component.getUserField(name)
-                    //println "Odisee: OOoFieldCategory.setUserFieldContent($name): uf=${uf} content='${content}'"
-                    //uf.uno(com.sun.star.beans.XPropertySet)
-                    uf?.setPropertyValue('Content', content ?: '' as String)
-                    //println "Odisee: OOoFieldCategory.setUserFieldContent($name): content='${component.getUserFieldContent(name)}'"
+                    uf.setPropertyValue('Content', (content ?: '') as String)
                 } catch (UnknownPropertyException upe) {
-                    // If that failed with an UnknownPropertyException
-                    log.warn "Unknown property 'Content' for userfield '${name}': ${upe.message}"
-                    // TODO WHY THE HELL... maybe this was done to support SetExpressions???
-                    def textFields = component.textFieldsSupplier().textFields
-                    XEnumeration elts = textFields.createEnumeration()
-                    XDependentTextField xDependentTextField
-                    def field
-                    XPropertySet tfm
-                    XPropertySet fieldProperties
-                    while (elts.hasMoreElements()) {
-                        field = elts.nextElement()
-                        xDependentTextField = (XDependentTextField) field.uno(XDependentTextField)
-                        tfm = xDependentTextField.textFieldMaster
-                        try {
-                            if (tfm.getPropertyValue("Name") == name) {
-                                fieldProperties = (XPropertySet) field.uno(XPropertySet)
-                                if (fieldProperties.getPropertyValue("NumberingType") == "5001") {
-                                    fieldProperties.setPropertyValue("Content", content)
-                                    fieldProperties.setPropertyValue("Value", (content ?: 0.0d) as Double)
-                                } else {
-                                    fieldProperties.setPropertyValue("Content", content)
-                                }
-                                break
-                            }
-                        } catch (e) {
-                            log.error "", e
+                    log.warning "Unknown property 'Content' for userfield '${name}': ${upe.message}"
+                    def textFields = textFieldsSupplier(component)?.textFields
+                    XEnumeration elts = textFields?.createEnumeration()
+                    boolean updated = false
+                    while (elts != null && elts.hasMoreElements()) {
+                        def field = elts.nextElement()
+                        if (field instanceof Any) {
+                            field = ((Any) field).object
                         }
+                        XDependentTextField xDependentTextField = field == null ? null : (XDependentTextField) field.uno(XDependentTextField)
+                        XPropertySet tfm = xDependentTextField?.textFieldMaster
+                        if (tfm != null && tfm.getPropertyValue("Name") == name) {
+                            XPropertySet fieldProperties = (XPropertySet) field.uno(XPropertySet)
+                            if (fieldProperties.getPropertyValue("NumberingType") == "5001") {
+                                fieldProperties.setPropertyValue("Content", content)
+                                fieldProperties.setPropertyValue("Value", (content ?: 0.0d) as Double)
+                            } else {
+                                fieldProperties.setPropertyValue("Content", content)
+                            }
+                            updated = true
+                            break
+                        }
+                    }
+                    if (!updated) {
+                        OdiseeException ex = new OdiseeException("Userfield '${name}' could not be updated", upe)
+                        ex.httpStatus = OdiseeException.UNPROCESSABLE
+                        throw ex
                     }
                 }
             }
