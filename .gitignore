@@ -10,6 +10,9 @@ clients/client-vbnet/src/vb/OdiseeClient/publish/
 
 # Environment
 .env
+.env.*
+data/
+*.tar
 
 # Gradle
 .gradle/

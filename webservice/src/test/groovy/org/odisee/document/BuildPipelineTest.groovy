@@ -3,182 +3,176 @@ package org.odisee.document
 import groovy.test.GroovyTestCase
 
 /**
- * GitHub Actions splits the Linux build into jobs that pass the compiled outputs.
+ * CI is one workflow. Jobs check out, move artifacts, and call make.
  * {@code ./gradlew build} stays one command and does not start a container.
  */
 class BuildPipelineTest extends GroovyTestCase {
 
-    void testLinuxJobsPassBuildOutputs() {
-        Map<String, String> jobs = jobs(workflow())
-        assertEquals(
-                ['setup', 'build', 'values', 'test', 'package', 'java-client-office', 'image'] as Set,
-                jobs.keySet() as Set,
-        )
+    private static final String SDLC_SHA256 = '45c6cf23664d030c61f0fedd2d0639cd9dc2dc7bb03c14167dce61fed9d495d6'
+
+    void testWorkflowMatchesTheCommonSdlc() {
+        File root = repoRoot()
+        File workflowDir = new File(root, '.github/workflows')
+        String[] workflowFiles = workflowDir.list()
+        assertEquals(['ci.yml'] as Set, workflowFiles as Set)
 
         String yaml = workflow()
-        String prepare = prepareAction()
-        String testWorkflow = calledWorkflow('test.yml')
-        String imageWorkflow = calledWorkflow('image.yml')
-        assertTrue(yaml.contains('workflow_dispatch:'))
-        assertTrue(yaml.contains('pull_request:'))
-        assertTrue(yaml.contains('branches: [master]'))
-        assertFalse(testWorkflow.contains('workflow_dispatch:'))
-        assertFalse(testWorkflow.contains('pull_request:'))
-        assertFalse(imageWorkflow.contains('workflow_dispatch:'))
-        assertFalse(imageWorkflow.contains('pull_request:'))
-        assertTrue(testWorkflow.contains('workflow_call:'))
-        assertTrue(imageWorkflow.contains('workflow_call:'))
-        assertFalse(testWorkflow.contains('2.6.0'))
-        assertFalse(imageWorkflow.contains('2.6.0'))
-        assertFalse(testWorkflow.contains('JAVA_VERSION: "21"'))
-        assertFalse(imageWorkflow.contains('JAVA_VERSION: "21"'))
-        assertFalse(prepare.contains('actions/checkout@'))
-        assertTrue(prepare.contains('actions/setup-java@v6'))
-        assertTrue(prepare.contains('actions/download-artifact@v8'))
-        assertTrue(prepare.contains('mkdir -p "$dir"'))
-        assertTrue(prepare.contains('cache: gradle'))
-        assertTrue(yaml.contains('fetch-depth: 0'))
-        assertTrue(yaml.contains('fetch-tags: true'))
-        assertTrue(testWorkflow.contains('fetch-tags: true'))
-        assertTrue(imageWorkflow.contains('fetch-tags: true'))
-        assertTrue(yaml.contains('actions/upload-artifact@v7'))
-        assertTrue(yaml.contains('softprops/action-gh-release@v3'))
+        Map<String, String> jobs = jobs(yaml)
+        assertEquals(
+                ['setup', 'build', 'test', 'test-java', 'publish-container', 'publish-github', 'report'] as Set,
+                jobs.keySet() as Set,
+        )
+        assertEquals('report', (jobs.keySet() as List)[-1])
+
+        String head = yaml.substring(0, yaml.indexOf('\njobs:\n'))
+        assertTrue(head.contains('name: CI'))
+        assertTrue(head.contains("branches: ['**']"))
+        assertTrue(head.contains('workflow_dispatch:'))
+        assertTrue(head.contains('options: [setup, build, test, test-java, publish-container, publish-github, report]'))
+        assertFalse(head.contains('pull_request'))
+        assertFalse(head.contains('tags:'))
+        assertFalse(head.contains('contents: write'))
+        assertFalse(head.contains('packages: write'))
+        assertTrue(head.contains('contents: read'))
+        assertTrue(head.contains('IMAGE: ghcr.io/rbe/odisee26'))
+        assertTrue(head.contains('SDLC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}'))
+        assertTrue(head.contains('JAVA_VERSION: "21"'))
+        assertTrue(head.contains('cancel-in-progress: ${{ github.event_name == \'push\' && github.ref != format(\'refs/heads/{0}\', github.event.repository.default_branch) }}'))
+
+        assertFalse(jobs.setup.contains('\n    needs:'))
+        assertTrue(jobs.build.contains('needs: setup'))
+        assertTrue(jobs.test.contains('needs: setup'))
+        assertTrue(jobs['test-java'].contains('needs: setup'))
+        assertTrue(jobs['publish-container'].contains('needs: [build, test]'))
+        assertTrue(jobs['publish-github'].contains('needs: [build, test]'))
+        assertTrue(jobs.report.contains('needs: [setup, build, test, test-java, publish-container, publish-github]'))
+        assertTrue(jobs.report.contains('if: ${{ !cancelled() }}'))
+        jobs.each { String name, String body ->
+            assertTrue(name, body.contains('runs-on: ubuntu-26.04'))
+            assertFalse(name, body.contains('ubuntu-latest'))
+            assertNull(name, body.find(/(?m)^\s*needs:.*\breport\b/))
+        }
+        assertFalse(yaml.contains('ubuntu-latest'))
+        assertFalse(yaml.contains('refs/tags'))
+        assertFalse(yaml.contains('softprops/'))
+        assertFalse(yaml.contains('setup-java'))
+        assertFalse(yaml.contains('published-versions'))
+        assertFalse(yaml.contains('2.6.0'))
+        assertFalse(yaml.contains('.gradle'))
+        assertFalse(yaml.contains('**/build/'))
         assertFalse(yaml.contains('actions/checkout@v4'))
-        assertFalse(yaml.contains('actions/setup-java@v4'))
         assertFalse(yaml.contains('actions/upload-artifact@v4'))
         assertFalse(yaml.contains('actions/download-artifact@v4'))
-        assertFalse(yaml.contains('action-gh-release@v2'))
-        assertTrue(yaml.contains('JAVA_VERSION: "21"'))
-        assertTrue(yaml.contains('JAVA_DISTRIBUTION: temurin'))
-        assertTrue(yaml.contains('ODISEE_BUILD_NUMBER: ${{ github.run_number }}'))
-        assertTrue(yaml.contains('BUILD_OUTPUTS: build-outputs'))
-        assertTrue(yaml.contains('DISTRIBUTION_ZIP: build/distributions/odisee-*-linux-x86_64.zip'))
-        assertFalse(yaml.contains('name: odisee-linux-x86_64'))
-        assertFalse(yaml.contains('java-version: "21"'))
-        assertFalse(yaml.contains('ubuntu-latest'))
-        ['setup', 'build', 'package', 'java-client-office'].each { String name ->
-            String body = jobs[name]
-            assertTrue(name, body.contains('runs-on: ubuntu-26.04'))
-            assertTrue(name, body.contains('uses: actions/checkout@v7'))
-            assertTrue(name, body.indexOf('uses: actions/checkout@v7') < body.indexOf('uses: ./.github/actions/prepare'))
-            assertTrue(name, body.contains('uses: ./.github/actions/prepare'))
-            assertTrue(name, body.contains('java-version: ${{ env.JAVA_VERSION }}'))
-            assertTrue(name, body.contains('java-distribution: ${{ env.JAVA_DISTRIBUTION }}'))
+
+        String publishOnDefault = "github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
+        assertTrue(jobs['publish-container'].contains("github.event_name == 'push'"))
+        assertTrue(jobs['publish-container'].contains(publishOnDefault))
+        assertTrue(jobs['publish-container'].contains("inputs.job == 'publish-container'"))
+        assertFalse(jobs['publish-container'].contains('test-java'))
+        assertTrue(jobs['publish-github'].contains("github.event_name == 'push'"))
+        assertTrue(jobs['publish-github'].contains(publishOnDefault))
+        assertTrue(jobs['publish-github'].contains("inputs.job == 'publish-github'"))
+        assertFalse(jobs['publish-github'].contains('test-java'))
+        assertTrue(jobs['test-java'].contains('fromJSON(\'["test-java","report"]\')'))
+        assertFalse(jobs['test-java'].contains('publish-container'))
+        assertTrue(jobs.build.contains('fetch-depth: 0'))
+        assertTrue(jobs.build.contains('fetch-tags: true'))
+        assertTrue(jobs['publish-container'].contains('name: dist'))
+        assertTrue(jobs['publish-container'].contains('path: build/dist'))
+        assertTrue(jobs['publish-github'].contains('name: dist'))
+        assertTrue(yaml.contains('name: dist'))
+        assertTrue(jobs['publish-container'].contains('packages: write'))
+        assertTrue(jobs['publish-github'].contains('contents: write'))
+        assertTrue(jobs.setup.contains('actions: write'))
+        assertTrue(jobs.setup.contains('run: make cleanup-actions-artifacts'))
+        assertTrue(jobs.setup.contains('run: make setup'))
+        assertTrue(jobs.build.contains('run: make build'))
+        assertTrue(jobs.test.contains('run: make test'))
+        assertTrue(jobs['test-java'].contains('run: make test-java'))
+        assertTrue(jobs['publish-container'].contains('run: make login'))
+        assertTrue(jobs['publish-container'].contains('run: make publish-container'))
+        assertTrue(jobs['publish-container'].contains('run: make cleanup-container-versions'))
+        assertTrue(jobs['publish-github'].contains('run: make publish-github'))
+        assertTrue(jobs['publish-github'].contains('run: make cleanup-github-releases'))
+        assertTrue(jobs.report.contains('run: make report'))
+        assertTrue(jobs.report.contains('JOB_RESULT_TEST_JAVA:'))
+
+        yaml.readLines().each { String line ->
+            def uses = (line =~ /^\s*- uses:\s*(\S+)\s*$/)
+            if (uses) {
+                String action = uses[0][1]
+                assertTrue(line, action == 'actions/checkout@v7'
+                        || action == 'actions/upload-artifact@v7'
+                        || action == 'actions/download-artifact@v8')
+            }
+            def run = (line =~ /^\s*run:\s*(.*)$/)
+            if (run) {
+                assertTrue(line, run[0][1] ==~ /make [a-z0-9-]+/)
+            }
         }
+        assertUploads(yaml)
 
-        String setup = jobs.setup
-        assertTrue(setup.contains('./gradlew --no-daemon :dependencies :webservice:dependencies :clients:client-java:dependencies :clients:client-javafx:dependencies :documentation:dependencies'))
-        assertFalse(setup.contains('build-outputs:'))
-        assertFalse(setup.contains('assemble'))
-        assertFalse(setup.contains('testClasses'))
-        assertFalse(setup.contains('upload-artifact'))
+        assertFalse(new File(root, '.github/workflows/build.yml').exists())
+        assertFalse(new File(root, '.github/workflows/test.yml').exists())
+        assertFalse(new File(root, '.github/workflows/image.yml').exists())
+        assertFalse(new File(root, '.github/actions/prepare/action.yml').exists())
+        assertFalse(new File(root, '.github/scripts/published-versions.sh').exists())
 
-        String build = jobs.build
-        assertTrue(build.contains('needs: setup'))
-        assertTrue(build.contains('./gradlew --no-daemon assemble testClasses integrationTestClasses'))
-        assertTrue(build.contains('name: ${{ env.BUILD_OUTPUTS }}'))
-        assertTrue(build.contains('include-hidden-files: true'))
-        assertTrue(build.contains('build/ci-empty-dirs.txt'))
-        assertTrue(build.contains('oxt/Odisee/dist/'))
-        assertFalse(build.contains('oxt/antlib/'))
-        assertFalse(build.contains('packageDistribution'))
-        assertFalse(build.contains(':webservice:test'))
-        assertFalse(build.contains('javaClientOfficeTest'))
+        byte[] sdlc = new File(root, 'sdlc.mk').bytes
+        String hash = java.security.MessageDigest.getInstance('SHA-256').digest(sdlc).encodeHex().toString()
+        assertEquals(SDLC_SHA256, hash)
 
-        String values = jobs.values
-        assertTrue(values.contains('java-version: ${{ steps.emit.outputs.java-version }}'))
-        assertTrue(values.contains('distribution-zip: ${{ steps.emit.outputs.distribution-zip }}'))
-        assertTrue(values.contains('echo "java-version=${JAVA_VERSION}"'))
-        assertTrue(values.contains('echo "odisee-build-number=${ODISEE_BUILD_NUMBER}"'))
-        assertFalse(values.contains('uses: ./.github/workflows/'))
+        String makefile = new File(root, 'Makefile').text
+        int includeAt = makefile.indexOf('\ninclude sdlc.mk\n')
+        int setupAt = makefile.indexOf('\nsetup:')
+        assertTrue(includeAt > 0)
+        assertTrue(setupAt > includeAt)
+        assertTrue(makefile.contains('IMAGE ?= ghcr.io/rbe/odisee26'))
+        assertTrue(makefile.contains('GRADLE ?= ./gradlew'))
+        assertTrue(makefile.contains('publish-tags'))
+        assertTrue(makefile.contains('--platform linux/amd64,linux/arm64'))
+        assertTrue(makefile.contains('qemu-user-binfmt'))
+        assertTrue(makefile.contains('--cache-from'))
+        assertFalse(makefile.contains('--cache-to'))
+        assertFalse(makefile.contains('GITHUB_REF_NAME'))
+        assertFalse(makefile.contains('published-versions.sh'))
+        assertFalse(makefile.contains('docker build'))
 
-        String test = jobs.test
-        assertTrue(test.contains('needs: [build, values]'))
-        assertTrue(test.contains('uses: ./.github/workflows/test.yml'))
-        assertTrue(test.contains('java-version: ${{ needs.values.outputs.java-version }}'))
-        assertTrue(test.contains('java-distribution: ${{ needs.values.outputs.java-distribution }}'))
-        assertTrue(test.contains('odisee-build-number: ${{ needs.values.outputs.odisee-build-number }}'))
-        assertTrue(test.contains('build-outputs: ${{ needs.values.outputs.build-outputs }}'))
-        assertTrue(test.contains('distribution-zip: ${{ needs.values.outputs.distribution-zip }}'))
-        assertFalse(test.contains('env.JAVA_VERSION'))
-        assertTrue(testWorkflow.contains('uses: actions/checkout@v7'))
-        assertTrue(testWorkflow.indexOf('uses: actions/checkout@v7') < testWorkflow.indexOf('uses: ./.github/actions/prepare'))
-        assertTrue(testWorkflow.contains('build-outputs: ${{ inputs.build-outputs }}'))
-        assertTrue(testWorkflow.contains('./gradlew --no-daemon :webservice:test :clients:client-java:test :clients:client-javafx:test :oxt:test :webservice:integrationTest :test'))
-        assertFalse(testWorkflow.contains('javaClientOfficeTest'))
-        assertFalse(testWorkflow.contains('libreOfficeTest'))
-        assertFalse(testWorkflow.contains('minioTest'))
-        assertFalse(testWorkflow.contains('keycloakTest'))
-        assertFalse(testWorkflow.contains('startStack'))
+        String ignore = new File(root, '.containerignore').text
+        ['.claude/', 'AGENTS.md', 'docs/', '.cursor/', 'CLAUDE.md'].each { String entry ->
+            assertTrue(entry, ignore.readLines().contains(entry))
+        }
+        assertTrue(makefile.contains('cp .containerignore build/image-context/.containerignore'))
 
-        String packaged = jobs['package']
-        assertTrue(packaged.contains('needs: [build, test]'))
-        assertTrue(packaged.contains('build-outputs: ${{ env.BUILD_OUTPUTS }}'))
-        assertTrue(packaged.contains('./gradlew --no-daemon :printVersion packageDistribution'))
-        assertTrue(packaged.contains('build/odisee-version.txt'))
-        assertTrue(packaged.contains('name: odisee-${{ env.ODISEE_VERSION }}-linux-x86_64'))
-        assertTrue(packaged.contains('${{ env.DISTRIBUTION_ZIP }}'))
-        assertTrue(packaged.contains("startsWith(github.ref, 'refs/tags/v')"))
-        assertTrue(packaged.contains('actions: write'))
-        assertTrue(packaged.contains('contents: write'))
-        assertTrue(packaged.contains('published-versions.sh artifacts'))
-        assertTrue(packaged.contains('"$GITHUB_REF"'))
-        assertTrue(packaged.indexOf('Upload distribution') < packaged.indexOf('published-versions.sh artifacts'))
+        String rules = new File(root, 'docs/pipeline-rules.md').text
+        assertTrue(rules.contains('test-java'))
+        assertTrue(rules.contains('linux/amd64'))
+        assertTrue(rules.contains('linux/arm64'))
+        assertTrue(rules.contains('no `docs` job'))
+        assertTrue(rules.contains('GRADLE=./gradlew'))
+        assertTrue(rules.contains('.claude/'))
+        assertTrue(rules.contains('AGENTS.md'))
+        assertTrue(rules.contains('HTTP 404'))
+        assertTrue(rules.contains('next-lower run'))
+    }
 
-        String image = jobs['image']
-        assertTrue(image.contains('needs: [test, values]'))
-        assertTrue(image.contains('java-version: ${{ needs.values.outputs.java-version }}'))
-        assertTrue(image.contains('distribution-zip: ${{ needs.values.outputs.distribution-zip }}'))
-        assertFalse(image.contains('env.JAVA_VERSION'))
-        assertTrue(image.contains("github.event_name == 'workflow_dispatch'"))
-        assertTrue(image.contains("github.ref == 'refs/heads/master'"))
-        assertTrue(image.contains("startsWith(github.ref, 'refs/tags/v')"))
-        assertFalse(image.contains('pull_request'))
-        assertTrue(image.contains('packages: write'))
-        assertTrue(image.contains('secrets: inherit'))
-        assertTrue(image.contains('uses: ./.github/workflows/image.yml'))
-        assertTrue(imageWorkflow.contains('uses: actions/checkout@v7'))
-        assertTrue(imageWorkflow.indexOf('uses: actions/checkout@v7') < imageWorkflow.indexOf('uses: ./.github/actions/prepare'))
-        assertTrue(imageWorkflow.contains('./gradlew --no-daemon :printVersion :webservice:prepareOdiseeImage'))
-        assertTrue(imageWorkflow.contains('build/odisee-version.txt'))
-        assertTrue(imageWorkflow.contains('webservice/build/container/odisee'))
-        assertTrue(imageWorkflow.contains('ghcr.io'))
-        assertTrue(imageWorkflow.contains('apt-get install -y podman qemu-user-binfmt'))
-        assertFalse(yaml.contains('qemu-user-static'))
-        assertFalse(imageWorkflow.contains('qemu-user-static'))
-        assertTrue(imageWorkflow.contains('podman build'))
-        assertTrue(imageWorkflow.contains('--platform linux/amd64,linux/arm64'))
-        assertTrue(imageWorkflow.contains('--manifest "${image}:${version}"'))
-        assertTrue(imageWorkflow.contains('--layers'))
-        assertTrue(imageWorkflow.contains('cache_repo="ghcr.io/${repo}/cache"'))
-        assertTrue(imageWorkflow.contains('--cache-from "${cache_repo}"'))
-        assertFalse(imageWorkflow.contains('--cache-to'))
-        assertTrue(imageWorkflow.contains('published-versions.sh gh-images'))
-        assertTrue(imageWorkflow.contains('published-versions.sh images "$version" "$GITHUB_REF"'))
-        assertTrue(imageWorkflow.contains("if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')"))
-        assertFalse(imageWorkflow.contains('${image}:cache'))
-        assertTrue(imageWorkflow.contains('podman manifest rm "${image}:${version}"'))
-        int versionPush = imageWorkflow.indexOf('podman manifest push --all "${image}:${version}"' + "\n")
-        int releaseCase = imageWorkflow.indexOf('refs/heads/master|refs/tags/v*')
-        int latestPush = imageWorkflow.indexOf('podman manifest push --all "${image}:${version}" "${image}:latest"')
-        int gitTagPush = imageWorkflow.indexOf('podman manifest push --all "${image}:${version}" "${image}:${GITHUB_REF_NAME}"')
-        assertTrue(versionPush >= 0)
-        assertTrue(releaseCase > versionPush)
-        assertTrue(latestPush > releaseCase)
-        assertTrue(gitTagPush > latestPush)
-        assertTrue(imageWorkflow.indexOf('GITHUB_REF_TYPE') < gitTagPush)
-        assertTrue(imageWorkflow.contains('if [ "$GITHUB_REF_TYPE" = "tag" ]; then'))
-        assertFalse(imageWorkflow.contains('buildx'))
-        assertFalse(imageWorkflow.contains('tonistiigi/binfmt'))
-        assertFalse(imageWorkflow.contains('darwin'))
-        assertFalse(imageWorkflow.contains('startStack'))
-        assertFalse(imageWorkflow.contains('buildOdiseeImage'))
-
-        String office = jobs['java-client-office']
-        assertTrue(office.contains('needs: build'))
-        assertTrue(office.contains('build-outputs: ${{ env.BUILD_OUTPUTS }}'))
-        assertTrue(office.contains('apt-get install -y podman'))
-        assertTrue(office.contains('./gradlew --no-daemon :clients:client-java:javaClientOfficeTest'))
+    void testVersionRefusesAMissingTag() {
+        ProcessBuilder builder = new ProcessBuilder(['make', 'version'])
+        builder.directory(repoRoot())
+        builder.environment().remove('GITHUB_RUN_NUMBER')
+        Process process = builder.start()
+        byte[] outBytes = null
+        byte[] errBytes = null
+        Thread outThread = Thread.start { outBytes = process.inputStream.readAllBytes() }
+        Thread errThread = Thread.start { errBytes = process.errorStream.readAllBytes() }
+        boolean finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)
+        outThread.join(5000)
+        errThread.join(5000)
+        String combined = new String(outBytes ?: new byte[0], 'UTF-8') + new String(errBytes ?: new byte[0], 'UTF-8')
+        assertTrue(combined, finished)
+        assertTrue(combined, process.exitValue() != 0)
+        assertTrue(combined, combined.contains('Refusing to invent a version.'))
+        assertFalse(combined, combined.contains('2.6.0'))
     }
 
     void testWorkflowDoesNotBuildVbnet() {
@@ -306,15 +300,43 @@ class BuildPipelineTest extends GroovyTestCase {
     }
 
     private static String workflow() {
-        new File(repoRoot(), '.github/workflows/build.yml').text
+        new File(repoRoot(), '.github/workflows/ci.yml').text
     }
 
-    private static String calledWorkflow(String name) {
-        new File(repoRoot(), ".github/workflows/${name}").text
-    }
-
-    private static String prepareAction() {
-        new File(repoRoot(), '.github/actions/prepare/action.yml').text
+    private static void assertUploads(String yaml) {
+        int uploads = 0
+        List<String> lines = yaml.readLines()
+        for (int i = 0; i < lines.size(); i++) {
+            if (!lines[i].contains('uses: actions/upload-artifact@')) {
+                continue
+            }
+            uploads++
+            String name = null
+            Integer days = null
+            for (int j = i + 1; j < lines.size() && j < i + 25; j++) {
+                String line = lines[j]
+                if (line =~ /^\s*- /) {
+                    break
+                }
+                def named = (line =~ /^\s*name:\s*(\S+)\s*$/)
+                if (named && name == null) {
+                    name = named[0][1]
+                }
+                def kept = (line =~ /retention-days:\s*(\d+)/)
+                if (kept) {
+                    days = Integer.valueOf(kept[0][1])
+                    break
+                }
+            }
+            assertNotNull("upload has no name near line ${i + 1}", name)
+            assertNotNull("upload ${name} has no retention-days", days)
+            if (name == 'report') {
+                assertEquals(name, 14, days.intValue())
+            } else {
+                assertEquals(name, 1, days.intValue())
+            }
+        }
+        assertTrue(uploads >= 7)
     }
 
     private static Map<String, String> jobs(String yaml) {

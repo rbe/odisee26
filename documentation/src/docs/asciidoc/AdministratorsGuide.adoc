@@ -95,7 +95,7 @@ Set `ODISEE_SHELL=1` to start that JVM in the background and exec bash, so `podm
 wget https://github.com/rbe/odisee26/releases/latest/download/odisee-2.6.0-<build>-linux-x86_64.zip
 ----
 
-GitHub Actions also attaches the same zip to each successful build. The version is `2.6.0-<build>`. `<build>` is the Actions run number. Publishing a release happens when a `v*` tag is pushed.
+GitHub Actions publishes that zip on the default branch, and when someone runs the `publish-github` job by hand. The version is the nearest `vMAJOR.MINOR.PATCH` tag, without the `v`, plus the Actions run number. A missing tag fails the publish. Pushing the tag does not publish, and the workflow does not create a git tag.
 
 .Supported Platforms
 [source,bash,lineno]
@@ -278,17 +278,18 @@ The service image ships with `compose.yaml`.
 `./gradlew :webservice:startStack` builds `odisee/odisee` and starts `odisee`, `minio`, and `keycloak` with `podman compose`.
 The image installs headless LibreOffice Writer, Calc, and Impress.
 `make stack` runs that task. `make stop`, `make rm`, and `make clean-images` stop those containers, remove them, and remove the images they use. `make help` lists the targets. The how-to is the comment block in the root `Makefile`.
-GitHub Actions job `image` publishes the same image to `ghcr.io/rbe/odisee26` on `master`, on a `v*` tag, and on a manual run.
+`make publish-container` publishes the same image to `ghcr.io/rbe/odisee26` on the default branch, and when someone runs that job by hand.
 One manifest lists `linux/amd64` and `linux/arm64`.
 There is no `darwin` image.
-`master` and a `v*` tag push `2.6.0-<build>` and `latest`.
-`<build>` is the Actions run number.
-A `v*` tag also pushes that tag name.
-A manual run of another branch pushes only `2.6.0-<build>`.
-Pull requests do not publish.
-On `master` and a `v*` tag, a publish keeps the current distribution artifact and the current `2.6.0-<build>` image tag, plus one former version of each, and deletes older ones.
+The published version is the nearest `vMAJOR.MINOR.PATCH` tag plus the Actions run number.
+The default branch also pushes `latest`.
+A manual run from any other ref pushes that version only.
 A manual run of another ref does not delete published versions.
-`latest` stays.
+It does not move `latest`, and it does not delete published versions.
+A tag push does not publish.
+On the default branch, a publish keeps that run and the next-lower run on the same version line.
+A version that still carries `latest`, or any tag other than that rolling tag, stays.
+The image copies named files. It does not include `.claude/`, `AGENTS.md`, or `docs/`.
 The first publish is private until the package is set public.
 
 [source,bash]

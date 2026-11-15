@@ -14,28 +14,44 @@ class MakefileHelpTest extends GroovyTestCase {
 
     private static final List<String> TARGETS = [
             'setup',
-            'stack',
-            'user',
-            'token',
+            'build',
             'test',
+            'test-java',
             'test-office',
             'test-minio',
             'test-keycloak',
-            'test-java',
+            'login',
+            'image',
+            'publish-container',
+            'publish-github',
+            'stack',
+            'user',
+            'token',
             'pull',
             'run',
             'stop',
             'rm',
             'clean-images',
+            'clean',
+            'publish-tags',
             'help',
+            'version',
+            'ci',
+            'report',
+            'cleanup-container-versions',
+            'cleanup-github-releases',
+            'cleanup-actions-artifacts',
     ]
 
     void testMakeAndHelpListEveryTarget() {
         String help = make(0, ['help']).out
         String bare = make(0, []).out
         assertEquals(help, bare)
-        List<String> lines = help.readLines().findAll { it.trim() }
+        List<String> lines = help.readLines().findAll { it.startsWith('  ') }
         assertEquals(TARGETS.size(), lines.size())
+        assertTrue(help.contains('The Makefile is the interface'))
+        assertTrue(help.contains('Podman is the only container engine'))
+        assertTrue(help.contains('make ci runs setup build test report. It does not publish.'))
         TARGETS.eachWithIndex { String target, int index ->
             String line = lines[index]
             assertTrue(line, line.startsWith('  ' + target + ' '))
@@ -75,11 +91,15 @@ class MakefileHelpTest extends GroovyTestCase {
                 'http://127.0.0.1:8180/realms/odisee/protocol/openid-connect/token',
                 'CLIENT_ID',
                 'CLIENT_SECRET',
-                'Build, test, and package',
-                'feature branch',
-                'current master',
+                'The workflow is CI',
+                '.github/workflows/ci.yml',
+                'vMAJOR.MINOR.PATCH',
                 '2.6.0-<run>',
+                'A missing tag fails the publish',
+                'does not create a git tag',
                 'latest is not moved by a branch run',
+                '.claude/',
+                'AGENTS.md',
                 'podman pull ghcr.io/rbe/odisee26:$(VERSION)',
                 'podman run -it -p 8080:8080 ghcr.io/rbe/odisee26:$(VERSION)',
                 '2.6.0-42',
@@ -127,11 +147,19 @@ class MakefileHelpTest extends GroovyTestCase {
         assertTrue(user, user.contains('webservice/src/main/container/bin/odictl user "press"'))
 
         assertTrue(make(0, ['-n', 'stack']).out.contains('./gradlew :webservice:startStack'))
-        assertTrue(make(0, ['-n', 'test']).out.contains('./gradlew :webservice:test'))
+        String test = make(0, ['-n', '_test']).out
+        assertTrue(test, test.contains('./gradlew --no-daemon --console=plain :webservice:test :clients:client-java:test :clients:client-javafx:test :oxt:test :webservice:integrationTest :test jacocoTestReport'))
         assertTrue(make(0, ['-n', 'test-office']).out.contains('./gradlew :webservice:libreOfficeTest'))
         assertTrue(make(0, ['-n', 'test-minio']).out.contains('./gradlew :webservice:minioTest'))
         assertTrue(make(0, ['-n', 'test-keycloak']).out.contains('./gradlew :webservice:keycloakTest'))
-        assertTrue(make(0, ['-n', 'test-java']).out.contains('./gradlew :clients:client-java:javaClientOfficeTest'))
+        assertTrue(make(0, ['-n', '_test-java']).out.contains('./gradlew --no-daemon --console=plain :clients:client-java:javaClientOfficeTest'))
+        String image = make(0, ['-n', 'image']).out
+        assertTrue(image, image.contains('podman build --platform linux/amd64,linux/arm64'))
+        assertTrue(image, image.contains('qemu-user-binfmt'))
+        String publish = make(0, ['-n', '_publish-container']).out
+        assertTrue(publish, publish.contains('publish-tags'))
+        assertTrue(publish, publish.contains('podman manifest push --all'))
+        assertFalse(publish, publish.contains('GITHUB_REF_NAME'))
         assertTrue(make(0, ['-n', 'stop']).out.contains('./gradlew :webservice:stopOdisee'))
         assertTrue(make(0, ['-n', 'rm']).out.contains('./gradlew :webservice:removeOdiseeContainers'))
         assertTrue(make(0, ['-n', 'clean-images']).out.contains('./gradlew :webservice:cleanOdiseeImages'))
@@ -159,16 +187,12 @@ class MakefileHelpTest extends GroovyTestCase {
         assertFalse(pull.err.contains('podman pull'))
     }
 
-    void testSetupPrintsTheBashNoteAndChecksPodman() {
-        MakeResult result = make(null, ['setup'])
-        String combined = result.out + '\n' + result.err
-        assertTrue(combined, combined.contains('macOS /bin/bash is 3.2. odictl re-execs Homebrew bash. Otherwise brew install bash.'))
-        if (result.code == 0) {
-            assertTrue(result.out, result.out.contains('podman:'))
-        } else {
-            assertEquals(combined, 2, result.code)
-            assertTrue(result.err, result.err.contains('podman is not on PATH. On a Mac it is /opt/homebrew/bin/podman or /usr/local/bin/podman.'))
-        }
+    void testSetupResolvesDependenciesAndDoesNotPublish() {
+        String dry = make(0, ['-n', '_setup']).out
+        assertTrue(dry, dry.contains('ensure-jdk'))
+        assertTrue(dry, dry.contains('./gradlew --no-daemon --console=plain :dependencies :webservice:dependencies :clients:client-java:dependencies :clients:client-javafx:dependencies :documentation:dependencies'))
+        assertFalse(dry, dry.contains('podman push'))
+        assertFalse(dry, dry.contains('packageDistribution'))
     }
 
     private static void assertOneLine(String err, String message) {

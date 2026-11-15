@@ -12,7 +12,9 @@ plugins {
 
 group = "org.odisee"
 
-// Semantic version. CI sets ODISEE_BUILD_NUMBER to the Actions run number: 2.6.0-42.
+// Local project version. Publish uses `make version` (the nearest vMAJOR.MINOR.PATCH
+// tag plus GITHUB_RUN_NUMBER) and does not read this value. ODISEE_BUILD_NUMBER
+// still renames a local build, for example 2.6.0-42.
 val odiseeBaseVersion = "2.6.0"
 extra["odiseeBaseVersion"] = odiseeBaseVersion
 val odiseeBuildNumber = System.getenv("ODISEE_BUILD_NUMBER")?.trim()?.takeIf { it.isNotEmpty() }
