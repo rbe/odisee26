@@ -1,0 +1,20 @@
+name: odisee26
+version: 2.6.0
+targets:
+  - claude
+dependencies:
+  apm:
+    - git: rbe/ralfskills
+      skills:
+        - plan
+        - develop
+        - review
+        - release
+        - record
+        - project-report
+        - project-setup
+        - github-pipeline
+        - jvm
+        - shell
+        - security
+        - api-design

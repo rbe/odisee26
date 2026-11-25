@@ -1,5 +1,7 @@
 package org.odisee.document
 
+// id: ADR-0006
+
 import com.sun.star.beans.XPropertySet
 import com.sun.star.container.XEnumerationAccess
 import com.sun.star.container.XNameAccess

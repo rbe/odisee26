@@ -1,5 +1,7 @@
 package org.odisee.document
 
+// id: ADR-0006
+
 import com.sun.net.httpserver.HttpServer
 import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException

@@ -1,5 +1,6 @@
 # Odisee frontend. This file is the how-to. `make` and `make help` list every target.
-# Run make from the repository root. sdlc.mk is the shared pipeline makefile.
+# Run make from the repository root. .claude/skills/github-pipeline/sdlc.mk is the shared pipeline makefile.
+# APM installs it from rbe/ralfskills (apm.yml, apm.lock.yaml).
 # The Makefile is the interface. A laptop and CI run the same targets.
 # Podman is the only container engine.
 #
@@ -44,7 +45,7 @@
 # make pull is podman pull ghcr.io/rbe/odisee26:$(VERSION).
 # make run is podman run -it -p 8080:8080 ghcr.io/rbe/odisee26:$(VERSION).
 # VERSION is required. An example is 2.6.0-42.
-# The image copies named files. It excludes .claude/, AGENTS.md, and docs/.
+# The image copies named files. It excludes .claude/, CLAUDE.md, and docs/.
 #
 # JUnit:
 # make test runs the unit tests. It does not start a container.
@@ -89,17 +90,33 @@ SDLC_JOBS ?= setup build test test-java publish-container publish-github
 SDLC_CI ?= setup build test report
 HELP_LEAD ?= Odisee. The Makefile is the interface. A laptop and CI run the same targets.
 CI_IMAGE ?= localhost/odisee26:ci
+OWNER ?= rbe
 # Host JDK 21. Recorded under Divergences in docs/pipeline-rules.md.
 GRADLE ?= ./gradlew --no-daemon --console=plain
 
-include sdlc.mk
-
+# The command variables of the Make contract. Each runs the real recipe
+# below through SDLC_LOG, which writes build/logs and build/summaries.
+SETUP_CMD = @$(call SDLC_LOG,setup,_setup)
+BUILD_CMD = @$(call SDLC_LOG,build,_build)
+TEST_CMD = @$(call SDLC_LOG,test,_test)
+# login comes from the contract: podman login ghcr.io with REGISTRY_USER and REGISTRY_TOKEN.
+PUBLISH_IMAGE = 1
+# This project builds a multi-arch manifest and defines image and
+# publish-container below. container.mk stays out. Recorded under
+# Divergences in docs/pipeline-rules.md.
+CONTAINER_MK := 1
+# NAME is the Keycloak user of `make user`. sdlc.mk would default it to the
+# repository name, so the GitHub repository is set here.
 NAME ?= press
+GH_REPO ?= $(PACKAGE)
+
+include .claude/skills/github-pipeline/sdlc.mk
+
 ODICTL := webservice/src/main/container/bin/odictl
 export CLIENT_ID
 export CLIENT_SECRET
 
-.PHONY: ensure-jdk ensure-podman login stack user token test-office test-minio test-keycloak test-java pull rm clean-images
+.PHONY: ensure-jdk ensure-podman stack user token test-office test-minio test-keycloak test-java pull rm clean-images
 
 ensure-jdk:
 	@set -eu; \
@@ -136,14 +153,12 @@ ensure-podman:
 	mkdir -p "$$HOME/.config/containers"; \
 	printf '%s\n' '[engine]' 'cgroup_manager = "cgroupfs"' 'events_logger = "file"' > "$$HOME/.config/containers/containers.conf"
 
+# The recipes of setup, build, and test come from the Make contract and
+# run SETUP_CMD, BUILD_CMD, and TEST_CMD. These lines only give make help
+# the text for this project.
 setup: ## Match CI: resolve Gradle dependencies. On a Mac, Podman is /opt/homebrew/bin/podman or /usr/local/bin/podman
-	@$(call SDLC_LOG,setup,_setup)
-
 build: ## Match CI: zip the Linux runtime and stage the tested boot JAR
-	@$(call SDLC_LOG,build,_build)
-
 test: ## Match CI: unit tests. Does not start a container
-	@$(call SDLC_LOG,test,_test)
 
 test-java: ## Match CI: Java client office proof. Starts its own containers, not the compose stack
 	@$(call SDLC_LOG,test-java,_test-java)
@@ -158,10 +173,6 @@ test-keycloak: ## Keycloak client-credentials test. Starts its own container, no
 	./gradlew :webservice:keycloakTest
 
 login: ## Match CI: log in to ghcr.io with REGISTRY_USER and REGISTRY_TOKEN
-	@set -eu; \
-	test -n "$${REGISTRY_USER:-}" || { echo "REGISTRY_USER is required" >&2; exit 1; }; \
-	test -n "$${REGISTRY_TOKEN:-}" || { echo "REGISTRY_TOKEN is required" >&2; exit 1; }; \
-	printf '%s\n' "$$REGISTRY_TOKEN" | podman login ghcr.io --username "$$REGISTRY_USER" --password-stdin
 
 image: ## Build the multi-arch service image from the tested JAR. No push
 	@set -eu; \
@@ -290,10 +301,11 @@ _publish-github:
 	version=$$($(THIS_MAKE) -s --no-print-directory version); \
 	asset=build/dist/odisee-$$version-linux-x86_64.zip; \
 	cp build/dist/odisee-linux-x86_64.zip "$$asset"; \
-	if gh release view "$$version" >/dev/null 2>&1; then \
-		gh release upload "$$version" "$$asset" --clobber; \
+	$(THIS_MAKE) --no-print-directory gh-image; \
+	if $(GH) release view "$$version" -R "$(PACKAGE)" >/dev/null 2>&1; then \
+		$(GH) release upload "$$version" "$$asset" -R "$(PACKAGE)" --clobber; \
 	else \
-		gh release create "$$version" "$$asset" --title "$$version" \
+		$(GH) release create "$$version" "$$asset" -R "$(PACKAGE)" --title "$$version" \
 			--notes "Odisee $$version." --target "$$(git rev-parse HEAD)"; \
 	fi; \
 	printf '# publish-github\n\nStatus: released\nRelease: %s\n' "$$version" > build/summaries/publish-github.md

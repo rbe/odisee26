@@ -289,7 +289,7 @@ It does not move `latest`, and it does not delete published versions.
 A tag push does not publish.
 On the default branch, a publish keeps that run and the next-lower run on the same version line.
 A version that still carries `latest`, or any tag other than that rolling tag, stays.
-The image copies named files. It does not include `.claude/`, `AGENTS.md`, or `docs/`.
+The image copies named files. It does not include `.claude/`, `CLAUDE.md`, or `docs/`.
 The first publish is private until the package is set public.
 
 [source,bash]

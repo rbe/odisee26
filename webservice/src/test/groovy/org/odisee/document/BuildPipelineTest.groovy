@@ -1,5 +1,7 @@
 package org.odisee.document
 
+// id: ADR-0007
+
 import groovy.test.GroovyTestCase
 
 /**
@@ -7,8 +9,6 @@ import groovy.test.GroovyTestCase
  * {@code ./gradlew build} stays one command and does not start a container.
  */
 class BuildPipelineTest extends GroovyTestCase {
-
-    private static final String SDLC_SHA256 = '45c6cf23664d030c61f0fedd2d0639cd9dc2dc7bb03c14167dce61fed9d495d6'
 
     void testWorkflowMatchesTheCommonSdlc() {
         File root = repoRoot()
@@ -118,15 +118,16 @@ class BuildPipelineTest extends GroovyTestCase {
         assertFalse(new File(root, '.github/actions/prepare/action.yml').exists())
         assertFalse(new File(root, '.github/scripts/published-versions.sh').exists())
 
-        byte[] sdlc = new File(root, 'sdlc.mk').bytes
-        String hash = java.security.MessageDigest.getInstance('SHA-256').digest(sdlc).encodeHex().toString()
-        assertEquals(SDLC_SHA256, hash)
-
+        assertTrue(new File(root, '.claude/skills/github-pipeline/sdlc.mk').isFile())
         String makefile = new File(root, 'Makefile').text
-        int includeAt = makefile.indexOf('\ninclude sdlc.mk\n')
-        int setupAt = makefile.indexOf('\nsetup:')
+        int includeAt = makefile.indexOf('\ninclude .claude/skills/github-pipeline/sdlc.mk\n')
+        int firstTargetAt = makefile.indexOf('\nensure-jdk:')
         assertTrue(includeAt > 0)
-        assertTrue(setupAt > includeAt)
+        assertTrue(firstTargetAt > includeAt)
+        assertTrue(makefile.contains('SETUP_CMD = @$(call SDLC_LOG,setup,_setup)'))
+        assertTrue(makefile.contains('BUILD_CMD = @$(call SDLC_LOG,build,_build)'))
+        assertTrue(makefile.contains('TEST_CMD = @$(call SDLC_LOG,test,_test)'))
+        assertNull(makefile.find(/(?m)^(setup|build|test|login):.*\n\t/))
         assertTrue(makefile.contains('IMAGE ?= ghcr.io/rbe/odisee26'))
         assertTrue(makefile.contains('GRADLE ?= ./gradlew'))
         assertTrue(makefile.contains('publish-tags'))
@@ -151,7 +152,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(rules.contains('no `docs` job'))
         assertTrue(rules.contains('GRADLE=./gradlew'))
         assertTrue(rules.contains('.claude/'))
-        assertTrue(rules.contains('AGENTS.md'))
+        assertTrue(rules.contains('CLAUDE.md'))
         assertTrue(rules.contains('HTTP 404'))
         assertTrue(rules.contains('next-lower run'))
     }

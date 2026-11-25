@@ -1,5 +1,7 @@
 package org.odisee.security
 
+// id: ADR-0003
+
 import groovy.test.GroovyTestCase
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

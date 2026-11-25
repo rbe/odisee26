@@ -1,5 +1,7 @@
 package org.odisee.client;
 
+// id: ADR-0001
+
 import org.junit.Test;
 
 import javax.xml.XMLConstants;
@@ -16,7 +18,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Source and schema contract checks for B58, B59, B60, and B61.
+ * Source and schema contract checks for the clients (old labels B58, B59, B60, and B61).
  */
 public class ClientsSkillsDocsContractTest {
 
@@ -140,11 +142,11 @@ public class ClientsSkillsDocsContractTest {
     @Test
     public void skillsDocsReadmesAndHttpFixturesMatchBearerAndReleaseContract() throws Exception {
         final Path root = repoRoot();
-        final String releaseSkill = read(root.resolve(".cursor/skills/release/SKILL.md"));
-        assertTrue(releaseSkill.contains("A missing tag fails the publish."));
-        assertTrue(releaseSkill.contains("A tag push does not publish."));
-        assertTrue(releaseSkill.contains("does not create a git tag."));
-        assertFalse(releaseSkill.contains("${GITHUB_REF_NAME}"));
+        final String pipelineRules = read(root.resolve("docs/pipeline-rules.md"));
+        assertTrue(pipelineRules.contains("No such tag, or a nearer pre-release tag, fails the publish."));
+        assertTrue(pipelineRules.contains("A tag push does not start a run."));
+        assertTrue(pipelineRules.contains("does not create that git tag."));
+        assertFalse(pipelineRules.contains("${GITHUB_REF_NAME}"));
 
         final String usersGuide = read(root.resolve("documentation/src/docs/asciidoc/UsersGuide.adoc"));
         assertTrue(usersGuide.contains("OdiseeClient.bearer("));
@@ -197,11 +199,8 @@ public class ClientsSkillsDocsContractTest {
             }
         }
 
-        final String bugs = read(root.resolve("docs/BUGS.md"));
-        assertTrue(bugs.contains("| B25 | major | partial in wave 4 |"));
-        for (String id : List.of("B57", "B58", "B59", "B60", "B61")) {
-            assertTrue("Missing " + id, bugs.contains("| " + id + " |"));
-        }
+        final String roadmap = read(root.resolve("docs/ROADMAP.md"));
+        assertTrue(roadmap.contains("old label B25, partial in wave 4"));
     }
 
     @Test
@@ -222,28 +221,12 @@ public class ClientsSkillsDocsContractTest {
         final String tenancy = read(root.resolve("documentation/src/docs/asciidoc/Multitenancy.adoc"));
         assertTrue(tenancy.contains("The host must be a public external host."));
 
-        final String features = read(root.resolve("docs/FEATURES.md"));
-        assertTrue(features.contains("OdiseeClient.bearer(serviceUrl, accessToken)"));
-        assertFalse(features.contains("new OdiseeClient(serviceUrl, username, password)"));
-        assertTrue(features.contains("public external host"));
+        final String delivery = read(root.resolve("docs/adr/ADR-0006.md"));
+        assertTrue(delivery.contains("public external host"));
 
         final String readme = read(root.resolve("README.md"));
         assertTrue(readme.contains("headless LibreOffice Writer, Calc, and Impress"));
         assertTrue(readme.contains("A manual run of another ref does not delete published versions."));
-
-        final String waves = read(root.resolve("docs/WAVES.md"));
-        assertFalse(waves.contains("headless LibreOffice Writer)"));
-        assertTrue(waves.contains("headless LibreOffice Writer, Calc, and Impress"));
-        assertTrue(waves.contains("public external host"));
-
-        final String bugs = read(root.resolve("docs/BUGS.md"));
-        assertTrue(bugs.contains("| B25 | major | partial in wave 4 |"));
-        for (int n = 40; n <= 61; n++) {
-            final String row = "| B" + n + " |";
-            final int first = bugs.indexOf(row);
-            assertTrue("Missing " + row, first >= 0);
-            assertTrue("Duplicate " + row, bugs.indexOf(row, first + row.length()) < 0);
-        }
     }
 
     private static String read(final Path file) throws Exception {

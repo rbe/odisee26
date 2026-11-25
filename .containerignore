@@ -1,6 +1,7 @@
 .git
 .github
 .claude/
+apm_modules/
 .cursor/
 AGENTS.md
 CLAUDE.md
