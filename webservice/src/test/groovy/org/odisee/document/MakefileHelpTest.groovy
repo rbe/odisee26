@@ -99,7 +99,7 @@ class MakefileHelpTest extends GroovyTestCase {
                 'does not create a git tag',
                 'latest is not moved by a branch run',
                 '.claude/',
-                'AGENTS.md',
+                'CLAUDE.md',
                 'podman pull ghcr.io/rbe/odisee26:$(VERSION)',
                 'podman run -it -p 8080:8080 ghcr.io/rbe/odisee26:$(VERSION)',
                 '2.6.0-42',

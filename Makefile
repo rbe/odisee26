@@ -44,7 +44,7 @@
 # make pull is podman pull ghcr.io/rbe/odisee26:$(VERSION).
 # make run is podman run -it -p 8080:8080 ghcr.io/rbe/odisee26:$(VERSION).
 # VERSION is required. An example is 2.6.0-42.
-# The image copies named files. It excludes .claude/, AGENTS.md, and docs/.
+# The image copies named files. It excludes .claude/, CLAUDE.md, and docs/.
 #
 # JUnit:
 # make test runs the unit tests. It does not start a container.
