@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit
 class MakefileHelpTest extends GroovyTestCase {
 
     private static final List<String> TARGETS = [
+            'gradle-image',
             'setup',
             'build',
             'test',
@@ -218,7 +219,10 @@ class MakefileHelpTest extends GroovyTestCase {
 
     void testSetupResolvesDependenciesAndDoesNotPublish() {
         String dry = make(0, ['-n', '_setup']).out
-        assertTrue(dry, dry.contains('ensure-jdk'))
+        assertTrue(dry, dry.contains('gradle-image'))
+        assertTrue(dry, dry.contains('podman run --rm'))
+        assertTrue(dry, dry.contains('localhost/odisee26-gradle:21 ./gradlew'))
+        assertFalse(dry, dry.contains('ensure-jdk'))
         assertTrue(dry, dry.contains('./gradlew --no-daemon --console=plain :dependencies :webservice:dependencies :clients:client-java:dependencies :clients:client-javafx:dependencies :documentation:dependencies'))
         assertFalse(dry, dry.contains('podman push'))
         assertFalse(dry, dry.contains('packageDistribution'))

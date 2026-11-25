@@ -27,7 +27,7 @@ Packages and images contain the tested build only: a binary or a container image
 | Image | `ghcr.io/rbe/odisee26` |
 | Package | `rbe/odisee26` |
 | Default branch | `master` |
-| Toolchain | Gradle wrapper on the host JDK, Java 21 |
+| Toolchain | Gradle wrapper in Podman, `eclipse-temurin:21-jdk` (`gradle/Containerfile`). The container-starting targets use the host JDK 21 |
 | Release | `publish-github` attaches `odisee-<version>-linux-x86_64.zip` |
 | Local project version | `2.6.0` in `build.gradle.kts`. Publish does not read it |
 
@@ -39,7 +39,7 @@ The published version is `make version`. A repository tag `v2.6.0` plus run `42`
 
 Each entry names the shared rule, what differs, and why.
 
-- Rule: the toolchain runs in a pinned image. Here: `GRADLE=./gradlew` inside `make setup`, `make build`, `make test`, and `make test-java`. Those targets install OpenJDK 21 when `java` is not 21. The workflow has no Gradle step and no `setup-java` step. Why: Gradle 8.14.5 does not start on a newer JDK, and the office proof and the local stack talk to Podman on the host. Containerising Gradle would hide that socket.
+- Rule: the toolchain runs in a pinned image. Here: `make setup`, `make build`, and `make test` run the Gradle wrapper in Podman, in the image of `gradle/Containerfile` (`eclipse-temurin:21-jdk` plus make and git). `test-java`, `test-office`, `test-minio`, `test-keycloak`, `stack`, `stop`, `rm`, and `clean-images` run `GRADLE_HOST`, the wrapper on the host JDK 21. `test-java` installs OpenJDK 21 when `java` is not 21. Why: those Gradle tasks start LibreOffice, MinIO, and Keycloak with the podman of the host and connect to their published ports. Gradle inside a container would need the Podman socket of the host and the same network. Roadmap row [W-8](ROADMAP.md#w-8) holds that work.
 - Rule: there is a `docs` job when the repo renders documentation. Here: there is no `docs` job. `packageDistribution` runs `:documentation:asciidoctor` and stores the HTML in the zip under `docs/`. Why: the book is contents of the release, and a `docs` job would render it a second time.
 - Rule: `publish-github` releases the tested JAR. Here: `publish-github` releases the Linux zip. The zip holds the service, `odictl`, the Java client, the LibreOffice extension, and the HTML book. The JavaFX jar stays out of the zip. Why: that zip is the installable product. The image is the other delivery.
 - Rule: `publish-container` pushes one image built from the tested JAR. Here: it builds one manifest for `linux/amd64` and `linux/arm64` with `podman build --platform`, `qemu-user-binfmt`, `--layers`, and `--cache-from`. A failed cache read deletes the partial manifest and builds again. There is no `--cache-to`. The `Containerfile` is `webservice/src/main/container/Containerfile`. There is no root `Containerfile`. The context is that tree, without `var/`, plus the tested boot JAR named `webservice.jar`, and `.containerignore` copied in. Why: the image is Ubuntu with headless Writer, Calc, and Impress. The copies are named files, so `.claude/`, `CLAUDE.md`, and `docs/` are not layers. The HTML book stays in the zip.
