@@ -1,5 +1,7 @@
 package org.odisee.document
 
+// id: ADR-0007
+
 import groovy.test.GroovyTestCase
 
 import java.nio.charset.StandardCharsets
@@ -35,12 +37,39 @@ class MakefileHelpTest extends GroovyTestCase {
             'clean',
             'publish-tags',
             'help',
+            'gh-image',
+            'ci-status',
+            'pull-request',
+            'pull-request-merge',
             'version',
             'ci',
             'report',
             'cleanup-container-versions',
             'cleanup-github-releases',
             'cleanup-actions-artifacts',
+            'py',
+            'doctor',
+            'podman-start',
+            'skills-install',
+            'skills-update',
+            'apm',
+            'old-board',
+            'test-changed',
+            'project-report',
+            'editorconfig',
+            'format',
+            'format-fix',
+            'lint',
+            'integration',
+            'coverage',
+            'image-ci',
+            'toon',
+            'ids',
+            'id',
+            'id-raise',
+            'req',
+            'links',
+            'links-check',
     ]
 
     void testMakeAndHelpListEveryTarget() {

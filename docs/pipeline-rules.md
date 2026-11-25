@@ -4,11 +4,11 @@ The shared part is the same in every repository. Change it everywhere or nowhere
 
 ## Shared rules
 
-The Makefile is the interface. A laptop and CI run the same targets, and a target does the same thing in both places. The workflow calls `make` and moves artifacts. It holds no other logic. Podman is the only container engine. The toolchain runs in a pinned image, so the host needs make, Podman, git, and gh.
+The Make contract is the project-setup skill. Make is the only interface. A person or an agent does the work through Make. `help` is the default goal. A target does the same thing on a laptop and in CI. The required targets are `setup`, `build`, `test`, `editorconfig`, `format`, `lint`, `integration`, and `coverage`. `test-changed` comes with the include. It is not a CI target. Set `TEST_CHANGED_CMD` before the include. Add `docs` only when this repository renders docs, and `login` when it publishes an image. `format` and `lint` run the one existing formatter and the one existing linter the language skill names. `coverage` writes `build/coverage/diff.md` for the lines this change touched. It does not apply a repository-wide percentage. Gradle, npm, Podman, python, and tar run inside those targets. CI runs those same targets.
 
-`sdlc.mk` at the repository root is the shared makefile. It is byte-identical to the canonical copy. The project Makefile sets `IMAGE`, `PACKAGE`, and `KEEP_VERSIONS`, includes `sdlc.mk`, and defines the project targets.
+The GitHub contract is the github-pipeline skill. Podman is the only container engine. The toolchain runs in a pinned image, so the host needs make, Podman, and git. The GitHub CLI runs in Podman, in the image of `make gh-image`. The Node template pins Node 24. A Gradle project uses the JDK in its template. A project diverges by toolchain and writes that down. The project Makefile sets `IMAGE`, `PACKAGE`, and `KEEP_VERSIONS`, includes `.claude/skills/github-pipeline/sdlc.mk` before any target, and defines the project targets. That include already provides `help`, so this repository leaves `project.mk` out. There is no root copy of `sdlc.mk`.
 
-There is one workflow, `.github/workflows/ci.yml`. Jobs, in order: `setup`, then `build`, `test`, and `docs` beside each other, then `publish-container` (needs `build` and `test`), then `report`. A repository that ships a release asset adds `publish-github`, which also needs `build` and `test`. Each job runs the make target with its name.
+There is one workflow, `.github/workflows/ci.yml`. A step is a checkout, an artifact upload or download, or `run: make <target>`. Jobs, in order: `setup`, then `build` and `test` beside each other (and `docs`, only when the repository renders docs), then `publish-container` (needs `build` and `test`), then `report`. A repository that releases a JAR adds `publish-github`, which also needs `build` and `test`. Each job runs the make target with its name.
 
 `publish-*` runs on a push to the default branch and when `workflow_dispatch` selects it. A tag push does not start a run. Any other branch runs through `report` and does not publish. A manual publish runs `build` and `test` first. In-progress runs are cancelled only off the default branch.
 
@@ -18,7 +18,7 @@ Every upload sets `retention-days`: 1 for intermediates, 14 for `report` and ren
 
 `report` is last. It still runs when an earlier job fails or is skipped. It writes `build/report/index.md`.
 
-Packages and images contain the tested build only. `.containerignore` keeps out `.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, and `docs/`.
+Packages and images contain the tested build only: a binary or a container image. `.containerignore` keeps out `.claude/`, `CLAUDE.md`, `docs/`, and `data/`. Example data ships only from `examples/` when the path and the name say it is an example.
 
 ## This repository
 
@@ -46,3 +46,6 @@ Each entry names the shared rule, what differs, and why.
 - Rule: `test` is the only test job, and it gates publish. Here: `test-java` runs `:clients:client-java:javaClientOfficeTest` beside `test`. It needs `setup`. `publish-container` and `publish-github` do not need it. `make ci` does not run it. Why: the proof starts LibreOffice in Podman. A failure still lets a publish that already passed `build` and `test` push. `report` still records the result.
 - Rule: laptop-only targets are outside the job graph. Here: `stack`, `user`, `token`, `pull`, `run`, `stop`, `rm`, `clean-images`, `test-office`, `test-minio`, and `test-keycloak` stay in the Makefile. No job calls them. Why: they are the local operator commands. Podman remains the only engine.
 - Rule: `make ci` runs `setup build test docs report`. Here: `SDLC_CI` is `setup build test report`. The `ci` comment inside `sdlc.mk` still names `docs`. `make help` prints the targets that actually run. Why: there is no `docs` target to call.
+- Rule: the project includes `sdlc.mk`, and `sdlc.mk` includes `container.mk` for `image` and `publish-container`. Here: the Makefile sets `CONTAINER_MK := 1` before the include, so `container.mk` adds no target. The Makefile defines `image` and `publish-container` itself. `make help` still prints the `image-ci` line of `container.mk`, and that target does not exist. Why: `container.mk` builds and pushes one single-arch image. This repository pushes one multi-arch manifest with `podman manifest push --all`.
+- Rule: there is no root copy of `sdlc.mk`. Here: the old root `sdlc.mk` is still in the repository. No makefile includes it. Roadmap row [W-5](ROADMAP.md#w-5) deletes it. Why: setup mode of `github-pipeline` leaves the bytes of a root `sdlc.mk` and names it.
+- Rule: `editorconfig`, `format`, `lint`, `integration`, and `coverage` run real tools. Here: they are the stubs of `contract.mk` and fail. `SDLC_CI` does not run them. Roadmap rows [W-2](ROADMAP.md#w-2), [W-3](ROADMAP.md#w-3), [W-4](ROADMAP.md#w-4), [W-6](ROADMAP.md#w-6), and [W-7](ROADMAP.md#w-7) hold the work. Why: the migration to the skills of rbe/ralfskills adds no formatter, no linter, and no refactor.

@@ -1,5 +1,7 @@
 package org.odisee.io
 
+// id: ADR-0001
+
 import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException
 

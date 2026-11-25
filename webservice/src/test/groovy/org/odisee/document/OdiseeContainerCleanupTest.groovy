@@ -1,5 +1,7 @@
 package org.odisee.document
 
+// id: ADR-0007
+
 import groovy.test.GroovyTestCase
 
 import java.nio.charset.StandardCharsets

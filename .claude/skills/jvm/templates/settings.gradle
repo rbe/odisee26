@@ -1,0 +1,3 @@
+// The name of the project. Gradle names the JAR after it.
+// Change it to the name of this project.
+rootProject.name = 'project-name'

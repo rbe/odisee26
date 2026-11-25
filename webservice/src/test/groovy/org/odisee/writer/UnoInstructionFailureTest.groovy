@@ -1,5 +1,7 @@
 package org.odisee.writer
 
+// id: ADR-0002
+
 import com.sun.star.beans.XPropertySet
 import com.sun.star.container.NoSuchElementException
 import com.sun.star.container.XEnumerationAccess

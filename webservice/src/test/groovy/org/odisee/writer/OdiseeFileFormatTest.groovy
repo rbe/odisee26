@@ -1,5 +1,7 @@
 package org.odisee.writer
 
+// id: ADR-0002
+
 import com.sun.star.beans.PropertyValue
 import com.sun.star.drawing.XDrawPagesSupplier
 import com.sun.star.frame.XStorable

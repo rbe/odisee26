@@ -38,3 +38,9 @@ out/
 
 # Windows
 Thumbs.db
+
+
+# APM dependencies
+apm_modules/
+docs/adr/index.toon
+docs/skill-index.toon

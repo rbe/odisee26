@@ -1,5 +1,7 @@
 package org.odisee.document
 
+// id: ADR-0001
+
 import com.sun.star.lang.XComponent
 import com.sun.star.script.provider.ScriptFrameworkErrorException
 import com.sun.star.script.provider.XScript
