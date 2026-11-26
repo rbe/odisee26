@@ -14,17 +14,25 @@ import java.util.concurrent.TimeUnit
  */
 class MakefileHelpTest extends GroovyTestCase {
 
+    // The order of make help: the groups Gates, Project, Board, Delivery, and Tools.
     private static final List<String> TARGETS = [
-            'gradle-image',
-            'podman-socket',
+            'ci',
+            'test-changed',
+            'check-docs',
             'setup',
             'build',
             'test',
+            'editorconfig',
+            'format',
+            'format-fix',
+            'lint',
+            'integration',
+            'coverage',
+            'gradle-image',
             'test-java',
             'test-office',
             'test-minio',
             'test-keycloak',
-            'login',
             'image',
             'publish-container',
             'publish-github',
@@ -37,34 +45,8 @@ class MakefileHelpTest extends GroovyTestCase {
             'rm',
             'clean-images',
             'clean',
-            'publish-tags',
-            'help',
-            'gh-image',
-            'ci-status',
-            'pull-request',
-            'pull-request-merge',
-            'version',
-            'ci',
-            'report',
-            'cleanup-container-versions',
-            'cleanup-github-releases',
-            'cleanup-actions-artifacts',
-            'py',
-            'doctor',
-            'podman-start',
-            'skills-install',
-            'skills-update',
-            'apm',
             'old-board',
-            'test-changed',
-            'r-project-report',
-            'editorconfig',
-            'format',
-            'format-fix',
-            'lint',
-            'integration',
-            'coverage',
-            'image-ci',
+            'project-report',
             'toon',
             'ids',
             'id',
@@ -72,6 +54,31 @@ class MakefileHelpTest extends GroovyTestCase {
             'req',
             'links',
             'links-check',
+            'old-board-delete',
+            'board-numbers',
+            'publish-tags',
+            'ci-status',
+            'pull-request',
+            'pull-request-merge',
+            'version',
+            'check-tag',
+            'report',
+            'cleanup-container-versions',
+            'cleanup-github-releases',
+            'cleanup-actions-artifacts',
+            'login',
+            'image-ci',
+            'help',
+            'gh-image',
+            'py',
+            'doctor',
+            'podman-start',
+            'skills-install',
+            'skills-update',
+            'apm',
+            'wrapper',
+            'jvm-tooling',
+            'podman-socket',
     ]
 
     void testMakeAndHelpListEveryTarget() {
@@ -92,10 +99,11 @@ class MakefileHelpTest extends GroovyTestCase {
         assertTrue(help.contains('NAME defaults to press'))
         assertTrue(help.contains('Prints the client id and secret'))
         assertTrue(help.contains('CLIENT_ID and CLIENT_SECRET'))
-        assertTrue(help.contains('Does not start a container'))
+        assertTrue(help.contains('Starts its own container'))
+        ['Gates:', 'Project:', 'Board:', 'Delivery:', 'Tools:'].each { String group ->
+            assertTrue(group, help.readLines().contains(group))
+        }
         assertTrue(help.contains('2.6.0-42'))
-        assertTrue(help.contains('/opt/homebrew/bin/podman'))
-        assertTrue(help.contains('/usr/local/bin/podman'))
     }
 
     void testHowToStaysInTheMakefileComment() {

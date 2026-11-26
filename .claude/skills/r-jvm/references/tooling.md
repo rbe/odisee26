@@ -2,6 +2,8 @@
 
 ## `make jvm-tooling`
 
+`jvm.mk` beside this skill has the targets `wrapper`, `jvm-tooling`, and `podman-socket`, and the defaults of `JDK_IMAGE`, `GRADLE_VERSION`, `GRADLE_IMAGE`, `GRADLE_RUN`, and `PODMAN_SOCKET`. The Makefile includes it with `include .claude/skills/r-jvm/jvm.mk` after `project.mk` or `sdlc.mk`. To change a variable, set it before that include.
+
 `make jvm-tooling` sets up a new Gradle project in one run. It does these things in order:
 
 1. If neither `build.gradle` nor `build.gradle.kts` exists, it writes `build.gradle` from `templates/build.gradle`.
