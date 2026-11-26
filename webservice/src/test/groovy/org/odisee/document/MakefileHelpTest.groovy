@@ -58,6 +58,7 @@ class MakefileHelpTest extends GroovyTestCase {
             'board-numbers',
             'publish-tags',
             'ci-status',
+            'ci-scope',
             'pull-request',
             'pull-request-merge',
             'version',
