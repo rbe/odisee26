@@ -23,7 +23,7 @@ class OdiseeContainerCleanupTest extends GroovyTestCase {
 
     private static final List<String> ODISEE_IMAGES = [
             'odisee-libreoffice-test:local',
-            'alpine/minio:RELEASE.2025-10-15T17-29-55Z',
+            'docker.io/alpine/minio:RELEASE.2025-10-15T17-29-55Z',
             'quay.io/keycloak/keycloak:26.8.0',
             'odisee/odisee:2.6.0',
             'odisee/webservice:2.6.0',
@@ -60,7 +60,9 @@ class OdiseeContainerCleanupTest extends GroovyTestCase {
             Map<String, String> present = [PODMAN_PRESENT_CONTAINERS: TEST_CONTAINERS.join('\n')]
             RunResult stop = run(0, work, present, 'stop')
             assertEquals(TEST_CONTAINERS, commands(stop.log, 'stop'))
-            assertTrue(stop.log, stop.log.contains('--project-directory'))
+            // podman-compose has no --project-directory. The directory of compose.yaml is the project directory.
+            assertFalse(stop.log, stop.log.contains('--project-directory'))
+            assertTrue(stop.log, stop.log.contains('compose -p odisee -f '))
             assertTrue(stop.log, stop.log.contains('compose.yaml stop'))
 
             RunResult removed = run(0, work, present, 'rm')

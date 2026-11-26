@@ -121,7 +121,7 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(new File(root, '.claude/skills/github-pipeline/sdlc.mk').isFile())
         String makefile = new File(root, 'Makefile').text
         int includeAt = makefile.indexOf('\ninclude .claude/skills/github-pipeline/sdlc.mk\n')
-        int firstTargetAt = makefile.indexOf('\nensure-jdk:')
+        int firstTargetAt = makefile.indexOf('\ngradle-image:')
         assertTrue(includeAt > 0)
         assertTrue(firstTargetAt > includeAt)
         assertTrue(makefile.contains('SETUP_CMD = @$(call SDLC_LOG,setup,_setup)'))
@@ -129,9 +129,15 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(makefile.contains('TEST_CMD = @$(call SDLC_LOG,test,_test)'))
         assertNull(makefile.find(/(?m)^(setup|build|test|login):.*\n\t/))
         assertTrue(makefile.contains('IMAGE ?= ghcr.io/rbe/odisee26'))
-        assertTrue(makefile.contains('GRADLE_HOST ?= ./gradlew'))
+        assertFalse(makefile.contains('GRADLE_HOST'))
+        assertFalse(makefile.contains('ensure-jdk'))
+        assertTrue(makefile.contains('GRADLE_PODMAN = '))
+        assertTrue(makefile.contains('CONTAINER_HOST=unix:///run/podman/podman.sock'))
         assertTrue(makefile.contains('GRADLE_IMAGE ?= localhost/odisee26-gradle:21'))
-        assertTrue(new File(root, 'gradle/Containerfile').text.contains('eclipse-temurin:21-jdk'))
+        String gradleImage = new File(root, 'gradle/Containerfile').text
+        assertTrue(gradleImage.contains('eclipse-temurin:21-jdk'))
+        assertTrue(gradleImage.contains('podman podman-compose'))
+        assertFalse(new File(root, 'Brewfile').text.contains('openjdk'))
         assertTrue(makefile.contains('publish-tags'))
         assertTrue(makefile.contains('--platform linux/amd64,linux/arm64'))
         assertTrue(makefile.contains('qemu-user-binfmt'))
@@ -152,11 +158,28 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(rules.contains('linux/amd64'))
         assertTrue(rules.contains('linux/arm64'))
         assertTrue(rules.contains('no `docs` job'))
-        assertTrue(rules.contains('GRADLE_HOST'))
+        assertTrue(rules.contains('GRADLE_PODMAN'))
         assertTrue(rules.contains('.claude/'))
         assertTrue(rules.contains('CLAUDE.md'))
         assertTrue(rules.contains('HTTP 404'))
         assertTrue(rules.contains('next-lower run'))
+    }
+
+    void testContainersPublishOnlyUserPortsAbove1024() {
+        File root = repoRoot()
+        List<Integer> hostPorts = []
+        ['Makefile', 'webservice/build.gradle.kts'].each { String path ->
+            new File(root, path).text.findAll(/-p (?:127\.0\.0\.1:)?(\d+):\d+/) { String all, String port ->
+                hostPorts << (port as Integer)
+            }
+        }
+        new File(root, 'webservice/src/main/container/compose.yaml').text.findAll(/(?m)^\s+- "(?:127\.0\.0\.1:)?(\d+):\d+"/) { String all, String port ->
+            hostPorts << (port as Integer)
+        }
+        assertTrue(hostPorts.toString(), hostPorts.containsAll([2002, 8080, 8180, 9000, 9001]))
+        hostPorts.each { Integer port ->
+            assertTrue(port.toString(), port > 1024)
+        }
     }
 
     void testVersionRefusesAMissingTag() {

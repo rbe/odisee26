@@ -135,7 +135,7 @@ tasks.register<Exec>("startLibreOffice") {
     )
 }
 
-val minioImage = "alpine/minio:RELEASE.2025-10-15T17-29-55Z"
+val minioImage = "docker.io/alpine/minio:RELEASE.2025-10-15T17-29-55Z"
 
 tasks.register<Exec>("startMinio") {
     group = "Odisee"
@@ -300,7 +300,7 @@ tasks.register<Exec>("startStack") {
         """
         set -eu
         export VERSION='$imageVersion'
-        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/compose.yaml' up -d
+        $podmanBin compose -p odisee -f '$composeDir/compose.yaml' up -d
         for i in ${'$'}(seq 1 180); do
             minio=0
             keycloak=0
@@ -321,8 +321,8 @@ tasks.register<Exec>("startStack") {
             sleep 1
         done
         echo 'odisee, minio, or keycloak did not become ready' >&2
-        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/compose.yaml' ps >&2 || true
-        $podmanBin compose -p odisee --project-directory '$composeDir' -f '$composeDir/compose.yaml' logs --tail 80 >&2 || true
+        $podmanBin compose -p odisee -f '$composeDir/compose.yaml' ps >&2 || true
+        $podmanBin compose -p odisee -f '$composeDir/compose.yaml' logs --tail 80 >&2 || true
         exit 1
         """.trimIndent(),
     )

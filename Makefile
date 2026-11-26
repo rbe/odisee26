@@ -94,20 +94,30 @@ CI_IMAGE ?= localhost/odisee26:ci
 OWNER ?= rbe
 # setup, build, and test run the Gradle wrapper in Podman, in the image
 # that `make gradle-image` builds from gradle/Containerfile (JDK 21, make,
-# git). The work tree is mounted at its own path, so a path in a test is
-# the same path on the host. The Gradle cache is $HOME/.gradle on the host.
+# git, and the podman client). The work tree is mounted at its own path,
+# so a path in a test is the same path on the host. The Gradle cache is
+# $HOME/.gradle on the host. The image tag holds the checksum of
+# gradle/Containerfile, so a changed Containerfile builds a new image.
 JDK_IMAGE ?= docker.io/library/eclipse-temurin:21-jdk
-GRADLE_IMAGE ?= localhost/odisee26-gradle:21
+GRADLE_IMAGE ?= localhost/odisee26-gradle:21-$(shell cksum < gradle/Containerfile | cut -d ' ' -f 1)
 # Extra podman run arguments of the Gradle run, such as -e for a proxy.
 GRADLE_RUN_ARGS ?=
-GRADLE = mkdir -p "$$HOME/.gradle" && podman run --rm --init $(PODMAN_NET_ARGS) $(GRADLE_RUN_ARGS) -e CI -e GITHUB_RUN_NUMBER \
+GRADLE_RUN = mkdir -p "$$HOME/.gradle" && podman run --rm --init
+GRADLE_ARGS = $(GRADLE_RUN_ARGS) -e CI -e GITHUB_RUN_NUMBER \
 	-e GRADLE_USER_HOME=/gradle -v "$$HOME/.gradle":/gradle:Z -v "$(CURDIR)":"$(CURDIR)":Z -w "$(CURDIR)" \
 	$(GRADLE_IMAGE) ./gradlew --no-daemon --console=plain
+GRADLE = $(GRADLE_RUN) $(PODMAN_NET_ARGS) $(GRADLE_ARGS)
 # The targets that start containers from Gradle (test-java, test-office,
-# test-minio, test-keycloak, stack, stop, rm, clean-images) run the wrapper
-# on the host JDK 21, because Gradle calls podman there. Recorded under
-# Divergences in docs/pipeline-rules.md.
-GRADLE_HOST ?= ./gradlew --no-daemon --console=plain
+# test-minio, test-keycloak, stack, stop, rm, clean-images) run the same
+# image with the Podman socket of the host and the host network. The
+# podman client in the image starts the containers through that socket,
+# and Gradle connects to their published ports on 127.0.0.1. On a Mac,
+# podman info names the socket inside the Podman machine, where the
+# container runs. make podman-socket starts the socket when it is off.
+PODMAN_SOCKET = $$(podman info --format '{{.Host.RemoteSocket.Path}}')
+GRADLE_PODMAN = $(GRADLE_RUN) --network host --security-opt label=disable \
+	-e CONTAINER_HOST=unix:///run/podman/podman.sock -v "$(PODMAN_SOCKET)":/run/podman/podman.sock \
+	$(GRADLE_ARGS)
 
 # The command variables of the Make contract. Each runs the real recipe
 # below through SDLC_LOG, which writes build/logs and build/summaries.
@@ -131,7 +141,7 @@ ODICTL := webservice/src/main/container/bin/odictl
 export CLIENT_ID
 export CLIENT_SECRET
 
-.PHONY: ensure-jdk ensure-podman gradle-image stack user token test-office test-minio test-keycloak test-java pull rm clean-images
+.PHONY: ensure-podman gradle-image podman-socket stack user token test-office test-minio test-keycloak test-java pull rm clean-images
 
 gradle-image: ## Build the Gradle toolchain image from gradle/Containerfile, once
 	@set -eu; \
@@ -139,25 +149,21 @@ gradle-image: ## Build the Gradle toolchain image from gradle/Containerfile, onc
 	  podman build $(PODMAN_NET_ARGS) --build-arg JDK_IMAGE=$(JDK_IMAGE) -t "$(GRADLE_IMAGE)" -f gradle/Containerfile gradle; \
 	fi
 
-ensure-jdk:
+podman-socket: ## Start the Podman API socket of this user when it is off. The Gradle targets that start containers use it
 	@set -eu; \
-	if ! java -version 2>&1 | grep -Eq 'version "21[.]'; then \
-		if command -v sudo >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then \
-			sudo apt-get update; \
-			sudo DEBIAN_FRONTEND=noninteractive apt-get install -y openjdk-21-jdk; \
-		else \
-			echo "JDK 21 is required. Set JAVA_HOME to a JDK 21." >&2; \
-			exit 1; \
-		fi; \
+	if [ "$$(podman info --format '{{.Host.RemoteSocket.Exists}}')" = true ]; then exit 0; fi; \
+	if command -v systemctl >/dev/null 2>&1 && systemctl --user start podman.socket 2>/dev/null; then \
+		if [ "$$(podman info --format '{{.Host.RemoteSocket.Exists}}')" = true ]; then exit 0; fi; \
 	fi; \
-	mkdir -p build; \
-	: > build/jdk21.env; \
-	for home in /usr/lib/jvm/java-21-openjdk-amd64 /usr/lib/jvm/java-21-openjdk-arm64 /usr/lib/jvm/java-21-openjdk; do \
-		if [ -x "$$home/bin/java" ]; then \
-			printf 'export JAVA_HOME=%s\nexport PATH="%s/bin:$$PATH"\n' "$$home" "$$home" > build/jdk21.env; \
-			break; \
-		fi; \
-	done
+	sock=$(PODMAN_SOCKET); \
+	mkdir -p build "$$(dirname "$$sock")"; \
+	nohup podman system service --time=0 "unix://$$sock" > build/podman-service.log 2>&1 & \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if [ -S "$$sock" ]; then exit 0; fi; \
+		sleep 1; \
+	done; \
+	echo "The Podman socket $$sock did not open. See build/podman-service.log." >&2; \
+	exit 1
 
 ensure-podman:
 	@set -eu; \
@@ -185,13 +191,16 @@ test-java: ## Match CI: Java client office proof. Starts its own containers, not
 	@$(call SDLC_LOG,test-java,_test-java)
 
 test-office: ## LibreOffice tests 1-3. Starts its own container, not the compose stack
-	./gradlew :webservice:libreOfficeTest
+	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
+	$(GRADLE_PODMAN) :webservice:libreOfficeTest
 
 test-minio: ## MinIO store test. Starts its own container, not the compose stack
-	./gradlew :webservice:minioTest
+	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
+	$(GRADLE_PODMAN) :webservice:minioTest
 
 test-keycloak: ## Keycloak client-credentials test. Starts its own container, not the compose stack
-	./gradlew :webservice:keycloakTest
+	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
+	$(GRADLE_PODMAN) :webservice:keycloakTest
 
 login: ## Match CI: log in to ghcr.io with REGISTRY_USER and REGISTRY_TOKEN
 
@@ -231,7 +240,8 @@ publish-github: ## Match CI: release MAJOR.MINOR.PATCH-run with the Linux zip
 	@$(call SDLC_LOG,publish-github,_publish-github)
 
 stack: ## Local stack. Build the image and start odisee on 8080, MinIO on 9000, and Keycloak on 8180
-	./gradlew :webservice:startStack
+	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
+	$(GRADLE_PODMAN) :webservice:startStack
 
 user: ## After stack. Run odictl user. NAME defaults to press. Prints the client id and secret
 	ODISEE_KEYCLOAK_ISSUER=http://127.0.0.1:8180/realms/odisee \
@@ -255,13 +265,16 @@ run: ## Run that image on port 8080. VERSION is required, for example 2.6.0-42
 	podman run -it -p 8080:8080 "ghcr.io/rbe/odisee26:$(VERSION)"
 
 stop: ## Stop the test containers and the compose stack. A missing container is success
-	./gradlew :webservice:stopOdisee
+	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
+	$(GRADLE_PODMAN) :webservice:stopOdisee
 
 rm: ## Remove those containers. A missing container is success
-	./gradlew :webservice:removeOdiseeContainers
+	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
+	$(GRADLE_PODMAN) :webservice:removeOdiseeContainers
 
 clean-images: ## Remove the Odisee images after the containers are gone
-	./gradlew :webservice:cleanOdiseeImages
+	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
+	$(GRADLE_PODMAN) :webservice:cleanOdiseeImages
 
 clean: ## Remove build/ and .gradle/
 	rm -rf build .gradle
@@ -294,10 +307,9 @@ _test:
 
 _test-java:
 	@set -eu; \
-	$(THIS_MAKE) --no-print-directory ensure-jdk; \
-	if [ -f build/jdk21.env ]; then . ./build/jdk21.env; fi; \
 	$(THIS_MAKE) --no-print-directory ensure-podman; \
-	$(GRADLE_HOST) :clients:client-java:javaClientOfficeTest; \
+	$(THIS_MAKE) --no-print-directory gradle-image podman-socket; \
+	$(GRADLE_PODMAN) :clients:client-java:javaClientOfficeTest; \
 	printf '# test-java\n\nJava client office proof.\n' > build/summaries/test-java.md
 
 _publish-container:

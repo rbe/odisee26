@@ -16,6 +16,7 @@ class MakefileHelpTest extends GroovyTestCase {
 
     private static final List<String> TARGETS = [
             'gradle-image',
+            'podman-socket',
             'setup',
             'build',
             'test',
@@ -176,13 +177,14 @@ class MakefileHelpTest extends GroovyTestCase {
         assertTrue(user, user.contains('ODISEE_KEYCLOAK_ADMIN_PASSWORD=admin'))
         assertTrue(user, user.contains('webservice/src/main/container/bin/odictl user "press"'))
 
-        assertTrue(make(0, ['-n', 'stack']).out.contains('./gradlew :webservice:startStack'))
+        assertTrue(make(0, ['-n', 'stack']).out.contains('./gradlew --no-daemon --console=plain :webservice:startStack'))
         String test = make(0, ['-n', '_test']).out
         assertTrue(test, test.contains('./gradlew --no-daemon --console=plain :webservice:test :clients:client-java:test :clients:client-javafx:test :oxt:test :webservice:integrationTest :test jacocoTestReport'))
-        assertTrue(make(0, ['-n', 'test-office']).out.contains('./gradlew :webservice:libreOfficeTest'))
-        assertTrue(make(0, ['-n', 'test-minio']).out.contains('./gradlew :webservice:minioTest'))
-        assertTrue(make(0, ['-n', 'test-keycloak']).out.contains('./gradlew :webservice:keycloakTest'))
-        assertTrue(make(0, ['-n', '_test-java']).out.contains('./gradlew --no-daemon --console=plain :clients:client-java:javaClientOfficeTest'))
+        ['test-office': 'libreOfficeTest', 'test-minio': 'minioTest', 'test-keycloak': 'keycloakTest',
+         'stop': 'stopOdisee', 'rm': 'removeOdiseeContainers', 'clean-images': 'cleanOdiseeImages'].each { String target, String task ->
+            assertGradleInPodmanWithSocket(make(0, ['-n', target]).out, ':webservice:' + task)
+        }
+        assertGradleInPodmanWithSocket(make(0, ['-n', '_test-java']).out, ':clients:client-java:javaClientOfficeTest')
         String image = make(0, ['-n', 'image']).out
         assertTrue(image, image.contains('podman build --platform linux/amd64,linux/arm64'))
         assertTrue(image, image.contains('qemu-user-binfmt'))
@@ -190,9 +192,6 @@ class MakefileHelpTest extends GroovyTestCase {
         assertTrue(publish, publish.contains('publish-tags'))
         assertTrue(publish, publish.contains('podman manifest push --all'))
         assertFalse(publish, publish.contains('GITHUB_REF_NAME'))
-        assertTrue(make(0, ['-n', 'stop']).out.contains('./gradlew :webservice:stopOdisee'))
-        assertTrue(make(0, ['-n', 'rm']).out.contains('./gradlew :webservice:removeOdiseeContainers'))
-        assertTrue(make(0, ['-n', 'clean-images']).out.contains('./gradlew :webservice:cleanOdiseeImages'))
 
         String pull = make(0, ['-n', 'pull', 'VERSION=2.6.0-42']).out
         assertTrue(pull.contains('podman pull "ghcr.io/rbe/odisee26:2.6.0-42"'))
@@ -221,11 +220,20 @@ class MakefileHelpTest extends GroovyTestCase {
         String dry = make(0, ['-n', '_setup']).out
         assertTrue(dry, dry.contains('gradle-image'))
         assertTrue(dry, dry.contains('podman run --rm'))
-        assertTrue(dry, dry.contains('localhost/odisee26-gradle:21 ./gradlew'))
+        assertTrue(dry, dry ==~ /(?s).*localhost\/odisee26-gradle:21-[0-9]+ \.\/gradlew.*/)
         assertFalse(dry, dry.contains('ensure-jdk'))
         assertTrue(dry, dry.contains('./gradlew --no-daemon --console=plain :dependencies :webservice:dependencies :clients:client-java:dependencies :clients:client-javafx:dependencies :documentation:dependencies'))
         assertFalse(dry, dry.contains('podman push'))
         assertFalse(dry, dry.contains('packageDistribution'))
+    }
+
+    private static void assertGradleInPodmanWithSocket(String dry, String task) {
+        assertTrue(dry, dry.contains('gradle-image podman-socket'))
+        assertTrue(dry, dry.contains('podman run --rm --init --network host'))
+        assertTrue(dry, dry.contains('-e CONTAINER_HOST=unix:///run/podman/podman.sock'))
+        assertTrue(dry, dry.contains(':/run/podman/podman.sock'))
+        assertTrue(dry, dry.contains('./gradlew --no-daemon --console=plain ' + task))
+        assertFalse(dry, dry.contains('ensure-jdk'))
     }
 
     private static void assertOneLine(String err, String message) {

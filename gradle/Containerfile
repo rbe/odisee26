@@ -1,9 +1,11 @@
-# The toolchain image of make setup, make build, and make test.
-# Gradle runs the wrapper with this JDK. The unit tests call make, git,
-# bash, and ps, so the image has them too. make gradle-image builds it.
 ARG JDK_IMAGE=docker.io/library/eclipse-temurin:21-jdk
 FROM ${JDK_IMAGE}
+# make and git for the build, procps for the OdictlTest debug-shell tests.
+# podman and podman-compose are clients of the Podman socket of the host:
+# the Gradle tasks that start LibreOffice, MinIO, Keycloak, and the compose
+# stack call them, and CONTAINER_HOST points them at that socket.
 RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends make git procps \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        make git procps curl python3 netcat-openbsd podman podman-compose \
     && rm -rf /var/lib/apt/lists/* \
     && git config --system --add safe.directory '*'

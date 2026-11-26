@@ -1,4 +1,4 @@
-FROM ubuntu:26.04 AS packages
+FROM docker.io/library/ubuntu:26.04 AS packages
 
 # Headless Writer, Calc, and Impress.
 # Docs, package indexes, and LibreOffice files that conversion does not read are

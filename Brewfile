@@ -3,5 +3,4 @@
 
 brew "bash"
 brew "flock"
-brew "openjdk@21"
 brew "podman"

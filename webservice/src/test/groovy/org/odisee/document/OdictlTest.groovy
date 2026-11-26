@@ -469,7 +469,7 @@ class OdictlTest extends GroovyTestCase {
             assertTrue(watchdog.contains('sockstat -46l'))
             assertFalse(containerfile.contains('iproute2'))
             assertFalse(containerfile.contains('net-tools'))
-            assertTrue(containerfile.contains('FROM ubuntu:26.04'))
+            assertTrue(containerfile.contains('FROM docker.io/library/ubuntu:26.04'))
             assertTrue(containerfile.contains('CMD ["/home/odisee/entrypoint.sh"]'))
         } finally {
             if (accepted != null) {
