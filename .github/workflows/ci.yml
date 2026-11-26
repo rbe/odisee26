@@ -11,8 +11,10 @@
 # runs Gradle. The job does not call ./gradlew. setup, test, and test-java are
 # the same kind of target. Between jobs the tested boot JAR and the zip move.
 # test runs beside build and compiles again; it does not download build output.
-# Publishing runs on a push to the default branch and when workflow_dispatch
-# selects a publish job. A tag push does not start a run; after tagging
+# Publishing runs when workflow_dispatch selects a publish job: a human
+# starts it, so a large image or zip stays inside the GitHub quotas. It
+# runs on a push to the default branch only when the repository variable
+# AUTO_PUBLISH is true. A tag push does not start a run; after tagging
 # vX.Y.Z, dispatch the publish job. A default-branch publish tags
 # <X.Y.Z>-<run> and latest, then keeps that run and the next-lower run.
 # A manual publish from any other ref tags the version only.
@@ -141,7 +143,7 @@ jobs:
   publish-container:
     needs: [build, test]
     if: >-
-      (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+      (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && vars.AUTO_PUBLISH == 'true') ||
       inputs.job == 'publish-container'
     runs-on: ubuntu-26.04
     timeout-minutes: 120
@@ -180,7 +182,7 @@ jobs:
   publish-github:
     needs: [build, test]
     if: >-
-      (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+      (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && vars.AUTO_PUBLISH == 'true') ||
       inputs.job == 'publish-github'
     runs-on: ubuntu-26.04
     permissions:

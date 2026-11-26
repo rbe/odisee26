@@ -38,6 +38,7 @@
 # The published version is the nearest vMAJOR.MINOR.PATCH tag, without the v, plus the Actions run number.
 # A tag v2.6.0 and run 42 publish 2.6.0-42. The shape is 2.6.0-<run>. A missing tag fails the publish. The workflow does not create a git tag.
 # A push of the tag does not publish. After tagging, run publish-container or publish-github from the Actions tab.
+# A push to the default branch publishes only when the repository variable AUTO_PUBLISH is true.
 # The default branch pushes that version and latest.
 # A manual run from any other ref pushes the version only. latest is not moved by a branch run, and cleanup deletes nothing.
 # make pull VERSION=2.6.0-42
@@ -99,6 +100,8 @@ OWNER ?= rbe
 # $HOME/.gradle on the host. The image tag holds the checksum of
 # gradle/Containerfile, so a changed Containerfile builds a new image.
 JDK_IMAGE ?= docker.io/library/eclipse-temurin:21-jdk
+# jvm.mk would default GRADLE_VERSION to another version. This project uses the wrapper version below.
+GRADLE_VERSION ?= 8.14.5
 GRADLE_IMAGE ?= localhost/odisee26-gradle:21-$(shell cksum < gradle/Containerfile | cut -d ' ' -f 1)
 # Extra podman run arguments of the Gradle run, such as -e for a proxy.
 GRADLE_RUN_ARGS ?=
@@ -113,7 +116,7 @@ GRADLE = $(GRADLE_RUN) $(PODMAN_NET_ARGS) $(GRADLE_ARGS)
 # podman client in the image starts the containers through that socket,
 # and Gradle connects to their published ports on 127.0.0.1. On a Mac,
 # podman info names the socket inside the Podman machine, where the
-# container runs. make podman-socket starts the socket when it is off.
+# container runs. make podman-socket (jvm.mk) starts the socket when it is off.
 PODMAN_SOCKET = $$(podman info --format '{{.Host.RemoteSocket.Path}}')
 GRADLE_PODMAN = $(GRADLE_RUN) --network host --security-opt label=disable \
 	-e CONTAINER_HOST=unix:///run/podman/podman.sock -v "$(PODMAN_SOCKET)":/run/podman/podman.sock \
@@ -136,47 +139,20 @@ NAME ?= press
 GH_REPO ?= $(PACKAGE)
 
 include .claude/skills/r-github-pipeline/sdlc.mk
+# wrapper, jvm-tooling, and podman-socket. GRADLE_RUN, GRADLE_IMAGE, JDK_IMAGE, and PODMAN_SOCKET above win over its defaults.
+include .claude/skills/r-jvm/jvm.mk
 
 ODICTL := webservice/src/main/container/bin/odictl
 export CLIENT_ID
 export CLIENT_SECRET
 
-.PHONY: ensure-podman gradle-image podman-socket stack user token test-office test-minio test-keycloak test-java pull rm clean-images
+.PHONY: ensure-podman gradle-image stack user token test-office test-minio test-keycloak test-java pull rm clean-images
 
 gradle-image: ## Build the Gradle toolchain image from gradle/Containerfile, once
 	@set -eu; \
 	if ! podman image exists "$(GRADLE_IMAGE)"; then \
 	  podman build $(PODMAN_NET_ARGS) --build-arg JDK_IMAGE=$(JDK_IMAGE) -t "$(GRADLE_IMAGE)" -f gradle/Containerfile gradle; \
 	fi
-
-podman-socket: ## Start the Podman API socket of this user when it is off. The Gradle targets that start containers use it
-	@set -eu; \
-	if [ "$$(podman info --format '{{.Host.ServiceIsRemote}}')" = true ]; then exit 0; fi; \
-	sock=$(PODMAN_SOCKET); \
-	if [ ! -S "$$sock" ] && command -v systemctl >/dev/null 2>&1; then \
-		systemctl --user start podman.socket 2>/dev/null || true; \
-	fi; \
-	if [ ! -S "$$sock" ]; then \
-		mkdir -p build "$$(dirname "$$sock")"; \
-		nohup podman system service --time=0 "unix://$$sock" > build/podman-service.log 2>&1 & \
-		for i in 1 2 3 4 5 6 7 8 9 10; do \
-			if [ -S "$$sock" ]; then break; fi; \
-			sleep 1; \
-		done; \
-	fi; \
-	if [ ! -S "$$sock" ]; then \
-		echo "The Podman socket $$sock did not open. See build/podman-service.log." >&2; \
-		exit 1; \
-	fi; \
-	if [ "$$(id -u)" != 0 ] && ! podman unshare test -S "$$sock"; then \
-		echo "podman-socket: $$sock is not in the mount namespace of rootless Podman. podman system migrate restarts its pause process." >&2; \
-		podman system migrate; \
-	fi; \
-	if [ "$$(id -u)" != 0 ] && ! podman unshare test -S "$$sock"; then \
-		echo "The Podman socket $$sock is not in the mount namespace of rootless Podman." >&2; \
-		exit 1; \
-	fi; \
-	echo "podman-socket: $$sock"
 
 ensure-podman:
 	@set -eu; \
@@ -194,11 +170,7 @@ ensure-podman:
 	printf '%s\n' '[engine]' 'cgroup_manager = "cgroupfs"' 'events_logger = "file"' > "$$HOME/.config/containers/containers.conf"
 
 # The recipes of setup, build, and test come from the Make contract and
-# run SETUP_CMD, BUILD_CMD, and TEST_CMD. These lines only give make help
-# the text for this project.
-setup: ## Match CI: resolve Gradle dependencies. On a Mac, Podman is /opt/homebrew/bin/podman or /usr/local/bin/podman
-build: ## Match CI: zip the Linux runtime and stage the tested boot JAR
-test: ## Match CI: unit tests. Does not start a container
+# run SETUP_CMD, BUILD_CMD, and TEST_CMD.
 
 test-java: ## Match CI: Java client office proof. Starts its own containers, not the compose stack
 	@$(call SDLC_LOG,test-java,_test-java)
@@ -215,7 +187,6 @@ test-keycloak: ## Keycloak client-credentials test. Starts its own container, no
 	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
 	$(GRADLE_PODMAN) :webservice:keycloakTest
 
-login: ## Match CI: log in to ghcr.io with REGISTRY_USER and REGISTRY_TOKEN
 
 image: ## Build the multi-arch service image from the tested JAR. No push
 	@set -eu; \
