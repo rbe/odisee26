@@ -24,3 +24,10 @@ dependencies:
         - r-observability
         - r-performance
         - r-skills-review
+        - r-onboard
+        - r-migrate-docs
+        - r-system-state-report
+        - r-board-merge-report
+        - r-board-merge
+        - r-privacy
+        - r-ux-ui-design
