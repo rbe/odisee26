@@ -15,7 +15,7 @@ export VERSION=$4
 shift 4
 
 compose() {
-  "$podman" compose -p odisee --project-directory "$compose_dir" -f "$compose_dir/compose.yaml" "$@"
+  "$podman" compose -p odisee -f "$compose_dir/compose.yaml" "$@"
 }
 
 # Containers started by startLibreOffice, startMinio, and startKeycloak.
