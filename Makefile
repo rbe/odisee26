@@ -151,19 +151,32 @@ gradle-image: ## Build the Gradle toolchain image from gradle/Containerfile, onc
 
 podman-socket: ## Start the Podman API socket of this user when it is off. The Gradle targets that start containers use it
 	@set -eu; \
-	if [ "$$(podman info --format '{{.Host.RemoteSocket.Exists}}')" = true ]; then exit 0; fi; \
-	if command -v systemctl >/dev/null 2>&1 && systemctl --user start podman.socket 2>/dev/null; then \
-		if [ "$$(podman info --format '{{.Host.RemoteSocket.Exists}}')" = true ]; then exit 0; fi; \
-	fi; \
+	if [ "$$(podman info --format '{{.Host.ServiceIsRemote}}')" = true ]; then exit 0; fi; \
 	sock=$(PODMAN_SOCKET); \
-	mkdir -p build "$$(dirname "$$sock")"; \
-	nohup podman system service --time=0 "unix://$$sock" > build/podman-service.log 2>&1 & \
-	for i in 1 2 3 4 5 6 7 8 9 10; do \
-		if [ -S "$$sock" ]; then exit 0; fi; \
-		sleep 1; \
-	done; \
-	echo "The Podman socket $$sock did not open. See build/podman-service.log." >&2; \
-	exit 1
+	if [ ! -S "$$sock" ] && command -v systemctl >/dev/null 2>&1; then \
+		systemctl --user start podman.socket 2>/dev/null || true; \
+	fi; \
+	if [ ! -S "$$sock" ]; then \
+		mkdir -p build "$$(dirname "$$sock")"; \
+		nohup podman system service --time=0 "unix://$$sock" > build/podman-service.log 2>&1 & \
+		for i in 1 2 3 4 5 6 7 8 9 10; do \
+			if [ -S "$$sock" ]; then break; fi; \
+			sleep 1; \
+		done; \
+	fi; \
+	if [ ! -S "$$sock" ]; then \
+		echo "The Podman socket $$sock did not open. See build/podman-service.log." >&2; \
+		exit 1; \
+	fi; \
+	if [ "$$(id -u)" != 0 ] && ! podman unshare test -S "$$sock"; then \
+		echo "podman-socket: $$sock is not in the mount namespace of rootless Podman. podman system migrate restarts its pause process." >&2; \
+		podman system migrate; \
+	fi; \
+	if [ "$$(id -u)" != 0 ] && ! podman unshare test -S "$$sock"; then \
+		echo "The Podman socket $$sock is not in the mount namespace of rootless Podman." >&2; \
+		exit 1; \
+	fi; \
+	echo "podman-socket: $$sock"
 
 ensure-podman:
 	@set -eu; \
