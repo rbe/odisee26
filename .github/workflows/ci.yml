@@ -51,13 +51,24 @@ jobs:
     permissions:
       contents: read
       actions: write
+    outputs:
+      board-only: ${{ steps.scope.outputs.board-only }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Free artifact storage
         env:
           GH_TOKEN: ${{ github.token }}
         run: make cleanup-actions-artifacts
-      - run: make setup
+      - name: Skip setup, build, and test for a push of board files only
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_BEFORE: ${{ github.event.before }}
+        run: make ci-scope
+      - if: steps.scope.outputs.board-only != 'true'
+        run: make setup
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -70,7 +81,7 @@ jobs:
 
   build:
     needs: setup
-    if: github.event_name == 'push' || contains(fromJSON('["build","publish-container","publish-github","report"]'), inputs.job)
+    if: (github.event_name == 'push' && needs.setup.outputs.board-only != 'true') || contains(fromJSON('["build","publish-container","publish-github","report"]'), inputs.job)
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
@@ -97,7 +108,7 @@ jobs:
 
   test:
     needs: setup
-    if: github.event_name == 'push' || contains(fromJSON('["test","publish-container","publish-github","report"]'), inputs.job)
+    if: (github.event_name == 'push' && needs.setup.outputs.board-only != 'true') || contains(fromJSON('["test","publish-container","publish-github","report"]'), inputs.job)
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
@@ -122,7 +133,7 @@ jobs:
 
   test-java:
     needs: setup
-    if: github.event_name == 'push' || contains(fromJSON('["test-java","report"]'), inputs.job)
+    if: (github.event_name == 'push' && needs.setup.outputs.board-only != 'true') || contains(fromJSON('["test-java","report"]'), inputs.job)
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
