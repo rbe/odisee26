@@ -5,7 +5,7 @@ package org.odisee.document
 import groovy.test.GroovyTestCase
 
 /**
- * Retention lives in {@code .claude/skills/github-pipeline/sdlc.mk}. APM
+ * Retention lives in {@code .claude/skills/r-github-pipeline/sdlc.mk}. APM
  * installs that file from rbe/ralfskills, and {@code apm.lock.yaml} pins it.
  * A publish keeps this run and the next-lower run, and it does not delete
  * a version that still wears {@code latest} or any tag that is not
@@ -17,7 +17,7 @@ class PublishedVersionsTest extends GroovyTestCase {
         String lock = new File(repoRoot(), 'apm.lock.yaml').text
         assertTrue(lock.contains('repo_url: rbe/ralfskills'))
         assertTrue(lock.contains('resolved_commit: '))
-        assertTrue(lock.contains('.claude/skills/github-pipeline/sdlc.mk'))
+        assertTrue(lock.contains('.claude/skills/r-github-pipeline/sdlc.mk'))
         assertFalse(new File(repoRoot(), '.github/scripts/published-versions.sh').exists())
     }
 
@@ -47,7 +47,7 @@ class PublishedVersionsTest extends GroovyTestCase {
     }
 
     private static String sdlc() {
-        new File(repoRoot(), '.claude/skills/github-pipeline/sdlc.mk').text
+        new File(repoRoot(), '.claude/skills/r-github-pipeline/sdlc.mk').text
     }
 
     private static File repoRoot() {

@@ -57,7 +57,7 @@ class MakefileHelpTest extends GroovyTestCase {
             'apm',
             'old-board',
             'test-changed',
-            'project-report',
+            'r-project-report',
             'editorconfig',
             'format',
             'format-fix',

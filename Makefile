@@ -1,5 +1,5 @@
 # Odisee frontend. This file is the how-to. `make` and `make help` list every target.
-# Run make from the repository root. .claude/skills/github-pipeline/sdlc.mk is the shared pipeline makefile.
+# Run make from the repository root. .claude/skills/r-github-pipeline/sdlc.mk is the shared pipeline makefile.
 # APM installs it from rbe/ralfskills (apm.yml, apm.lock.yaml).
 # The Makefile is the interface. A laptop and CI run the same targets.
 # Podman is the only container engine.
@@ -135,7 +135,7 @@ CONTAINER_MK := 1
 NAME ?= press
 GH_REPO ?= $(PACKAGE)
 
-include .claude/skills/github-pipeline/sdlc.mk
+include .claude/skills/r-github-pipeline/sdlc.mk
 
 ODICTL := webservice/src/main/container/bin/odictl
 export CLIENT_ID

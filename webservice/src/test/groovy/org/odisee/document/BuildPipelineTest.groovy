@@ -118,9 +118,9 @@ class BuildPipelineTest extends GroovyTestCase {
         assertFalse(new File(root, '.github/actions/prepare/action.yml').exists())
         assertFalse(new File(root, '.github/scripts/published-versions.sh').exists())
 
-        assertTrue(new File(root, '.claude/skills/github-pipeline/sdlc.mk').isFile())
+        assertTrue(new File(root, '.claude/skills/r-github-pipeline/sdlc.mk').isFile())
         String makefile = new File(root, 'Makefile').text
-        int includeAt = makefile.indexOf('\ninclude .claude/skills/github-pipeline/sdlc.mk\n')
+        int includeAt = makefile.indexOf('\ninclude .claude/skills/r-github-pipeline/sdlc.mk\n')
         int firstTargetAt = makefile.indexOf('\ngradle-image:')
         assertTrue(includeAt > 0)
         assertTrue(firstTargetAt > includeAt)
