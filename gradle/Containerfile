@@ -1,0 +1,9 @@
+# The toolchain image of make setup, make build, and make test.
+# Gradle runs the wrapper with this JDK. The unit tests call make, git,
+# bash, and ps, so the image has them too. make gradle-image builds it.
+ARG JDK_IMAGE=docker.io/library/eclipse-temurin:21-jdk
+FROM ${JDK_IMAGE}
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends make git procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --system --add safe.directory '*'

@@ -8,7 +8,7 @@ Stages, in order: `plan`, `develop`, `review`, `release`. A new or vague request
 
 This project ships as a container image and as a GitHub release of the Linux zip, with the merge into the default branch `master`.
 
-JDK 21, Gradle 8.14.5, and Grails 7.2.4. Gradle runs on the host JDK 21, not in Podman. `docs/pipeline-rules.md` records this and the other divergences from the pipeline contract.
+JDK 21, Gradle 8.14.5, and Grails 7.2.4. `make setup`, `make build`, and `make test` run Gradle in Podman. The targets that start containers from Gradle still run Gradle on the host JDK 21. `docs/pipeline-rules.md` records this and the other divergences from the pipeline contract.
 
 Fast-forward the local `master` checkout to `origin/master` before new work. Do not merge a feature branch into that checkout.
 

@@ -11,3 +11,5 @@ The things to do. A row is a feature, a defect, or a question, and is not done. 
 | <a id="w-5"></a>W-5 | defect | Delete the root `sdlc.mk`. No makefile includes it since the Makefile includes `.claude/skills/github-pipeline/sdlc.mk` | |
 | <a id="w-6"></a>W-6 | defect | No `.editorconfig`: `make editorconfig` fails. The template of `project-setup` sets 2-space indent, and the Groovy and Java files use 4 spaces | |
 | <a id="w-7"></a>W-7 | defect | No diff coverage: `COVERAGE_CMD` and `TEST_CHANGED_CMD` are unset, so `make coverage` and `make test-changed` fail. JaCoCo already writes XML in `make test` | |
+| <a id="w-8"></a>W-8 | feature | Run the Gradle tasks that start containers (`test-java`, `test-office`, `test-minio`, `test-keycloak`, `stack`, `stop`, `rm`, `clean-images`) in Podman. Gradle then needs the Podman socket of the host and the host network. Today they run `GRADLE_HOST` on the host JDK 21 | |
+| <a id="w-9"></a>W-9 | defect | Host port bindings must be 8000 to 8999. `startLibreOffice` publishes 127.0.0.1:2002, and `startMinio` and the compose stack publish 127.0.0.1:9000 | |

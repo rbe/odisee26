@@ -74,7 +74,8 @@
 # A missing image is success. Other images on the machine stay.
 #
 # setup:
-# make setup resolves Gradle dependencies. It installs OpenJDK 21 when java is not 21.
+# make setup resolves Gradle dependencies. Gradle runs in Podman with JDK 21 (gradle/Containerfile).
+# The targets that start containers from Gradle run on the host and install OpenJDK 21 when java is not 21.
 # On a Mac the Podman binary is /opt/homebrew/bin/podman or /usr/local/bin/podman.
 # Gradle checks PATH and then those two paths (gradle/podman-executable.gradle.kts).
 # macOS /bin/bash is 3.2. odictl re-execs Homebrew bash
@@ -91,8 +92,22 @@ SDLC_CI ?= setup build test report
 HELP_LEAD ?= Odisee. The Makefile is the interface. A laptop and CI run the same targets.
 CI_IMAGE ?= localhost/odisee26:ci
 OWNER ?= rbe
-# Host JDK 21. Recorded under Divergences in docs/pipeline-rules.md.
-GRADLE ?= ./gradlew --no-daemon --console=plain
+# setup, build, and test run the Gradle wrapper in Podman, in the image
+# that `make gradle-image` builds from gradle/Containerfile (JDK 21, make,
+# git). The work tree is mounted at its own path, so a path in a test is
+# the same path on the host. The Gradle cache is $HOME/.gradle on the host.
+JDK_IMAGE ?= docker.io/library/eclipse-temurin:21-jdk
+GRADLE_IMAGE ?= localhost/odisee26-gradle:21
+# Extra podman run arguments of the Gradle run, such as -e for a proxy.
+GRADLE_RUN_ARGS ?=
+GRADLE = mkdir -p "$$HOME/.gradle" && podman run --rm --init $(PODMAN_NET_ARGS) $(GRADLE_RUN_ARGS) -e CI -e GITHUB_RUN_NUMBER \
+	-e GRADLE_USER_HOME=/gradle -v "$$HOME/.gradle":/gradle:Z -v "$(CURDIR)":"$(CURDIR)":Z -w "$(CURDIR)" \
+	$(GRADLE_IMAGE) ./gradlew --no-daemon --console=plain
+# The targets that start containers from Gradle (test-java, test-office,
+# test-minio, test-keycloak, stack, stop, rm, clean-images) run the wrapper
+# on the host JDK 21, because Gradle calls podman there. Recorded under
+# Divergences in docs/pipeline-rules.md.
+GRADLE_HOST ?= ./gradlew --no-daemon --console=plain
 
 # The command variables of the Make contract. Each runs the real recipe
 # below through SDLC_LOG, which writes build/logs and build/summaries.
@@ -116,7 +131,13 @@ ODICTL := webservice/src/main/container/bin/odictl
 export CLIENT_ID
 export CLIENT_SECRET
 
-.PHONY: ensure-jdk ensure-podman stack user token test-office test-minio test-keycloak test-java pull rm clean-images
+.PHONY: ensure-jdk ensure-podman gradle-image stack user token test-office test-minio test-keycloak test-java pull rm clean-images
+
+gradle-image: ## Build the Gradle toolchain image from gradle/Containerfile, once
+	@set -eu; \
+	if ! podman image exists "$(GRADLE_IMAGE)"; then \
+	  podman build $(PODMAN_NET_ARGS) --build-arg JDK_IMAGE=$(JDK_IMAGE) -t "$(GRADLE_IMAGE)" -f gradle/Containerfile gradle; \
+	fi
 
 ensure-jdk:
 	@set -eu; \
@@ -247,16 +268,14 @@ clean: ## Remove build/ and .gradle/
 
 _setup:
 	@set -eu; \
-	$(THIS_MAKE) --no-print-directory ensure-jdk; \
-	if [ -f build/jdk21.env ]; then . ./build/jdk21.env; fi; \
+	$(THIS_MAKE) --no-print-directory gradle-image; \
 	$(GRADLE) --version; \
 	$(GRADLE) :dependencies :webservice:dependencies :clients:client-java:dependencies :clients:client-javafx:dependencies :documentation:dependencies; \
-	printf '# setup\n\nDependencies resolved into the Gradle cache. JDK 21.\n' > build/summaries/setup.md
+	printf '# setup\n\nDependencies resolved into the Gradle cache. JDK 21 in Podman.\n' > build/summaries/setup.md
 
 _build:
 	@set -eu; \
-	$(THIS_MAKE) --no-print-directory ensure-jdk; \
-	if [ -f build/jdk21.env ]; then . ./build/jdk21.env; fi; \
+	$(THIS_MAKE) --no-print-directory gradle-image; \
 	$(GRADLE) packageDistribution; \
 	mkdir -p build/dist; \
 	jars=$$(ls webservice/build/libs/webservice-*.jar 2>/dev/null | grep -v -- '-plain.jar$$' || true); \
@@ -269,8 +288,7 @@ _build:
 
 _test:
 	@set -eu; \
-	$(THIS_MAKE) --no-print-directory ensure-jdk; \
-	if [ -f build/jdk21.env ]; then . ./build/jdk21.env; fi; \
+	$(THIS_MAKE) --no-print-directory gradle-image; \
 	$(GRADLE) :webservice:test :clients:client-java:test :clients:client-javafx:test :oxt:test :webservice:integrationTest :test jacocoTestReport; \
 	printf '# test\n\nJUnit XML is under each project build/test-results. Coverage is in build/reports/jacoco.\n' > build/summaries/test.md
 
@@ -279,7 +297,7 @@ _test-java:
 	$(THIS_MAKE) --no-print-directory ensure-jdk; \
 	if [ -f build/jdk21.env ]; then . ./build/jdk21.env; fi; \
 	$(THIS_MAKE) --no-print-directory ensure-podman; \
-	$(GRADLE) :clients:client-java:javaClientOfficeTest; \
+	$(GRADLE_HOST) :clients:client-java:javaClientOfficeTest; \
 	printf '# test-java\n\nJava client office proof.\n' > build/summaries/test-java.md
 
 _publish-container:
