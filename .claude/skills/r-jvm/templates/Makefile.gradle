@@ -42,9 +42,6 @@ FORMAT_CMD = $(GRADLE) spotlessCheck
 FORMAT_FIX_CMD = $(GRADLE) spotlessApply
 LINT_CMD = $(GRADLE) checkstyleMain checkstyleTest
 COVERAGE_CMD = set -eu; \
-	base=$$(git merge-base HEAD origin/$(DEFAULT_BRANCH) 2>/dev/null || git merge-base HEAD $(DEFAULT_BRANCH) 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null || git hash-object -t tree /dev/null); \
-	git add -N .; \
-	git diff "$$base" > build/coverage/change.diff; \
 	$(GRADLE) test jacocoTestReport; \
 	$(PYTHON) .claude/skills/r-project-report/scripts/jacoco_cover_map.py; \
 	report=$$(find build -name jacocoTestReport.xml | head -n 1); \
