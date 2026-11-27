@@ -30,6 +30,7 @@ import org.odisee.uno.UnoCategory
  * Category for working with Writer fields: userfields, set expressions.
  */
 @Log
+@SuppressWarnings('ReturnNullFromCatchBlock') // null means the field does not exist.
 class OOoFieldCategory {
 
     /**

@@ -29,8 +29,6 @@ import javax.xml.parsers.ParserConfigurationException
 
 final class XmlHelper {
 
-    private static final String S_NEWLINE = '\n'
-
     private static final DocumentBuilderFactory SECURE_FACTORY = secureFactory()
 
     private XmlHelper() {

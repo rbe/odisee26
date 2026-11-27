@@ -11,6 +11,11 @@
 
 package org.odisee.document
 
+import com.sun.star.beans.PropertyVetoException
+import com.sun.star.beans.UnknownPropertyException
+import com.sun.star.container.NoSuchElementException
+import com.sun.star.lang.DisposedException
+import com.sun.star.lang.WrappedTargetException
 import com.sun.star.lang.XComponent
 import groovy.util.logging.Log
 import groovy.xml.XmlSlurper
@@ -18,13 +23,19 @@ import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
 import org.odisee.io.SafePaths
 import org.odisee.ooo.connection.OfficeConnection
+import org.odisee.ooo.connection.OdiseeServerException
 import org.odisee.ooo.connection.OfficeConnectionFactory
 import org.odisee.ooo.connection.UnoCall
 import org.odisee.ooo.connection.UnoDeadlineExceeded
 
 import java.util.concurrent.Callable
 import org.odisee.shared.OdiseeConstant
-import org.odisee.writer.*
+import org.odisee.writer.OOoAutotextCategory
+import org.odisee.writer.OOoBookmarkCategory
+import org.odisee.writer.OOoDocumentCategory
+import org.odisee.writer.OOoFieldCategory
+import org.odisee.writer.OOoImageCategory
+import org.odisee.writer.OOoTextTableCategory
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -207,14 +218,14 @@ class OdiseeXmlCategory {
         int imageWidth = 0
         try {
             imageWidth = image.'@width'?.toString()?.toInteger() ?: 0
-        } catch (NumberFormatException e) {
-            // ignore
+        } catch (NumberFormatException ignored) {
+            // A width that is not a number counts as 0.
         }
         int imageHeight = 0
         try {
             imageHeight = image.'@height'?.toString()?.toInteger() ?: 0
-        } catch (NumberFormatException e) {
-            // ignore
+        } catch (NumberFormatException ignored) {
+            // A width that is not a number counts as 0.
         }
         final String bookmarkName = image.'@bookmark'.toString()?.trim()
         imageExtension(imageType)
@@ -289,13 +300,16 @@ class OdiseeXmlCategory {
         Path outputPath = arg?.outputPath ? Paths.get(arg.outputPath.toString()) : Files.createTempDirectory('odisee-img')
         Files.createDirectories(outputPath)
         Path tempImage = Files.createTempFile(outputPath, 'image', ".${extension}")
+        boolean written = false
         try {
             restrictTempPermissions(tempImage)
             Files.write(tempImage, imageData, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)
+            written = true
             return tempImage
-        } catch (Throwable e) {
-            deleteTempImageQuietly(tempImage)
-            throw e
+        } finally {
+            if (!written) {
+                deleteTempImageQuietly(tempImage)
+            }
         }
     }
 
@@ -520,7 +534,7 @@ class OdiseeXmlCategory {
                         withinOffice('instruction', UnoCall.deadlineMillis()) {
                             try {
                                 OdiseeXmlCategory."process${methodName}"(xComponent, arg, instr)
-                            } catch (Throwable e) {
+                            } catch (OdiseeException | OdiseeServerException | IOException | GroovyRuntimeException | IllegalArgumentException | IllegalStateException | NoSuchElementException | UnknownPropertyException | PropertyVetoException | WrappedTargetException | com.sun.star.lang.IllegalArgumentException | DisposedException e) {
                                 keepOrRecord(e, failures, "${tagName} ${instruction}", officeConnectionFactory)
                             }
                             null
@@ -578,10 +592,9 @@ class OdiseeXmlCategory {
                 } else {
                     output.clear()
                 }
-            } catch (Throwable error) {
-                if (dropsSlot(error)) {
-                    leavePool = true
-                }
+            } catch (UnoDeadlineExceeded error) {
+                // Only a missed deadline drops the slot, see dropsSlot.
+                leavePool = dropsSlot(error)
                 throw error
             } finally {
                 if (xComponent != null) {
@@ -596,7 +609,7 @@ class OdiseeXmlCategory {
                     } catch (UnoDeadlineExceeded closeDeadline) {
                         leavePool = true
                         log.log(java.util.logging.Level.SEVERE, 'Odisee: Closing the office document exceeded its deadline', closeDeadline)
-                    } catch (Throwable closeError) {
+                    } catch (OdiseeServerException | OdiseeException | IllegalStateException | DisposedException closeError) {
                         log.log(java.util.logging.Level.SEVERE, 'Odisee: Could not close the office document', closeError)
                     }
                 }

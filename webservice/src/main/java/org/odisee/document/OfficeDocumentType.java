@@ -12,81 +12,87 @@
 package org.odisee.document;
 
 public enum OfficeDocumentType {
+  TEXT("Text document", "swriter", "ott", "odt", "writer_pdf_Export"),
+  SPREADSHEET("Spreadsheet", "scalc", "ots", "ods", "calc_pdf_Export"),
+  PRESENTATION("Presentation", "simpress", "otp", "odp", "impress_pdf_Export");
 
-    TEXT("Text document", "swriter", "ott", "odt", "writer_pdf_Export"),
-    SPREADSHEET("Spreadsheet", "scalc", "ots", "ods", "calc_pdf_Export"),
-    PRESENTATION("Presentation", "simpress", "otp", "odp", "impress_pdf_Export");
+  private final String description;
+  private final String internalType;
+  private final String pdfExportFilter;
+  private final String templateExtension;
+  private final String documentExtension;
 
-    private final String description;
-    private final String internalType;
-    private final String pdfExportFilter;
-    private final String templateExtension;
-    private final String documentExtension;
+  OfficeDocumentType(
+      final String description,
+      final String internalType,
+      final String templateExtension,
+      final String documentExtension,
+      final String pdfExportFilter) {
+    this.description = description;
+    this.internalType = internalType;
+    this.templateExtension = templateExtension;
+    this.documentExtension = documentExtension;
+    this.pdfExportFilter = pdfExportFilter;
+  }
 
-    OfficeDocumentType(final String description, final String internalType, final String templateExtension, final String documentExtension, final String pdfExportFilter) {
-        this.description = description;
-        this.internalType = internalType;
-        this.templateExtension = templateExtension;
-        this.documentExtension = documentExtension;
-        this.pdfExportFilter = pdfExportFilter;
+  public String getDescription() {
+    return description;
+  }
+
+  public String getInternalType() {
+    return internalType;
+  }
+
+  public String getTemplateExtension() {
+    return templateExtension;
+  }
+
+  public String getDocumentExtension() {
+    return documentExtension;
+  }
+
+  public String getPdfExportFilter() {
+    return pdfExportFilter;
+  }
+
+  /**
+   * Find an enum constant by a search term.
+   *
+   * @param what Can be description, internalType of pdfExportFilter.
+   * @return OfficeDocumentType
+   */
+  public static OfficeDocumentType find(final String what) {
+    OfficeDocumentType r = null;
+    for (final OfficeDocumentType t : OfficeDocumentType.values()) {
+      if (t.getDescription().equals(what)
+          || t.getInternalType().equals(what)
+          || t.getTemplateExtension().equals(what)
+          || t.getDocumentExtension().equals(what)
+          || t.getPdfExportFilter().equals(what)) {
+        r = t;
+        break;
+      }
     }
+    return r;
+  }
 
-    public String getDescription() {
-        return description;
+  /**
+   * Template and document extensions select the application when the open document does not. Writer
+   * stays the default so an {@code .ott} file keeps the Writer instruction set.
+   */
+  public static OfficeDocumentType fromFileName(final String fileName) {
+    if (fileName == null) {
+      return TEXT;
     }
-
-    public String getInternalType() {
-        return internalType;
+    String lower = fileName.toLowerCase(java.util.Locale.ROOT);
+    int dot = lower.lastIndexOf('.');
+    String ext = dot >= 0 ? lower.substring(dot + 1) : lower;
+    if ("ots".equals(ext) || "ods".equals(ext) || "xls".equals(ext) || "xlsx".equals(ext)) {
+      return SPREADSHEET;
     }
-
-    public String getTemplateExtension() {
-        return templateExtension;
+    if ("otp".equals(ext) || "odp".equals(ext) || "ppt".equals(ext) || "pptx".equals(ext)) {
+      return PRESENTATION;
     }
-
-    public String getDocumentExtension() {
-        return documentExtension;
-    }
-
-    public String getPdfExportFilter() {
-        return pdfExportFilter;
-    }
-
-    /**
-     * Find an enum constant by a search term.
-     * @param what Can be description, internalType of pdfExportFilter.
-     * @return OfficeDocumentType
-     */
-    public static OfficeDocumentType find(final String what) {
-        OfficeDocumentType r = null;
-        for (final OfficeDocumentType t : OfficeDocumentType.values()) {
-            if (t.getDescription().equals(what) || t.getInternalType().equals(what)
-                    || t.getTemplateExtension().equals(what) || t.getDocumentExtension().equals(what)
-                    || t.getPdfExportFilter().equals(what)) {
-                r = t;
-                break;
-            }
-        }
-        return r;
-    }
-
-    /**
-     * Template and document extensions select the application when the open document does not.
-     * Writer stays the default so an {@code .ott} file keeps the Writer instruction set.
-     */
-    public static OfficeDocumentType fromFileName(final String fileName) {
-        if (fileName == null) {
-            return TEXT;
-        }
-        String lower = fileName.toLowerCase(java.util.Locale.ROOT);
-        int dot = lower.lastIndexOf('.');
-        String ext = dot >= 0 ? lower.substring(dot + 1) : lower;
-        if ("ots".equals(ext) || "ods".equals(ext) || "xls".equals(ext) || "xlsx".equals(ext)) {
-            return SPREADSHEET;
-        }
-        if ("otp".equals(ext) || "odp".equals(ext) || "ppt".equals(ext) || "pptx".equals(ext)) {
-            return PRESENTATION;
-        }
-        return TEXT;
-    }
-
+    return TEXT;
+  }
 }

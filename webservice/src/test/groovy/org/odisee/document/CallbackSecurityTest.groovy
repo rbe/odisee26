@@ -6,8 +6,6 @@ import com.sun.net.httpserver.HttpServer
 import groovy.test.GroovyTestCase
 import org.odisee.api.OdiseeException
 
-import java.net.InetAddress
-import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger

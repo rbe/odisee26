@@ -2,91 +2,88 @@ package org.odisee.ooo.connection;
 
 import java.net.InetSocketAddress;
 
-/**
- * Office connection whose {@link #connect()} succeeds or fails on demand.
- */
+/** Office connection whose {@link #connect()} succeeds or fails on demand. */
 public final class ScriptedOfficeConnection extends OfficeConnection {
 
-    private boolean failConnect;
+  private boolean failConnect;
 
-    private boolean connected;
+  private boolean connected;
 
-    private boolean retired;
+  private boolean retired;
 
-    private boolean hangProbe;
+  private boolean hangProbe;
 
-    private int closeCount;
+  private int closeCount;
 
-    public ScriptedOfficeConnection(final boolean failConnect) {
-        this(failConnect, "127.0.0.1", 9);
+  public ScriptedOfficeConnection(final boolean failConnect) {
+    this(failConnect, "127.0.0.1", 9);
+  }
+
+  public ScriptedOfficeConnection(final boolean failConnect, final String host, final int port) {
+    super(new InetSocketAddress(host, port));
+    this.failConnect = failConnect;
+  }
+
+  public void setFailConnect(final boolean failConnect) {
+    this.failConnect = failConnect;
+  }
+
+  public void setHangProbe(final boolean hangProbe) {
+    this.hangProbe = hangProbe;
+  }
+
+  public boolean retired() {
+    return retired;
+  }
+
+  @Override
+  void connect() throws OdiseeServerException {
+    if (failConnect) {
+      throw new OdiseeServerException("down");
     }
+    connected = true;
+  }
 
-    public ScriptedOfficeConnection(final boolean failConnect, final String host, final int port) {
-        super(new InetSocketAddress(host, port));
-        this.failConnect = failConnect;
+  @Override
+  boolean isConnected() {
+    return connected;
+  }
+
+  @Override
+  public boolean responds() throws OdiseeServerException {
+    if (hangProbe) {
+      try {
+        Thread.sleep(5_000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new OdiseeServerException("interrupted", e);
+      }
     }
+    connect();
+    return isConnected();
+  }
 
-    public void setFailConnect(final boolean failConnect) {
-        this.failConnect = failConnect;
+  @Override
+  public void setFaulted(final boolean faulted) {
+    if (faulted) {
+      connected = false;
     }
+  }
 
-    public void setHangProbe(final boolean hangProbe) {
-        this.hangProbe = hangProbe;
-    }
+  public int closeCount() {
+    return closeCount;
+  }
 
-    public boolean retired() {
-        return retired;
-    }
+  @Override
+  public void close() {
+    connected = false;
+    closeCount++;
+  }
 
-    @Override
-    void connect() throws OdiseeServerException {
-        if (failConnect) {
-            throw new OdiseeServerException("down");
-        }
-        connected = true;
-    }
-
-    @Override
-    boolean isConnected() {
-        return connected;
-    }
-
-    @Override
-    public boolean responds() throws OdiseeServerException {
-        if (hangProbe) {
-            try {
-                Thread.sleep(5_000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new OdiseeServerException("interrupted", e);
-            }
-        }
-        connect();
-        return isConnected();
-    }
-
-    @Override
-    public void setFaulted(final boolean faulted) {
-        if (faulted) {
-            connected = false;
-        }
-    }
-
-    public int closeCount() {
-        return closeCount;
-    }
-
-    @Override
-    public void close() {
-        connected = false;
-        closeCount++;
-    }
-
-    @Override
-    public boolean releaseForWatchdog() {
-        connected = false;
-        retired = true;
-        return true;
-    }
-
+  @Override
+  public boolean releaseForWatchdog() {
+    connected = false;
+    retired = true;
+    return true;
+  }
 }

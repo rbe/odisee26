@@ -16,24 +16,23 @@ import java.util.List;
 
 public final class ProcessHelper {
 
-    private static final String OS_NAME = System.getProperty("os.name");
+  private static final String OS_NAME = System.getProperty("os.name");
 
-    private ProcessHelper() {
-        throw new AssertionError();
+  private ProcessHelper() {
+    throw new AssertionError();
+  }
+
+  public static String[] convert(final Path executable, final List<String> options) {
+    final int arguments = options.size() + 1;
+    final String[] cmd = new String[arguments];
+    final String prefix = OS_NAME.startsWith("Windows") ? "" : "./";
+    cmd[0] = String.format("%s%s", prefix, executable.getFileName());
+    for (int i = 0; i < options.size(); i++) {
+      cmd[i + 1] = options.get(i);
     }
-
-    public static String[] convert(final Path executable, final List<String> options) {
-        final int arguments = options.size() + 1;
-        final String[] cmd = new String[arguments];
-        final String prefix = OS_NAME.startsWith("Windows") ? "" : "./";
-        cmd[0] = String.format("%s%s", prefix, executable.getFileName());
-        for (int i = 0; i < options.size(); i++) {
-            cmd[i + 1] = options.get(i);
-        }
-        for (String o : cmd) {
-            System.out.printf(" %s", o);
-        }
-        return cmd;
+    for (String o : cmd) {
+      System.out.printf(" %s", o);
     }
-
+    return cmd;
+  }
 }

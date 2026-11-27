@@ -8,6 +8,7 @@
  */
 package org.odisee.document
 
+import org.odisee.ooo.connection.OdiseeServerRuntimeException
 import org.odisee.ooo.connection.OfficeConnectionFactory
 import org.odisee.ooo.connection.PoolGauges
 
@@ -28,7 +29,7 @@ class ReadyController {
                 gauges = factory.gauges()
             }
             ReadyResponse.apply(response, ready, gauges)
-        } catch (Throwable e) {
+        } catch (OdiseeServerRuntimeException e) {
             log.error 'Readiness probe failed', e
             ReadyResponse.apply(response, false, PoolGauges.EMPTY)
         } finally {

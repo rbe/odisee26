@@ -34,6 +34,7 @@ class OdiseePathTest extends GroovyTestCase {
         assertEquals('rel-home', resolved.toString())
     }
 
+    @SuppressWarnings('CatchNullPointerException') // A null pointer is the defect this test looks for.
     private static void assertMissing(String env, String property) {
         try {
             OdiseePath.resolveHome(env, property)

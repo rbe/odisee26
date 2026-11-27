@@ -13,10 +13,21 @@ package org.odisee.writer
 
 import com.sun.star.beans.XPropertySet
 import com.sun.star.drawing.XDrawPagesSupplier
-import com.sun.star.frame.*
+import com.sun.star.frame.XComponentLoader
+import com.sun.star.frame.XController
+import com.sun.star.frame.XDispatchHelper
+import com.sun.star.frame.XDispatchProvider
+import com.sun.star.frame.XFrame
+import com.sun.star.frame.XModel
+import com.sun.star.frame.XStorable
 import com.sun.star.lang.XComponent
 import com.sun.star.lang.XMultiComponentFactory
 import com.sun.star.presentation.XPresentationSupplier
+import com.sun.star.lang.DisposedException
+import com.sun.star.lang.WrappedTargetRuntimeException
+import com.sun.star.reflection.InvocationTargetException
+import com.sun.star.script.CannotConvertException
+import com.sun.star.script.provider.ScriptFrameworkErrorException
 import com.sun.star.script.provider.XScript
 import com.sun.star.script.provider.XScriptProvider
 import com.sun.star.script.provider.XScriptProviderSupplier
@@ -393,8 +404,8 @@ class OOoDocumentCategory {
                     if (xCloseable != null) {
                         try {
                             xCloseable.close(true)
-                        } catch (CloseVetoException e) {
-                            // Ignore
+                        } catch (CloseVetoException ignored) {
+                            // The component vetoed the close.
                         }
                     } else {
                         component.dispose()
@@ -487,7 +498,7 @@ class OOoDocumentCategory {
                 }
             } catch (OdiseeException e) {
                 throw e
-            } catch (Exception e) {
+            } catch (ScriptFrameworkErrorException | CannotConvertException | InvocationTargetException | com.sun.star.lang.IllegalArgumentException | DisposedException | WrappedTargetRuntimeException e) {
                 OdiseeException ex = new OdiseeException("Cannot execute macro '${name}': ${e.message ?: e.class.simpleName}", e)
                 ex.httpStatus = OdiseeException.UNPROCESSABLE
                 throw ex

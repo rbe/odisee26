@@ -91,8 +91,8 @@ class Document {
         }
         try {
             extension = filename?.split("\\.").toList().last() // TODO Throw error when there's no extension?
-        } catch (e) {
-            // ignore
+        } catch (ignored) {
+            // The name has no extension.
         }
         size = bytes.length
         // Check if it's a template

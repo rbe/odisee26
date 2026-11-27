@@ -10,6 +10,10 @@ package org.odisee.json
 
 // id: ADR-0001
 
+import static org.junit.Assert.assertEquals
+import static org.junit.Assert.assertTrue
+import static org.junit.Assert.fail
+
 import groovy.xml.XmlUtil
 import groovy.xml.dom.DOMCategory
 import org.junit.Test
@@ -17,9 +21,6 @@ import org.odisee.api.OdiseeException
 import org.odisee.document.RequestSchema
 import org.w3c.dom.Element
 
-import static org.junit.Assert.assertEquals
-import static org.junit.Assert.assertTrue
-import static org.junit.Assert.fail
 
 class JsonRequestTest {
 

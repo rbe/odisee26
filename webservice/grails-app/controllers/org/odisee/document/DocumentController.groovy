@@ -185,7 +185,7 @@ class DocumentController {
      * The synchronous generate route does not keep a callback.
      * The job route does.
      */
-    static String callbackForGenerate(String callback) {
+    static String callbackForGenerate(String ignored) {
         null
     }
 

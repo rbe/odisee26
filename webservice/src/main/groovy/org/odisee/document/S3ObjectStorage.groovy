@@ -29,6 +29,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest
  * Objects are not expired, deleted, or given a lifecycle.
  */
 @Slf4j
+@SuppressWarnings('CatchRuntimeException') // Each failure of the S3 client becomes one OdiseeException.
 class S3ObjectStorage implements ObjectStorage {
 
     @Override

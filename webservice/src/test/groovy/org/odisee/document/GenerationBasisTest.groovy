@@ -21,6 +21,7 @@ import java.util.zip.ZipInputStream
  */
 class GenerationBasisTest extends GroovyTestCase {
 
+    @SuppressWarnings('IntegerGetInteger') // The port is a system property on purpose.
     private static final int PORT = Integer.getInteger('odisee.libreoffice.port', 2002)
 
     private OdiseeService service

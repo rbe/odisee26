@@ -9,10 +9,8 @@ import org.odisee.io.OdiseePath
 import org.odisee.io.TenantPaths
 import org.springframework.security.oauth2.jwt.Jwt
 
-import java.net.HttpURLConnection
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 /**

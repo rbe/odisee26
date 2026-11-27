@@ -27,7 +27,6 @@ import org.odisee.writer.OOoImageCategory
 
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
-import java.net.InetAddress
 import java.nio.file.FileSystem
 import java.nio.file.Files
 import java.nio.file.Path

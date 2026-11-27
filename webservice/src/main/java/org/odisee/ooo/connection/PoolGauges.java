@@ -9,60 +9,67 @@
 
 package org.odisee.ooo.connection;
 
-/**
- * Pool figures an operator reads from {@code /ready}.
- */
+/** Pool figures an operator reads from {@code /ready}. */
 public final class PoolGauges {
 
-    public static final PoolGauges EMPTY = new PoolGauges(0, 0, 0L, 0L, 0L);
+  public static final PoolGauges EMPTY = new PoolGauges(0, 0, 0L, 0L, 0L);
 
-    private final int poolSize;
+  private final int poolSize;
 
-    private final int inUse;
+  private final int inUse;
 
-    private final long generationMillis;
+  private final long generationMillis;
 
-    private final long instructionFailures;
+  private final long instructionFailures;
 
-    private final long sofficeRestarts;
+  private final long sofficeRestarts;
 
-    public PoolGauges(final int poolSize, final int inUse, final long generationMillis,
-                      final long instructionFailures, final long sofficeRestarts) {
-        this.poolSize = poolSize;
-        this.inUse = inUse;
-        this.generationMillis = generationMillis;
-        this.instructionFailures = instructionFailures;
-        this.sofficeRestarts = sofficeRestarts;
-    }
+  public PoolGauges(
+      final int poolSize,
+      final int inUse,
+      final long generationMillis,
+      final long instructionFailures,
+      final long sofficeRestarts) {
+    this.poolSize = poolSize;
+    this.inUse = inUse;
+    this.generationMillis = generationMillis;
+    this.instructionFailures = instructionFailures;
+    this.sofficeRestarts = sofficeRestarts;
+  }
 
-    public int poolSize() {
-        return poolSize;
-    }
+  public int poolSize() {
+    return poolSize;
+  }
 
-    public int inUse() {
-        return inUse;
-    }
+  public int inUse() {
+    return inUse;
+  }
 
-    public long generationMillis() {
-        return generationMillis;
-    }
+  public long generationMillis() {
+    return generationMillis;
+  }
 
-    public long instructionFailures() {
-        return instructionFailures;
-    }
+  public long instructionFailures() {
+    return instructionFailures;
+  }
 
-    public long sofficeRestarts() {
-        return sofficeRestarts;
-    }
+  public long sofficeRestarts() {
+    return sofficeRestarts;
+  }
 
-    public String toJson(final boolean ready) {
-        return "{\"ready\":" + ready
-                + ",\"poolSize\":" + poolSize
-                + ",\"inUse\":" + inUse
-                + ",\"generationMillis\":" + generationMillis
-                + ",\"instructionFailures\":" + instructionFailures
-                + ",\"sofficeRestarts\":" + sofficeRestarts
-                + "}";
-    }
-
+  public String toJson(final boolean ready) {
+    return "{\"ready\":"
+        + ready
+        + ",\"poolSize\":"
+        + poolSize
+        + ",\"inUse\":"
+        + inUse
+        + ",\"generationMillis\":"
+        + generationMillis
+        + ",\"instructionFailures\":"
+        + instructionFailures
+        + ",\"sofficeRestarts\":"
+        + sofficeRestarts
+        + "}";
+  }
 }

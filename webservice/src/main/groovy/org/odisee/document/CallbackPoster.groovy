@@ -15,12 +15,7 @@ import org.odisee.api.OdiseeException
 import javax.net.ssl.SSLParameters
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
-import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.Socket
-import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
-import java.util.Locale
 
 /**
  * POSTs a job status to a callback URL. Callers check the allow-list first.

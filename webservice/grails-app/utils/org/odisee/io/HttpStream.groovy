@@ -70,11 +70,10 @@ final class HttpStream {
                 response.setHeader("Content-Disposition", "inline; filename=${fname}.${contentType}")
                 response.contentLength = file.size()
                 response.outputStream << file.bytes
-            } else {
-                // TODO Stream error image
-                //response.outputStream << Files.readAllBytes()
             }
-        } catch (Exception e) {
+            // TODO Stream error image when the file is missing
+            //response.outputStream << Files.readAllBytes()
+        } catch (IOException e) {
             e.printStackTrace()
             // TODO Stream error image
             //response.outputStream << Files.readAllBytes()

@@ -13,11 +13,9 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 
-import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.time.Instant
-import java.util.Date
 
 /**
  * A locally signed JWT and the Keycloak certificate path on localhost.

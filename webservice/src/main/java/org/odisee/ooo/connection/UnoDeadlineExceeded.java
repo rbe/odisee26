@@ -9,27 +9,24 @@
 
 package org.odisee.ooo.connection;
 
-/**
- * A UNO call did not return before its deadline. The slot must leave the pool.
- */
+/** A UNO call did not return before its deadline. The slot must leave the pool. */
 public final class UnoDeadlineExceeded extends OdiseeServerException {
 
-    private final String phase;
+  private final String phase;
 
-    private final long deadlineMillis;
+  private final long deadlineMillis;
 
-    public UnoDeadlineExceeded(final String phase, final long deadlineMillis) {
-        super(String.format("Office %s exceeded the %d ms deadline", phase, deadlineMillis));
-        this.phase = phase;
-        this.deadlineMillis = deadlineMillis;
-    }
+  public UnoDeadlineExceeded(final String phase, final long deadlineMillis) {
+    super(String.format("Office %s exceeded the %d ms deadline", phase, deadlineMillis));
+    this.phase = phase;
+    this.deadlineMillis = deadlineMillis;
+  }
 
-    public String phase() {
-        return phase;
-    }
+  public String phase() {
+    return phase;
+  }
 
-    public long deadlineMillis() {
-        return deadlineMillis;
-    }
-
+  public long deadlineMillis() {
+    return deadlineMillis;
+  }
 }
