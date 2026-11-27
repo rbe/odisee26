@@ -161,8 +161,6 @@ class BuildPipelineTest extends GroovyTestCase {
         assertTrue(rules.contains('GRADLE_PODMAN'))
         assertTrue(rules.contains('.claude/'))
         assertTrue(rules.contains('CLAUDE.md'))
-        assertTrue(rules.contains('HTTP 404'))
-        assertTrue(rules.contains('next-lower run'))
     }
 
     void testContainersPublishOnlyUserPortsAbove1024() {

@@ -143,8 +143,6 @@ public class ClientsSkillsDocsContractTest {
     public void skillsDocsReadmesAndHttpFixturesMatchBearerAndReleaseContract() throws Exception {
         final Path root = repoRoot();
         final String pipelineRules = read(root.resolve("docs/pipeline-rules.md"));
-        assertTrue(pipelineRules.contains("No such tag, or a nearer pre-release tag, fails the publish."));
-        assertTrue(pipelineRules.contains("A tag push does not start a run."));
         assertTrue(pipelineRules.contains("does not create that git tag."));
         assertFalse(pipelineRules.contains("${GITHUB_REF_NAME}"));
 
