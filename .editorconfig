@@ -1,0 +1,52 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[{Makefile,Makefile.*,*.mk}]
+indent_style = unset
+indent_size = unset
+
+[*.md]
+indent_style = unset
+indent_size = unset
+
+# gofmt owns the layout of a Go file.
+[{*.go,go.mod,go.sum}]
+indent_style = unset
+indent_size = unset
+
+# The Gradle files use 4 spaces.
+[*.{gradle,kts}]
+indent_size = 4
+
+# google-java-format owns the layout of a Java file. A Groovy file aligns continuation
+# lines and multi-line strings, so its indent is no multiple of one size.
+[*.{java,groovy,gsp}]
+indent_size = unset
+
+# These files align attributes, call chains, or help text in columns.
+[*.{xml,xsd,xjb,adoc}]
+indent_size = unset
+
+[webservice/src/main/container/bin/odictl]
+indent_size = unset
+
+# Other tools or other authors write these files. LibreOffice writes the extension
+# in oxt/Odisee, and Visual Studio writes the VB.NET client. The licence texts and
+# the XHTML DTDs are copies of third-party files.
+[{oxt/Odisee/**,clients/client-vbnet/**,LICENSE,LICENSE-*,**/LICENSE/**,**/LICENSE.txt,**.dtd,**.ent}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# 
+#
 # Odisee(R)
 # Copyright (C) 2011-2019 art of coding UG (haftungsbeschränkt).
 # Copyright (C) 2005-2010 Informationssysteme Ralf Bensmann.
 #
 # Nutzung unterliegt Lizenzbedingungen. Use is subject to license terms.
-# 
+#
 
 # macOS /bin/bash is 3.2 and rejects declare -A.
 # This file is sourced. $0 is the entry script that was invoked.
