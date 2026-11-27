@@ -1,5 +1,5 @@
 # One pipeline. Delivery is the service image and a GitHub release of the
-# Linux zip. The image is a multi-arch LibreOffice manifest. The office
+# Linux zip. The image is a LibreOffice image, published for linux/amd64 and linux/arm64. The office
 # proof is test-java. It does not gate publish. There is no docs job:
 # packageDistribution renders the book into the zip.
 # Jobs: setup, then build, test, and test-java beside each other, then

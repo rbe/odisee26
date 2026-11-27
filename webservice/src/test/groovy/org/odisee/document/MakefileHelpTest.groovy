@@ -195,8 +195,8 @@ class MakefileHelpTest extends GroovyTestCase {
         }
         assertGradleInPodmanWithSocket(make(0, ['-n', '_test-java']).out, ':clients:client-java:javaClientOfficeTest')
         String image = make(0, ['-n', 'image']).out
-        assertTrue(image, image.contains('podman build --platform linux/amd64,linux/arm64'))
-        assertTrue(image, image.contains('qemu-user-binfmt'))
+        assertTrue(image, image.contains('build/image-context/webservice.jar'))
+        assertFalse(image, image.contains('--platform'))
         String publish = make(0, ['-n', '_publish-container']).out
         assertTrue(publish, publish.contains('publish-tags'))
         assertTrue(publish, publish.contains('podman manifest push --all'))
