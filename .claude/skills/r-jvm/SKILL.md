@@ -33,4 +33,5 @@ This skill gives the Make targets and the code rules for Java, Groovy, Grails, a
 - `references/groovy.md`: read it when the file is Groovy.
 - `references/grails.md`: read it when the file belongs to a Grails application.
 - `references/gradle.md`: read it when the file is a Gradle file, or when the change touches `make coverage`, `make test-changed`, or a workflow step.
+- `references/upgrade.md`: read it when `r-component-upgrade` updates a component of this language.
 </references>
