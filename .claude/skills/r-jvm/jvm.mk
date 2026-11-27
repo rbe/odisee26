@@ -51,6 +51,15 @@ GRADLE_RUN ?= mkdir -p "$$HOME/.gradle" && podman run --rm $(PODMAN_NET_ARGS) $(
 # On a Mac, podman info names the socket inside the Podman machine, where
 # the container that runs Gradle runs.
 PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}')
+# Host mode (TOOLS=host of podman-python.mk): Gradle runs from the JDK on
+# PATH. GRADLE_RUN drops the image name that follows it, so
+# $(GRADLE_RUN) $(JDK_IMAGE) ./gradlew runs ./gradlew. GRADLE_PODMAN
+# needs no socket, because a container that Gradle starts uses the
+# engine of the host. These replace the values that the project set.
+ifeq ($(TOOLS),host)
+GRADLE_RUN = env MAVEN_MIRROR="$(strip $(MAVEN_MIRROR))" sh -c 'shift; exec "$$@" $(if $(strip $(MAVEN_MIRROR)),--init-script "$(JVM_MK_DIR)maven-mirror.gradle")' gradle-host
+GRADLE_PODMAN = $(GRADLE_RUN) $(JDK_IMAGE) ./gradlew --console=plain
+endif
 
 .PHONY: wrapper jvm-tooling podman-socket
 

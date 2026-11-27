@@ -109,6 +109,12 @@ GRADLE_ARGS = $(GRADLE_RUN_ARGS) $(MAVEN_MIRROR_ARGS) -e CI -e GITHUB_RUN_NUMBER
 	-e GRADLE_USER_HOME=/gradle -v "$$HOME/.gradle":/gradle:Z -v "$(CURDIR)":"$(CURDIR)":Z -w "$(CURDIR)" \
 	$(GRADLE_IMAGE) ./gradlew --no-daemon --console=plain
 GRADLE = $(GRADLE_RUN) $(PODMAN_NET_ARGS) $(GRADLE_ARGS)
+# Host mode (TOOLS=host of r-project-setup): Gradle runs from the JDK on
+# PATH, for a machine without Podman, such as a cloud session. In host
+# mode GRADLE_RUN drops the image name that follows it.
+ifeq ($(TOOLS),host)
+GRADLE = $(GRADLE_RUN) $(GRADLE_IMAGE) ./gradlew --no-daemon --console=plain
+endif
 # The targets that start containers from Gradle (test-java, test-office,
 # test-minio, test-keycloak, stack, stop, rm, clean-images) run the same
 # image with the Podman socket of the host and the host network. The
@@ -178,10 +184,14 @@ export CLIENT_SECRET
 .PHONY: ensure-podman gradle-image stack user token test-office test-minio test-keycloak test-java pull rm clean-images
 
 gradle-image: ## Build the Gradle toolchain image from gradle/Containerfile, once
+ifeq ($(TOOLS),host)
+	@true
+else
 	@set -eu; \
 	if ! podman image exists "$(GRADLE_IMAGE)"; then \
 	  podman build $(PODMAN_NET_ARGS) --build-arg JDK_IMAGE=$(JDK_IMAGE) -t "$(GRADLE_IMAGE)" -f gradle/Containerfile gradle; \
 	fi
+endif
 
 ensure-podman:
 	@set -eu; \
