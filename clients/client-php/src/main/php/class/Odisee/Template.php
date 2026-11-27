@@ -33,7 +33,7 @@ class Template
     {
         $this->odisee = $odisee;
     }
-    
+
     public function createHalloOdisee() {
         $request = $this->odisee->createRequest('HalloOdisee');
         $this->odisee->setUserfield($request, 'hallo', 'Odisee von PHP am ');

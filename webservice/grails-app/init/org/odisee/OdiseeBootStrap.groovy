@@ -20,11 +20,11 @@ class OdiseeBootStrap {
     def init = { servletContext ->
         String version = serverVersion(grailsApplication.config)
         println """
-           _ \\      |_)               
+           _ \\      |_)
           |   |  _` | |  __|  _ \\  _ \\
           |   | (   | |\\__ \\  __/  __/
          \\___/ \\__,_|_|____/\\___|\\___|
-         
+
          Server ${version} initialized.
 """
         OdiseePath.dumpEnv()
@@ -33,12 +33,12 @@ class OdiseeBootStrap {
     def destroy = {
         String version = serverVersion(grailsApplication.config)
         println """
-           ____      ___              
-          / __ \\____/ (_)_______  ___ 
+           ____      ___
+          / __ \\____/ (_)_______  ___
          / / / / __  / / ___/ _ \\/ _ \\
         / /_/ / /_/ / (__  )  __/  __/
         \\____/\\__,_/_/____/\\___/\\___/
-         
+
          Server ${version} stopped.
 """
     }

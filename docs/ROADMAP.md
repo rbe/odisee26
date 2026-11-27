@@ -5,4 +5,3 @@ The things to do. A row is a feature, a defect, or a question, and is not done. 
 | Id | Kind | Title | Proposal |
 | --- | --- | --- | --- |
 | <a id="w-1"></a>W-1 | defect | A request name, a macro name, a macro library, and a macro language pass a stricter allow-list than "no separator and no `..`" (old label B25, partial in wave 4) | |
-| <a id="w-6"></a>W-6 | defect | No `.editorconfig`: `make editorconfig` fails. The template of `r-project-setup` sets 2-space indent, and the Groovy and Java files use 4 spaces | |
