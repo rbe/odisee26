@@ -15,6 +15,8 @@ The rules of the pipeline stand once, in the skills `r-project-setup` (the Make 
 
 `make setup`, `make build`, and `make test` are the Gradle calls. The workflow checks out, uploads and downloads artifacts, and calls `make`. `make login` reads `REGISTRY_USER` and `REGISTRY_TOKEN` and runs `podman login ghcr.io`. `build` stages `build/dist/application.jar` and `build/dist/odisee-linux-x86_64.zip`. `test` needs `setup`, so it runs beside `build`. `test-java` is the LibreOffice proof. It needs `setup` and does not gate either publish job.
 
+`make publish-container` (`container.mk`) pushes one manifest for `linux/amd64` and `linux/arm64`.
+
 The published version is `make version`. A repository tag `v2.6.0` plus run `42` is `2.6.0-42`. This pipeline does not create that git tag. Pushing the tag does not publish. After the tag exists, start `publish-container` or `publish-github` from the Actions tab, or push the default branch when `AUTO_PUBLISH` is `true`.
 
 ## Divergences

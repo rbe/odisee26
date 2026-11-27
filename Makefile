@@ -76,7 +76,7 @@
 #
 # setup:
 # make setup resolves Gradle dependencies. Gradle runs in Podman with JDK 21 (gradle/Containerfile).
-# The targets that start containers from Gradle run on the host and install OpenJDK 21 when java is not 21.
+# The targets that start containers from Gradle run Gradle in that same image with the Podman socket of the host. The host needs no JDK.
 # On a Mac the Podman binary is /opt/homebrew/bin/podman or /usr/local/bin/podman.
 # Gradle checks PATH and then those two paths (gradle/podman-executable.gradle.kts).
 # macOS /bin/bash is 3.2. odictl re-execs Homebrew bash
