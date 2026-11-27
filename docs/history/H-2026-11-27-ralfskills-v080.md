@@ -1,6 +1,6 @@
 ---
 id: H-2026-11-27-ralfskills-v080
-title: Move to RalfSkills 4c028a8 and drop the own multi-arch image code
+title: Move to RalfSkills v0.8.0 and drop the own multi-arch image code
 status: closed
 adrs: []
 skills: [r-plan, r-develop, r-review, r-release, r-record, r-github-pipeline, r-jvm, r-project-setup]
@@ -8,7 +8,7 @@ roadmap: []
 proposals: []
 ---
 
-# Move to RalfSkills 4c028a8 and drop the own multi-arch image code
+# Move to RalfSkills v0.8.0 and drop the own multi-arch image code
 
 ## Plan
 
@@ -16,7 +16,7 @@ The owner decided that odisee26 uses `container.mk` for `image` and `publish-con
 
 ## Develop
 
-`apm.yml` pins `4c028a8` and no longer lists `r-upgrade-java-components`. The Makefile sets `IMAGE_CONTEXT`, `CONTAINERFILE`, `IMAGE_PREPARE`, and `IMAGE_BUILD_ARGS`. It no longer defines `CONTAINER_MK`, `image`, or `_publish-container`. Two Groovy tests now assert that new text. The Brewfile and its two documentation lines are gone. The language skill is `r-jvm`.
+`apm.yml` pins the tag `v0.8.0` and no longer lists `r-upgrade-java-components`. The Makefile sets `IMAGE_CONTEXT`, `CONTAINERFILE`, `IMAGE_PREPARE`, and `IMAGE_BUILD_ARGS`. It no longer defines `CONTAINER_MK`, `image`, or `_publish-container`. Two Groovy tests now assert that new text. The Brewfile and its two documentation lines are gone. The language skill is `r-jvm`.
 
 ## Review
 
