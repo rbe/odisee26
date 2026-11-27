@@ -137,7 +137,7 @@ class BuildPipelineTest extends GroovyTestCase {
         String gradleImage = new File(root, 'gradle/Containerfile').text
         assertTrue(gradleImage.contains('eclipse-temurin:21-jdk'))
         assertTrue(gradleImage.contains('podman podman-compose'))
-        assertFalse(new File(root, 'Brewfile').text.contains('openjdk'))
+        assertFalse(new File(root, 'Brewfile').exists())
         assertTrue(makefile.contains('publish-tags'))
         assertTrue(makefile.contains('--platform linux/amd64,linux/arm64'))
         assertTrue(makefile.contains('qemu-user-binfmt'))
