@@ -1,0 +1,24 @@
+// Gradle init script of r-jvm. jvm.mk mounts it into the init.d folder of
+// GRADLE_USER_HOME only when MAVEN_MIRROR is set. Each Maven repository at
+// https://repo.maven.apache.org/maven2 then reads from MAVEN_MIRROR. The
+// build files of the project stay as they are.
+def mirror = System.getenv('MAVEN_MIRROR')
+if (mirror) {
+    def central = 'https://repo.maven.apache.org/maven2'
+    def useMirror = { repos ->
+        repos.withType(MavenArtifactRepository).configureEach { repo ->
+            if (repo.url.toString().startsWith(central)) {
+                repo.url = mirror
+            }
+        }
+    }
+    beforeSettings { settings ->
+        useMirror(settings.pluginManagement.repositories)
+        useMirror(settings.dependencyResolutionManagement.repositories)
+        useMirror(settings.buildscript.repositories)
+    }
+    allprojects {
+        useMirror(buildscript.repositories)
+        useMirror(repositories)
+    }
+}

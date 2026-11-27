@@ -7,7 +7,14 @@
 #     include .claude/skills/r-jvm/jvm.mk
 #
 # A project that sets JDK_IMAGE, GRADLE_VERSION, GRADLE_IMAGE,
-# GRADLE_RUN, or PODMAN_SOCKET before the include keeps its value.
+# GRADLE_RUN, PODMAN_SOCKET, or MAVEN_MIRROR before the include keeps its
+# value. A project that sets its own GRADLE_RUN adds $(MAVEN_MIRROR_ARGS)
+# to it.
+#
+# MAVEN_MIRROR is empty by default, and Gradle then reads Maven Central.
+# If it is a URL, Gradle reads each Maven Central artifact from that URL.
+# Use it when Maven Central answers HTTP 429, for example
+#   make test MAVEN_MIRROR=https://maven-central.storage-download.googleapis.com/maven2/
 # $(GRADLE) and $(GRADLE_PODMAN) stay in the Makefile of the project,
 # because each project picks its own Gradle image and its own tasks.
 #
@@ -26,13 +33,20 @@
 ifndef JVM_MK
 JVM_MK := 1
 
+# The folder of this file, read before another file is included.
+JVM_MK_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 # NAME, the project name of a new project, comes from tools.mk: the
 # repository name of the remote origin, else the directory name.
 # make jvm-tooling writes it to settings.gradle.
 JDK_IMAGE ?= docker.io/library/eclipse-temurin:25-jdk
 GRADLE_VERSION ?= 9.1.0
 GRADLE_IMAGE ?= docker.io/library/gradle:$(GRADLE_VERSION)-jdk25
-GRADLE_RUN ?= mkdir -p "$$HOME/.gradle" && podman run --rm $(PODMAN_NET_ARGS) -e CI -e GRADLE_USER_HOME=/gradle \
+MAVEN_MIRROR ?=
+# The init script maven-mirror.gradle beside this file does the change.
+MAVEN_MIRROR_ARGS = $(if $(strip $(MAVEN_MIRROR)),-e MAVEN_MIRROR=$(strip $(MAVEN_MIRROR)) \
+	-v "$(JVM_MK_DIR)maven-mirror.gradle":/gradle/init.d/r-maven-mirror.gradle:ro)
+GRADLE_RUN ?= mkdir -p "$$HOME/.gradle" && podman run --rm $(PODMAN_NET_ARGS) $(MAVEN_MIRROR_ARGS) -e CI -e GRADLE_USER_HOME=/gradle \
 	-v "$$HOME/.gradle":/gradle:Z -v "$(CURDIR)":/work:Z -w /work
 # On a Mac, podman info names the socket inside the Podman machine, where
 # the container that runs Gradle runs.

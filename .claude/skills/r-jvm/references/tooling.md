@@ -4,6 +4,8 @@
 
 `jvm.mk` beside this skill has the targets `wrapper`, `jvm-tooling`, and `podman-socket`, and the defaults of `JDK_IMAGE`, `GRADLE_VERSION`, `GRADLE_IMAGE`, `GRADLE_RUN`, and `PODMAN_SOCKET`. The Makefile includes it with `include .claude/skills/r-jvm/jvm.mk` after `project.mk` or `sdlc.mk`. To change a variable, set it before that include.
 
+If Maven Central answers HTTP 429, run the target with `MAVEN_MIRROR` set to a mirror of Maven Central, for example `make test MAVEN_MIRROR=https://maven-central.storage-download.googleapis.com/maven2/`. `jvm.mk` then mounts the init script `maven-mirror.gradle` into Gradle, and Gradle reads each Maven Central artifact from the mirror. The build files stay as they are. A project that sets its own `GRADLE_RUN` adds `$(MAVEN_MIRROR_ARGS)` to it. CI can set `MAVEN_MIRROR` as a repository variable.
+
 `make jvm-tooling` sets up a new Gradle project in one run. It does these things in order:
 
 1. If neither `build.gradle` nor `build.gradle.kts` exists, it writes `build.gradle` from `templates/build.gradle`.
