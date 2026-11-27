@@ -128,10 +128,19 @@ BUILD_CMD = @$(call SDLC_LOG,build,_build)
 TEST_CMD = @$(call SDLC_LOG,test,_test)
 # login comes from the contract: podman login ghcr.io with REGISTRY_USER and REGISTRY_TOKEN.
 PUBLISH_IMAGE = 1
-# This project builds a multi-arch manifest and defines image and
-# publish-container below. container.mk stays out. Recorded under
-# Divergences in docs/pipeline-rules.md.
-CONTAINER_MK := 1
+# The image is built from a context that holds the tested JAR. container.mk
+# builds it for one platform in the build job and for PLATFORMS when it publishes.
+# The Containerfile is copied into the context, so CONTAINERFILE names that copy.
+IMAGE_CONTEXT = build/image-context
+CONTAINERFILE = build/image-context/Containerfile
+IMAGE_PREPARE = rm -rf build/image-context; \
+	mkdir -p build/image-context; \
+	cp -a webservice/src/main/container/. build/image-context/; \
+	rm -rf build/image-context/var; \
+	cp .containerignore build/image-context/.containerignore; \
+	test -f build/dist/application.jar; \
+	cp build/dist/application.jar build/image-context/webservice.jar
+IMAGE_BUILD_ARGS = --layers --build-arg projectVersion=$${version:-LocalBuild}
 # NAME is the Keycloak user of `make user`. sdlc.mk would default it to the
 # repository name, so the GitHub repository is set here.
 NAME ?= press
@@ -185,39 +194,6 @@ test-minio: ## MinIO store test. Starts its own container, not the compose stack
 test-keycloak: ## Keycloak client-credentials test. Starts its own container, not the compose stack
 	@$(THIS_MAKE) --no-print-directory gradle-image podman-socket
 	$(GRADLE_PODMAN) :webservice:keycloakTest
-
-
-image: ## Build the multi-arch service image from the tested JAR. No push
-	@set -eu; \
-	PODMAN_PACKAGES="podman qemu-user-binfmt" $(THIS_MAKE) --no-print-directory ensure-podman; \
-	test -f build/dist/application.jar; \
-	rm -rf build/image-context; \
-	mkdir -p build/image-context; \
-	cp -a webservice/src/main/container/. build/image-context/; \
-	rm -rf build/image-context/var; \
-	cp .containerignore build/image-context/.containerignore; \
-	cp build/dist/application.jar build/image-context/webservice.jar; \
-	version="$${IMAGE_VERSION:-LocalBuild}"; \
-	revision="$${GITHUB_SHA:-}"; \
-	if [ -z "$$revision" ]; then revision=$$(git rev-parse HEAD 2>/dev/null || printf '%s' unknown); fi; \
-	cache_repo="$(IMAGE)/cache"; \
-	if ! podman build --platform linux/amd64,linux/arm64 --manifest "$(CI_IMAGE)" --layers \
-		--build-arg "projectVersion=$$version" \
-		--label "org.opencontainers.image.source=https://github.com/$(PACKAGE)" \
-		--label "org.opencontainers.image.version=$$version" \
-		--label "org.opencontainers.image.revision=$$revision" \
-		--cache-from "$$cache_repo" build/image-context; then \
-		podman manifest rm "$(CI_IMAGE)" >/dev/null 2>&1 || true; \
-		podman build --platform linux/amd64,linux/arm64 --manifest "$(CI_IMAGE)" --layers \
-			--build-arg "projectVersion=$$version" \
-			--label "org.opencontainers.image.source=https://github.com/$(PACKAGE)" \
-			--label "org.opencontainers.image.version=$$version" \
-			--label "org.opencontainers.image.revision=$$revision" \
-			build/image-context; \
-	fi
-
-publish-container: ## Match CI: push the version, and latest on the default branch
-	@$(call SDLC_LOG,publish-container,_publish-container)
 
 publish-github: ## Match CI: release MAJOR.MINOR.PATCH-run with the Linux zip
 	@$(call SDLC_LOG,publish-github,_publish-github)
@@ -294,19 +270,6 @@ _test-java:
 	$(THIS_MAKE) --no-print-directory gradle-image podman-socket; \
 	$(GRADLE_PODMAN) :clients:client-java:javaClientOfficeTest; \
 	printf '# test-java\n\nJava client office proof.\n' > build/summaries/test-java.md
-
-_publish-container:
-	@set -eu; \
-	version=$$($(THIS_MAKE) -s --no-print-directory version); \
-	mkdir -p build; \
-	printf '%s\n' "$$version" > build/publish-version.txt; \
-	IMAGE_VERSION="$$version" $(THIS_MAKE) --no-print-directory image; \
-	tags=$$($(THIS_MAKE) -s --no-print-directory publish-tags); \
-	for tag in $$tags; do \
-		podman manifest push --all "$(CI_IMAGE)" "$(IMAGE):$$tag"; \
-	done; \
-	shown=$$(printf '%s\n' "$$tags" | sed 's/^/- /'); \
-	printf '# publish-container\n\nStatus: pushed\nImage: %s\nTags:\n%s\n' "$(IMAGE)" "$$shown" > build/summaries/publish-container.md
 
 _publish-github:
 	@set -eu; \
