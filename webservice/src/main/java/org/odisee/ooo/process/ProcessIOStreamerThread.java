@@ -20,44 +20,44 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ProcessIOStreamerThread extends Thread {
 
-    private final AtomicBoolean work = new AtomicBoolean(true);
+  private final AtomicBoolean work = new AtomicBoolean(true);
 
-    private final InputStream in;
+  private final InputStream in;
 
-    private final PrintStream out;
+  private final PrintStream out;
 
-    private final String prefix;
+  private final String prefix;
 
-    public ProcessIOStreamerThread(final InputStream in, final PrintStream out, final String prefix) {
-        super(String.format("%s-Pipe: %s", ProcessIOStreamerThread.class.getSimpleName(), prefix));
-        this.in = in;
-        this.out = out;
-        this.prefix = prefix;
-    }
+  public ProcessIOStreamerThread(final InputStream in, final PrintStream out, final String prefix) {
+    super(String.format("%s-Pipe: %s", ProcessIOStreamerThread.class.getSimpleName(), prefix));
+    this.in = in;
+    this.out = out;
+    this.prefix = prefix;
+  }
 
-    @Override
-    public void run() {
-        try (final BufferedReader r = new BufferedReader(new InputStreamReader(in))) {
-            while (work.get()) {
-                final String s = r.readLine();
-                if (s == null) {
-                    break;
-                }
-                out.printf("%s%s%n", prefix, s);
-            }
-        } catch (IOException e) {
-            e.printStackTrace(System.err);
+  @Override
+  public void run() {
+    try (final BufferedReader r = new BufferedReader(new InputStreamReader(in))) {
+      while (work.get()) {
+        final String s = r.readLine();
+        if (s == null) {
+          break;
         }
+        out.printf("%s%s%n", prefix, s);
+      }
+    } catch (IOException e) {
+      e.printStackTrace(System.err);
     }
+  }
 
-    public void stopWork() {
-        work.getAndSet(false);
-    }
+  public void stopWork() {
+    work.getAndSet(false);
+  }
 
-    public static ProcessIOStreamerThread pipe(final InputStream input, final PrintStream output, final String prefix) {
-        ProcessIOStreamerThread t = new ProcessIOStreamerThread(input, output, prefix);
-        t.start();
-        return t;
-    }
-
+  public static ProcessIOStreamerThread pipe(
+      final InputStream input, final PrintStream output, final String prefix) {
+    ProcessIOStreamerThread t = new ProcessIOStreamerThread(input, output, prefix);
+    t.start();
+    return t;
+  }
 }

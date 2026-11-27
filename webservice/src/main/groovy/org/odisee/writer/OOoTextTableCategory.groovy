@@ -32,6 +32,7 @@ import org.odisee.uno.UnoCategory
  * Work with Writer's text tables.
  */
 @Log
+@SuppressWarnings('ReturnNullFromCatchBlock') // null means the table does not exist.
 class OOoTextTableCategory {
 
     private static final String EXCLAMATION_MARK = '!'

@@ -10,7 +10,6 @@ import org.odisee.api.OdiseeException
 import org.odisee.io.TenantPaths
 import org.w3c.dom.Element
 
-import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.Principal

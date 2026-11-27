@@ -16,16 +16,18 @@ import com.sun.star.container.NoSuchElementException
 import com.sun.star.container.XNameAccess
 import com.sun.star.lang.XComponent
 import com.sun.star.lang.XMultiServiceFactory
-import com.sun.star.text.*
+import com.sun.star.text.TextContentAnchorType
+import com.sun.star.text.XBookmarksSupplier
+import com.sun.star.text.XText
+import com.sun.star.text.XTextContent
+import com.sun.star.text.XTextCursor
+import com.sun.star.text.XTextDocument
+import com.sun.star.text.XTextRange
 import com.sun.star.uno.Any
 import org.odisee.api.OdiseeException
 import org.odisee.debug.Profile
 import org.odisee.uno.UnoCategory
 
-import java.net.InetAddress
-import java.net.URI
-import java.net.URISyntaxException
-import java.net.UnknownHostException
 import java.nio.file.Path
 
 /**

@@ -3,7 +3,6 @@ package org.odisee.ooo.connection
 import com.sun.star.frame.XComponentLoader
 import com.sun.star.lang.XMultiComponentFactory
 
-import java.net.InetSocketAddress
 
 class StubOfficeConnection extends OfficeConnection {
 

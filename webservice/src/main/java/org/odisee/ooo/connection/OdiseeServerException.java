@@ -13,16 +13,15 @@ package org.odisee.ooo.connection;
 
 public class OdiseeServerException extends Exception {
 
-    public OdiseeServerException(String message) {
-        super(message);
-    }
+  public OdiseeServerException(String message) {
+    super(message);
+  }
 
-    public OdiseeServerException(String message, Throwable cause) {
-        super(message, cause);
-    }
+  public OdiseeServerException(String message, Throwable cause) {
+    super(message, cause);
+  }
 
-    public OdiseeServerException(Throwable cause) {
-        super(cause);
-    }
-
+  public OdiseeServerException(Throwable cause) {
+    super(cause);
+  }
 }

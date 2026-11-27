@@ -13,83 +13,86 @@ package org.odisee.uno;
 
 import com.sun.star.beans.PropertyValue;
 import com.sun.star.lib.uno.helper.UnoUrl;
-import org.odisee.ooo.connection.OdiseeServerException;
-
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
+import org.odisee.ooo.connection.OdiseeServerException;
 
 public final class UnoHelper {
 
-    private UnoHelper() {
-        throw new AssertionError();
-    }
+  private UnoHelper() {
+    throw new AssertionError();
+  }
 
-    public static String makeUnoUrl(InetSocketAddress socketAddress) {
-        return String.format("socket,host=%s,port=%d;urp;StarOffice.ServiceManager",
-                socketAddress.getHostName(), socketAddress.getPort());
-    }
+  public static String makeUnoUrl(InetSocketAddress socketAddress) {
+    return String.format(
+        "socket,host=%s,port=%d;urp;StarOffice.ServiceManager",
+        socketAddress.getHostName(), socketAddress.getPort());
+  }
 
-    public static int getHost(String unoURL) throws OdiseeServerException {
-        HashMap connectionParameters = null;
-        try {
-            connectionParameters = UnoUrl.parseUnoUrl(unoURL).getConnectionParameters();
-            return Integer.parseInt((String) connectionParameters.get("host"));
-        } catch (com.sun.star.lang.IllegalArgumentException e) {
-            throw new OdiseeServerException("Cannot extract host from UNOHelper URL", e);
-        }
+  public static int getHost(String unoURL) throws OdiseeServerException {
+    HashMap connectionParameters = null;
+    try {
+      connectionParameters = UnoUrl.parseUnoUrl(unoURL).getConnectionParameters();
+      return Integer.parseInt((String) connectionParameters.get("host"));
+    } catch (com.sun.star.lang.IllegalArgumentException e) {
+      throw new OdiseeServerException("Cannot extract host from UNOHelper URL", e);
     }
+  }
 
-    public static int getPort(String unoURL) throws OdiseeServerException {
-        HashMap connectionParameters = null;
-        try {
-            connectionParameters = UnoUrl.parseUnoUrl(unoURL).getConnectionParameters();
-            return Integer.parseInt((String) connectionParameters.get("port"));
-        } catch (com.sun.star.lang.IllegalArgumentException e) {
-            throw new OdiseeServerException("Cannot extract port from UNOHelper URL", e);
-        }
+  public static int getPort(String unoURL) throws OdiseeServerException {
+    HashMap connectionParameters = null;
+    try {
+      connectionParameters = UnoUrl.parseUnoUrl(unoURL).getConnectionParameters();
+      return Integer.parseInt((String) connectionParameters.get("port"));
+    } catch (com.sun.star.lang.IllegalArgumentException e) {
+      throw new OdiseeServerException("Cannot extract port from UNOHelper URL", e);
     }
+  }
 
-    public static PropertyValue makePropertyValue(final String name, final Object value) {
-        PropertyValue propertyValue = new PropertyValue();
-        propertyValue.Name = name;
-        propertyValue.Value = value;
-        return propertyValue;
-    }
+  public static PropertyValue makePropertyValue(final String name, final Object value) {
+    PropertyValue propertyValue = new PropertyValue();
+    propertyValue.Name = name;
+    propertyValue.Value = value;
+    return propertyValue;
+  }
 
-    public static void addPropertyValue(final List<PropertyValue> properties, final String name, final Object value) {
-        PropertyValue propertyValue = makePropertyValue(name, value);
-        properties.add(propertyValue);
-    }
+  public static void addPropertyValue(
+      final List<PropertyValue> properties, final String name, final Object value) {
+    PropertyValue propertyValue = makePropertyValue(name, value);
+    properties.add(propertyValue);
+  }
 
-    public static PropertyValue makePropertyValue(final String name, final int value) {
-        PropertyValue propertyValue = new PropertyValue();
-        propertyValue.Name = name;
-        propertyValue.Value = value;
-        return propertyValue;
-    }
+  public static PropertyValue makePropertyValue(final String name, final int value) {
+    PropertyValue propertyValue = new PropertyValue();
+    propertyValue.Name = name;
+    propertyValue.Value = value;
+    return propertyValue;
+  }
 
-    public static void addPropertyValue(final List<PropertyValue> properties, final String name, final int value) {
-        PropertyValue propertyValue = makePropertyValue(name, value);
-        properties.add(propertyValue);
-    }
+  public static void addPropertyValue(
+      final List<PropertyValue> properties, final String name, final int value) {
+    PropertyValue propertyValue = makePropertyValue(name, value);
+    properties.add(propertyValue);
+  }
 
-    public static PropertyValue makePropertyValue(final String name, final boolean value) {
-        PropertyValue propertyValue = new PropertyValue();
-        propertyValue.Name = name;
-        propertyValue.Value = value;
-        return propertyValue;
-    }
+  public static PropertyValue makePropertyValue(final String name, final boolean value) {
+    PropertyValue propertyValue = new PropertyValue();
+    propertyValue.Name = name;
+    propertyValue.Value = value;
+    return propertyValue;
+  }
 
-    public static void addPropertyValue(final List<PropertyValue> properties, final String name, final boolean value) {
-        PropertyValue propertyValue = makePropertyValue(name, value);
-        properties.add(propertyValue);
-    }
+  public static void addPropertyValue(
+      final List<PropertyValue> properties, final String name, final boolean value) {
+    PropertyValue propertyValue = makePropertyValue(name, value);
+    properties.add(propertyValue);
+  }
 
-    /* TODO
-    public static void main(String[] args) throws OdiseeServerException {
-        System.out.println(UnoHelper.getPort("uno:socket,host=78.47.242.148,port=2083;urp;StarOffice.ServiceManager"));
-    }
-    */
+  /* TODO
+  public static void main(String[] args) throws OdiseeServerException {
+      System.out.println(UnoHelper.getPort("uno:socket,host=78.47.242.148,port=2083;urp;StarOffice.ServiceManager"));
+  }
+  */
 
 }

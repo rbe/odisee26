@@ -190,9 +190,9 @@ final class BucketFile {
             ownerOnly(tmp)
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             ownerOnly(file)
-        } catch (Throwable e) {
+        } finally {
+            // After a successful move the temp file is gone and this does nothing.
             Files.deleteIfExists(tmp)
-            throw e
         }
     }
 

@@ -97,7 +97,7 @@ class HttpStatusTest extends GroovyTestCase {
             try {
                 missing.getOfficeConnectionFactory()
                 fail('missing odiinst')
-            } catch (Throwable error) {
+            } catch (OdiseeServerRuntimeException error) {
                 assertBody(error, 503)
             }
 
@@ -107,7 +107,7 @@ class HttpStatusTest extends GroovyTestCase {
             try {
                 empty.refreshPool()
                 fail('empty odiinst')
-            } catch (Throwable error) {
+            } catch (OdiseeServerRuntimeException error) {
                 assertBody(error, 503)
             }
 
@@ -143,6 +143,7 @@ class HttpStatusTest extends GroovyTestCase {
         int[] seen = [0] as int[]
         ByteArrayOutputStream bytes = new ByteArrayOutputStream()
         def response = new Object() {
+            @SuppressWarnings('EmptyMethod') // The fake response needs reset() and does nothing.
             void reset() {
             }
 

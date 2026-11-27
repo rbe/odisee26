@@ -8,7 +8,6 @@
  */
 package org.odisee.document
 
-import java.net.InetSocketAddress
 
 /**
  * Reloads {@code etc/odiinst} when its text changes.

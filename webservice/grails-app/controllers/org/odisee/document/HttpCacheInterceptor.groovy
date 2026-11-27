@@ -14,6 +14,7 @@ class HttpCacheInterceptor {
 
     boolean after() { true }
 
+    @SuppressWarnings('EmptyMethod') // The trait declares it, and this controller adds nothing after the view.
     void afterView() {
         // no-op
     }

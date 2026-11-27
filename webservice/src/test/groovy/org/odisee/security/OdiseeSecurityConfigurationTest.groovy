@@ -2,6 +2,11 @@ package org.odisee.security
 
 // id: ADR-0003
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+
 import groovy.test.GroovyTestCase
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -25,10 +30,6 @@ import org.springframework.security.core.context.SecurityContextHolder
 
 import java.nio.file.Files
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 class OdiseeSecurityConfigurationTest extends GroovyTestCase {
 

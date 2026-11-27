@@ -8,12 +8,14 @@
  */
 package org.odisee.json
 
+import groovy.json.JsonException
 import groovy.json.JsonSlurper
 import groovy.xml.MarkupBuilder
 import org.odisee.api.OdiseeException
 import org.odisee.document.Delivery
 import org.odisee.xml.XmlHelper
 import org.w3c.dom.Element
+import org.xml.sax.SAXException
 
 /**
  * Turns a JSON document request into the XML DOM the generator already walks.
@@ -74,7 +76,7 @@ final class JsonRequest {
         final Object parsed
         try {
             parsed = new JsonSlurper().parseText(json)
-        } catch (Exception e) {
+        } catch (JsonException e) {
             throw new OdiseeException('Invalid JSON request: ' + e.message, e)
         }
         if (!(parsed instanceof Map)) {
@@ -90,7 +92,7 @@ final class JsonRequest {
             return element
         } catch (OdiseeException e) {
             throw e
-        } catch (Exception e) {
+        } catch (SAXException | IOException | IllegalStateException e) {
             throw new OdiseeException('Invalid JSON request', e)
         }
     }

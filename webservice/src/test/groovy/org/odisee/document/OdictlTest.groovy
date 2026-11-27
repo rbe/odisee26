@@ -10,10 +10,6 @@ import org.odisee.io.OdiseePath
 import org.odisee.io.TenantPaths
 import org.odisee.security.OidcFile
 
-import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.ServerSocket
-import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path

@@ -9,6 +9,7 @@
 package org.odisee.document
 
 import org.grails.web.servlet.mvc.GrailsWebRequest
+import org.odisee.api.OdiseeException
 import org.springframework.web.context.request.RequestContextHolder
 
 import java.security.Principal
@@ -28,7 +29,7 @@ class TemplateController {
             response.contentType = 'application/json'
             response.outputStream << TemplateCatalog.toJson(catalog)
             response.outputStream.flush()
-        } catch (Throwable e) {
+        } catch (IOException | OdiseeException | IllegalArgumentException | IllegalStateException e) {
             errorResponse = true
             log.error e.message, e
             HttpStatuses.apply(response, e)

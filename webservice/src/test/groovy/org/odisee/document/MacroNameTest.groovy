@@ -94,13 +94,14 @@ class MacroNameTest extends GroovyTestCase {
         }
     }
 
+    @SuppressWarnings('ThrowRuntimeException') // The Basic macro fails with a UNO wrapped-target runtime exception.
     void testMacroInvocationExceptionFailsWith422() {
         XScript script = (XScript) Proxy.newProxyInstance(
                 XScript.classLoader,
                 [XScript] as Class[],
                 { Object proxy, java.lang.reflect.Method method, Object[] args ->
                     if (method.name == 'invoke') {
-                        throw new RuntimeException('boom inside Basic')
+                        throw new com.sun.star.lang.WrappedTargetRuntimeException('boom inside Basic')
                     }
                     null
                 } as InvocationHandler)

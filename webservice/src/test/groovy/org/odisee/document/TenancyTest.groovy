@@ -149,14 +149,6 @@ class TenancyTest extends GroovyTestCase {
         [getName: { name }] as Principal
     }
 
-    private static Element request() {
-        DOMBuilder.parse(new StringReader('''<odisee>
-  <request name="One">
-    <template name="Letter" outputFormat="pdf"/>
-  </request>
-</odisee>''')).documentElement
-    }
-
     private static Element archivedRequest() {
         DOMBuilder.parse(new StringReader('''<odisee>
   <request name="One">

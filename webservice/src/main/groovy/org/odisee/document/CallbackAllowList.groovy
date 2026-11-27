@@ -12,12 +12,10 @@ import org.odisee.api.OdiseeException
 import org.odisee.io.OdiseePath
 import org.odisee.io.SafePaths
 
-import java.net.InetAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.util.Locale
 
 /**
  * Per-user callback hosts in {@code $ODISEE_HOME/etc/callback-hosts}.
@@ -25,6 +23,7 @@ import java.util.Locale
  * and is a public external host. Loopback, link-local, RFC 1918, CGNAT, ULA, and internal names
  * are rejected.
  */
+@SuppressWarnings('ReturnNullFromCatchBlock') // null means the host is not allowed.
 final class CallbackAllowList {
 
     private static final Object LOCK = new Object()
@@ -149,7 +148,7 @@ final class CallbackAllowList {
             try {
                 InetAddress addr = InetAddress.getByName(lower)
                 return isPublicAddress(addr) ? "[${lower}]".toString() : null
-            } catch (Exception ignored) {
+            } catch (UnknownHostException ignored) {
                 return null
             }
         }
@@ -173,7 +172,7 @@ final class CallbackAllowList {
             try {
                 InetAddress addr = InetAddress.getByAddress(octets)
                 return isPublicAddress(addr) ? lower : null
-            } catch (Exception ignored) {
+            } catch (UnknownHostException ignored) {
                 return null
             }
         }

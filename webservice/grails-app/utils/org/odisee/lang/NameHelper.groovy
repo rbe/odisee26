@@ -50,11 +50,8 @@ final class NameHelper {
     static String mapUnderscoreToCamelCase(s) {
         def buf = new StringBuilder()
         s.eachWithIndex { c, i ->
-            if (c == "_") {
-            } else if (i > 0 && s.charAt(i - 1) == "_") {
-                buf << c.toUpperCase()
-            } else {
-                buf << c
+            if (c != "_") {
+                buf << (i > 0 && s.charAt(i - 1) == "_" ? c.toUpperCase() : c)
             }
         }
         buf.toString()
@@ -67,11 +64,8 @@ final class NameHelper {
     static String mapDashToCamelCase(s) {
         def buf = new StringBuilder()
         s.eachWithIndex { c, i ->
-            if (c == "-") {
-            } else if (i > 0 && s.charAt(i - 1) == "-") {
-                buf << c.toUpperCase()
-            } else {
-                buf << c
+            if (c != "-") {
+                buf << (i > 0 && s.charAt(i - 1) == "-" ? c.toUpperCase() : c)
             }
         }
         buf.toString()

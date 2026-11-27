@@ -126,6 +126,27 @@ GRADLE_PODMAN = $(GRADLE_RUN) --network host --security-opt label=disable \
 SETUP_CMD = @$(call SDLC_LOG,setup,_setup)
 BUILD_CMD = @$(call SDLC_LOG,build,_build)
 TEST_CMD = @$(call SDLC_LOG,test,_test)
+# The gates. Gradle runs in Podman. Spotless runs google-java-format on the Java files and
+# leaves Groovy and Kotlin files alone. Checkstyle is the linter of Java and CodeNarc is the linter of Groovy.
+FORMAT_CMD = @$(THIS_MAKE) --no-print-directory gradle-image && $(GRADLE) spotlessCheck
+FORMAT_FIX_CMD = @$(THIS_MAKE) --no-print-directory gradle-image && $(GRADLE) spotlessApply
+LINT_CMD = @$(THIS_MAKE) --no-print-directory gradle-image && $(GRADLE) checkstyleMain checkstyleTest checkstyleIntegrationTest codenarcMain codenarcTest codenarcIntegrationTest
+# The one integration entry. It starts its own containers through the Podman socket.
+INTEGRATION_CMD = @$(THIS_MAKE) --no-print-directory test-java
+# JaCoCo writes one execution file for each project. The coverage map names the tests that cover
+# each source file. scripts/jacoco_repo_paths.py gives the XML report the paths of this multi-module
+# build. diff-cover reads that report and writes build/coverage/diff.md.
+COVERAGE_CMD = set -eu; \
+	$(THIS_MAKE) --no-print-directory gradle-image; \
+	$(GRADLE) jacocoDiffReport; \
+	files=$$(find . -path '*/build/jacoco/test.exec' -not -path './apm_modules/*' | sed 's|^\./||' | sort | tr '\n' ' '); \
+	$(PYTHON) .claude/skills/r-project-report/scripts/jacoco_cover_map.py $$files; \
+	$(PYTHON) scripts/jacoco_repo_paths.py build/reports/jacoco/diff/jacocoDiff.xml build/reports/jacoco/diff/jacocoDiffRepo.xml; \
+	REPORT=build/reports/jacoco/diff/jacocoDiffRepo.xml $(DIFF_COVER)
+TEST_CHANGED_CMD = chosen=$$($(PYTHON) .claude/skills/r-project-report/scripts/changed_tests.py --print) || exit 1; \
+	chosen=$$(printf '%s' "$$chosen" | tr '\n' ' '); \
+	if [ -z "$$chosen" ]; then printf '%s\n' "test-changed: no test covers the changed files. make test runs the full suite."; \
+	else printf 'test-changed: %s\n' "$$chosen"; $(THIS_MAKE) --no-print-directory gradle-image; args=""; for name in $$chosen; do args="$$args --tests $$name"; done; $(GRADLE) :webservice:test :clients:client-java:test :clients:client-javafx:test :oxt:test $$args; fi
 # login comes from the contract: podman login ghcr.io with REGISTRY_USER and REGISTRY_TOKEN.
 PUBLISH_IMAGE = 1
 # The image is built from a context that holds the tested JAR. container.mk

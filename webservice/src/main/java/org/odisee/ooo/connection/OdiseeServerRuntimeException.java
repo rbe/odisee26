@@ -13,25 +13,24 @@ package org.odisee.ooo.connection;
 
 public class OdiseeServerRuntimeException extends RuntimeException {
 
-    public OdiseeServerRuntimeException() {
-    }
+  public OdiseeServerRuntimeException() {}
 
-    public OdiseeServerRuntimeException(String message) {
-        super(message);
-    }
+  public OdiseeServerRuntimeException(String message) {
+    super(message);
+  }
 
-    public OdiseeServerRuntimeException(String message, Throwable cause) {
-        super(message, cause);
-    }
+  public OdiseeServerRuntimeException(String message, Throwable cause) {
+    super(message, cause);
+  }
 
-    public OdiseeServerRuntimeException(Throwable cause) {
-        super(cause);
-    }
+  public OdiseeServerRuntimeException(Throwable cause) {
+    super(cause);
+  }
 
-/*
-    public OdiseeServerRuntimeException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
-        super(message, cause, enableSuppression, writableStackTrace);
-    }
-*/
+  /*
+      public OdiseeServerRuntimeException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+          super(message, cause, enableSuppression, writableStackTrace);
+      }
+  */
 
 }

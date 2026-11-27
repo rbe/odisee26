@@ -15,6 +15,9 @@ import org.odisee.io.SafePaths
 import org.odisee.io.TenantPaths
 import org.odisee.shared.OdiseeConstant
 
+import javax.xml.parsers.ParserConfigurationException
+import org.xml.sax.SAXException
+
 import java.nio.file.Path
 import java.util.zip.ZipFile
 
@@ -88,7 +91,7 @@ final class TemplateCatalog {
             [userFields: userFields, bookmarks: bookmarks, tables: tables]
         } catch (OdiseeException e) {
             throw e
-        } catch (Exception e) {
+        } catch (IOException | SAXException | ParserConfigurationException | IllegalStateException e) {
             throw new OdiseeException("Template '${file.fileName}' is not a readable document", OdiseeException.UNPROCESSABLE)
         } finally {
             zip?.close()

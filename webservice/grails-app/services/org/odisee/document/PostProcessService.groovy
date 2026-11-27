@@ -71,7 +71,7 @@ class PostProcessService {
     /**
      * <action type="merge-results">
      */
-    void processMergeResults(Map arg, Element actionElement) {
+    void processMergeResults(Map arg, Element ignored) {
         if (!arg.result?.output) {
             throw new OdiseeException('Cannot merge results, no document was generated', OdiseeException.UNPROCESSABLE)
         }

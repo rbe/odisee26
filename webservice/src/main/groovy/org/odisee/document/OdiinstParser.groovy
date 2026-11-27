@@ -12,7 +12,6 @@ import org.odisee.api.OdiseeException
 import org.odisee.io.SafePaths
 import org.odisee.shared.OdiseeConstant
 
-import java.net.InetSocketAddress
 
 /**
  * {@code etc/odiinst} lines are

@@ -12,7 +12,9 @@ import groovy.util.logging.Slf4j
 import org.odisee.api.OdiseeException
 import org.odisee.io.SafePaths
 import org.odisee.io.TenantPaths
+import org.odisee.ooo.connection.OdiseeServerException
 import org.w3c.dom.Element
+import org.xml.sax.SAXException
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -99,7 +101,7 @@ class JobService {
                     file             : null,
                     filename         : null
             ])
-        } catch (Throwable e) {
+        } catch (OdiseeServerException | SAXException | IOException | GroovyRuntimeException | IllegalArgumentException | IllegalStateException e) {
             log.error("Job ${id} failed", e)
             JobStore.update(user, id, [
                     status           : 'failed',
@@ -107,6 +109,16 @@ class JobService {
                     file             : null,
                     filename         : null
             ])
+        } finally {
+            // An exception type that no clause names must not leave the job running for ever.
+            if (JobStore.find(user, id)?.status == 'running') {
+                JobStore.update(user, id, [
+                        status           : 'failed',
+                        failedInstruction: null,
+                        file             : null,
+                        filename         : null
+                ])
+            }
         }
         postCallback(user, id)
     }
@@ -123,7 +135,7 @@ class JobService {
         }
         try {
             poster.call(new URI(callback), JobResponses.callbackBody(job))
-        } catch (Exception e) {
+        } catch (URISyntaxException | IOException | OdiseeException | IllegalArgumentException e) {
             log.error("Job ${id} callback failed", e)
         }
     }

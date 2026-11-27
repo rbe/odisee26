@@ -20,7 +20,7 @@ After RalfSkills v0.8.0, `make test` failed 2 of 264 tests on `master`.
 
 ## Review
 
-`make check-docs` passed. `make test` did not run in the cloud container: Maven Central answered HTTP 429. CI of the pull request runs it. `make lint`, `make format`, and `make editorconfig` are still stubs ([W-2](../ROADMAP.md#w-2)).
+`make check-docs` passed. `make test` did not run in the cloud container: Maven Central answered HTTP 429. CI of the pull request runs it. `make lint`, `make format`, and `make editorconfig` are still stubs (W-2).
 
 ## Release
 
