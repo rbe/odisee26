@@ -72,7 +72,7 @@ image: ## Build the image
 	  ghcr.io//*|"") printf '%s\n' "image: set OWNER (the GitHub owner) or IMAGE before the include." >&2; exit 1 ;; \
 	esac; \
 	$(IMAGE_PREPARE); \
-	podman build $(PODMAN_NET_ARGS) -f "$(CONTAINERFILE)" $(IMAGE_BUILD_ARGS) \
+	podman build $(PODMAN_NET_ARGS) -f "$(CONTAINERFILE)" $(IMAGE_BUILD_ARGS) $(DEPS_TOKEN_BUILD_ARGS) \
 		--label org.opencontainers.image.source="https://github.com/$(PACKAGE)" \
 		--label org.opencontainers.image.revision="$(or $(GITHUB_SHA),local)" \
 		--label org.opencontainers.image.version="$(or $(GITHUB_RUN_NUMBER),local)" \
@@ -131,7 +131,7 @@ _publish-container:
 	  manifest="localhost/$(NAME):publish"; \
 	  podman manifest rm "$$manifest" >/dev/null 2>&1 || true; \
 	  podman rmi "$$manifest" >/dev/null 2>&1 || true; \
-	  podman build $(PODMAN_NET_ARGS) --platform "$$platforms" --manifest "$$manifest" -f "$(CONTAINERFILE)" $(IMAGE_BUILD_ARGS) \
+	  podman build $(PODMAN_NET_ARGS) --platform "$$platforms" --manifest "$$manifest" -f "$(CONTAINERFILE)" $(IMAGE_BUILD_ARGS) $(DEPS_TOKEN_BUILD_ARGS) \
 	    --label org.opencontainers.image.source="https://github.com/$(PACKAGE)" \
 	    --label org.opencontainers.image.revision="$(or $(GITHUB_SHA),local)" \
 	    --label org.opencontainers.image.version="$$version" \

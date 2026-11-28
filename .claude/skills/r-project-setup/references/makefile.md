@@ -95,12 +95,39 @@ The language skill names the tool of `FORMAT_CMD`, `LINT_CMD`, `COVERAGE_CMD`, a
 | `help.mk` | `HELP_GROUPS` and `HELP_LIST`, the awk command that `help` runs. `project.mk` includes it, and `sdlc.mk` includes `project.mk` |
 | `contract.mk` | `setup`, `build`, `test`, the quality targets, `project-report`, and `docs` and `login` when the variables say so |
 | `doctor.mk` | `doctor` |
+| `deps-token.mk` | `DEPS_TOKEN` for private git dependencies: `DEPS_REPOS`, `DEPS_TOKEN_ENV`, `DEPS_GIT_AUTH`, `DEPS_TOKEN_BUILD_ARGS`, and the setup step `deps-token` |
 | `skills.mk` | `skills-install`, `skills-update`, `apm` |
 | `old-board.mk` | `old-board` |
 | `test-changed.mk` | `test-changed` |
 | `check-docs.mk` | `check-docs` |
 | `podman-python.mk` | `$(PYTHON)` and `py` |
 | `tools.mk` | The images and versions of editorconfig-checker, ruff, coverage, diff-cover, and APM, the host forms of these tools, `BOARD_FILES`, and `host-tools` |
+
+## Private git dependencies
+
+A dependency from a private GitHub repository needs a token, because a tool image has no ssh client and no login. The token is `DEPS_TOKEN` on this machine, in Make, and as the repository secret of CI. GitHub refuses a secret name that starts with `GITHUB_`, and the job token cannot read another private repository.
+
+What the project sets:
+
+- `DEPS_REPOS` in the Makefile names the private repositories, for example `DEPS_REPOS = OWNER/one OWNER/two`. If it is set, `make setup` stops at once when `DEPS_TOKEN` is empty, except with `TOOLS=host`.
+- The owner creates a fine-grained token with "Contents: read" on the repositories of `DEPS_REPOS`. The owner stores it as the repository secret `DEPS_TOKEN`, and exports it as `DEPS_TOKEN` on the machine.
+
+What the project uses:
+
+- A tool container that runs git adds `$(DEPS_TOKEN_ENV)` to its `podman run` options and starts its shell command with `$(DEPS_GIT_AUTH) `. git then fetches each `github.com` address over HTTPS with the token. The image needs `git` and `ca-certificates`.
+- `container.mk` passes `DEPS_TOKEN` to `podman build` as the build secret `deps_token`. The `Containerfile` step that fetches the dependencies reads it:
+
+```dockerfile
+RUN --mount=type=secret,id=deps_token \
+  if [ -s /run/secrets/deps_token ]; then \
+  url="https://x-access-token:$(cat /run/secrets/deps_token)@github.com/"; \
+  export GIT_CONFIG_COUNT=3 \
+  GIT_CONFIG_KEY_0="url.$url.insteadOf" GIT_CONFIG_VALUE_0="ssh://git@github.com/" \
+  GIT_CONFIG_KEY_1="url.$url.insteadOf" GIT_CONFIG_VALUE_1="git@github.com:" \
+  GIT_CONFIG_KEY_2="url.$url.insteadOf" GIT_CONFIG_VALUE_2="https://github.com/"; \
+  fi; \
+  npm ci
+```
 
 The `sdlc.mk` of `r-github-pipeline` includes the same `contract.mk`, `doctor.mk`, `skills.mk`, `old-board.mk`, `test-changed.mk`, and `check-docs.mk`. The targets stay when a project changes from `project.mk` to `sdlc.mk`. A repository on `sdlc.mk` defines its own project targets.
 

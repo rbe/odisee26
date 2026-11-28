@@ -17,6 +17,16 @@ if (mirror) {
         useMirror(settings.dependencyResolutionManagement.repositories)
         useMirror(settings.buildscript.repositories)
     }
+    // With no plugin repository in the settings, Gradle reads the Plugin
+    // Portal, which sends plugin dependencies on to Maven Central. The
+    // mirror comes first, and the Portal keeps the plugin markers.
+    settingsEvaluated { settings ->
+        def plugins = settings.pluginManagement.repositories
+        if (plugins.isEmpty()) {
+            plugins.maven { url = mirror; name = 'MavenMirror' }
+            plugins.gradlePluginPortal()
+        }
+    }
     allprojects {
         useMirror(buildscript.repositories)
         useMirror(repositories)

@@ -32,6 +32,9 @@ changed_tests = load("changed_tests", HERE / "changed_tests.py")
 node_cover_map = load("node_cover_map", HERE / "node_cover_map.py")
 jacoco_cover_map = load("jacoco_cover_map", HERE / "jacoco_cover_map.py")
 go_cover_map = load("go_cover_map", HERE / "go_cover_map.py")
+pytest_cover = load("pytest_cover", HERE / "pytest_cover.py")
+jacoco_repo_paths = load("jacoco_repo_paths", HERE / "jacoco_repo_paths.py")
+jacoco_summary = load("jacoco_summary", HERE / "jacoco_summary.py")
 skill_index = load("skill_index", ROOT / "skills/r-record/scripts/skill_index.py")
 
 
@@ -621,6 +624,19 @@ class ReviewRulesTest(unittest.TestCase):
         for path in (ROOT / "skills").glob("r-*/SKILL.md"):
             if path.parent.name != "r-release":
                 self.assertNotIn("git add -A", path.read_text(encoding="utf-8"))
+
+    def test_review_opens_the_pull_request_and_release_closes_in_it(self):
+        """id: R-162"""
+        review = self.skill("r-review")
+        self.assertIn("run `make pull-request`, then `make ci-status WAIT=1`", review)
+        self.assertIn("merge only after `r-release` has closed the task", review)
+        release = self.skill("r-release")
+        self.assertIn("is already merged into the default branch, stop", release)
+        self.assertNotIn("run `make pull-request`,", release)
+        self.assertLess(
+            release.index("Ask `r-record` to write the Release section"),
+            release.index("Merge the branch into the default branch."),
+        )
 
 
 class GeneralRulesTest(unittest.TestCase):
@@ -1642,7 +1658,7 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
         self.assertIn("-e GH_TOKEN -e GITHUB_TOKEN", gh)
         self.assertTrue(gh.endswith("$(GH_IMAGE)"))
         self.assertIn("\ngh-image: ## ", sdlc)
-        self.assertEqual(sdlc.count("$(GH) api"), 13)
+        self.assertEqual(sdlc.count("$(GH) api"), 14)
         self.assertEqual(host_calls(self.PIPELINE / "sdlc.mk"), [])
         for target in (
             "cleanup-container-versions",
@@ -1843,6 +1859,38 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
             skill,
         )
 
+    def test_the_podman_socket_is_a_path_when_podman_info_writes_a_unix_url(self):
+        """id: R-116"""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            podman = folder / "podman"
+            podman.write_text(
+                "#!/bin/sh\necho unix:///run/podman/podman.sock\n", encoding="utf-8"
+            )
+            podman.chmod(0o755)
+            makefile = folder / "Makefile"
+            makefile.write_text(
+                f"include {ROOT / 'skills' / 'r-jvm' / 'jvm.mk'}\n"
+                "show-socket:\n\t@echo $(PODMAN_SOCKET)\n",
+                encoding="utf-8",
+            )
+            env = dict(os.environ, PATH=f"{folder}{os.pathsep}{os.environ['PATH']}")
+            result = subprocess.run(
+                [
+                    "make",
+                    "-s",
+                    "--no-print-directory",
+                    "-f",
+                    str(makefile),
+                    "show-socket",
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=True,
+            )
+        self.assertEqual(result.stdout.strip(), "/run/podman/podman.sock")
+
     def test_maven_mirror_is_used_only_when_set(self):
         """id: R-128"""
         jvm = ROOT / "skills" / "r-jvm" / "jvm.mk"
@@ -1876,6 +1924,137 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
         text = script.read_text(encoding="utf-8")
         self.assertIn("System.getenv('MAVEN_MIRROR')", text)
         self.assertIn("'https://repo.maven.apache.org/maven2'", text)
+        self.assertIn("settingsEvaluated", text)
+        self.assertIn("plugins.isEmpty()", text)
+        self.assertLess(
+            text.index("plugins.maven { url = mirror"),
+            text.index("plugins.gradlePluginPortal()"),
+        )
+
+    def test_a_project_test_does_not_test_the_installed_collection(self):
+        """id: R-160"""
+        develop = (ROOT / "skills" / "r-develop" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "- A test of a product repository proves the facts of that project."
+            " It does not test what this skill collection installs or owns.",
+            develop,
+        )
+        for owned in (
+            "`.claude/skills/`",
+            "the included makefiles",
+            "`ci.yml` from the template",
+            "`make help`",
+            "`apm.lock.yaml`",
+        ):
+            self.assertIn(owned, develop)
+
+    def test_each_project_mounts_its_own_gradle_cache(self):
+        """id: R-159"""
+        jvm = ROOT / "skills" / "r-jvm" / "jvm.mk"
+        with tempfile.TemporaryDirectory() as tmp:
+            makefile = Path(tmp) / "Makefile"
+            makefile.write_text(
+                f"include {jvm}\nshow:\n\t@echo '$(GRADLE_RUN)'\n", encoding="utf-8"
+            )
+            run = ["make", "--no-print-directory", "-f", str(makefile), "show"]
+            env = {k: v for k, v in os.environ.items() if k != "TOOLS"}
+            shown = {
+                name: subprocess.run(
+                    [*run, f"NAME={name}"],
+                    cwd=tmp,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout
+                for name in ("alpha", "beta")
+            }
+        for name, line in shown.items():
+            self.assertIn(f'-v "$HOME/.gradle/projects/{name}":/gradle:Z', line)
+        self.assertNotIn('"$HOME/.gradle":/gradle', shown["alpha"])
+        pipeline = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
+        self.assertNotIn("~/.gradle/caches", pipeline)
+        self.assertIn("~/.gradle/projects/*/caches", pipeline)
+
+    def test_setup_stops_without_deps_token_when_deps_repos_is_set(self):
+        """id: R-161"""
+        mk = ROOT / "skills" / "r-project-setup" / "deps-token.mk"
+        with tempfile.TemporaryDirectory() as tmp:
+            makefile = Path(tmp) / "Makefile"
+            makefile.write_text(
+                f"include {mk}\nsetup:\n\t@echo installed\n"
+                "show:\n\t@echo '$(DEPS_TOKEN_BUILD_ARGS)'\n",
+                encoding="utf-8",
+            )
+            env = {
+                k: v
+                for k, v in os.environ.items()
+                if k not in ("TOOLS", "DEPS_TOKEN", "DEPS_REPOS")
+            }
+
+            def make(*args, **extra):
+                return subprocess.run(
+                    ["make", "--no-print-directory", "-f", str(makefile), *args],
+                    cwd=tmp,
+                    env={**env, **extra},
+                    capture_output=True,
+                    text=True,
+                )
+
+            stopped = make("setup", "DEPS_REPOS=OWNER/one")
+            self.assertNotEqual(stopped.returncode, 0)
+            self.assertIn("DEPS_TOKEN is empty", stopped.stderr)
+            self.assertIn("OWNER/one", stopped.stderr)
+            self.assertNotIn("installed", stopped.stdout)
+            with_token = make("setup", "DEPS_REPOS=OWNER/one", DEPS_TOKEN="t")
+            self.assertEqual(with_token.stdout.strip(), "installed")
+            self.assertEqual(make("setup").stdout.strip(), "installed")
+            host = make("setup", "DEPS_REPOS=OWNER/one", "TOOLS=host")
+            self.assertEqual(host.stdout.strip(), "installed")
+            self.assertEqual(
+                make("show", DEPS_TOKEN="t").stdout.strip(),
+                "--secret id=deps_token,env=DEPS_TOKEN",
+            )
+            self.assertEqual(make("show").stdout.strip(), "")
+
+    def test_the_workflow_passes_deps_token_only_to_the_dependency_steps(self):
+        """id: R-161"""
+        text = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
+        line = "DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}"
+        self.assertEqual(text.count(line), 3)
+        for step in ("make setup", "make build", "make publish-container"):
+            start = text.index(f"run: {step}\n")
+            step_start = text.rindex("      - ", 0, start)
+            step_end = text.find("\n      - ", start)
+            self.assertIn(line, text[step_start:step_end], step)
+        container = (self.PIPELINE / "container.mk").read_text(encoding="utf-8")
+        self.assertEqual(container.count("$(DEPS_TOKEN_BUILD_ARGS)"), 2)
+
+    def test_a_gradle_workflow_restores_the_cache_and_passes_the_mirror(self):
+        """id: R-154"""
+        text = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
+        self.assertIn("  MAVEN_MIRROR: ${{ vars.MAVEN_MIRROR }}\n", text)
+        first_gradle_step = {
+            "setup": "run: make setup",
+            "build": "run: make build",
+            "test": "run: make editorconfig",
+        }
+        for name, step in first_gradle_step.items():
+            job = rf"(?ms)^  {name}:\n.*?(?=^  [a-z-]+:\n|\Z)"
+            body = re.search(job, text).group(0)
+            self.assertIn("~/.gradle/projects/*/caches", body, name)
+            self.assertLess(
+                body.index("uses: actions/cache/restore@"), body.index(step), name
+            )
+            if name == "setup":
+                self.assertLess(
+                    body.index(step), body.index("uses: actions/cache/save@")
+                )
+            else:
+                self.assertNotIn("actions/cache/save@", body, name)
+        self.assertEqual(text.count("actions/cache/save@"), 1)
 
     def test_a_client_package_has_one_generic_publish_workflow(self):
         """id: R-117"""
@@ -2158,9 +2337,21 @@ case "$*" in
     *"-X DELETE"*) ;;
     *"/versions?per_page"*) cat versions.tsv ;;
     *"/releases?per_page"*) cat releases.tsv ;;
+    *"/artifacts?per_page"*) cat artifacts.tsv ;;
+    *"/actions/runs/"*) run=${*##*actions/runs/}; grep "^${run%% *} " runs.txt | cut -d' ' -f2 ;;
     *"users/"*) echo User ;;
 esac
 """
+
+# Columns: id, name, size, run. Run 7 is finished, run 8 still runs, and
+# run 0 is an artifact without a run. Each one is minutes old.
+ARTIFACTS = (
+    ("50", "image", "220000000", "7"),
+    ("51", "report", "12000", "7"),
+    ("52", "image", "220000000", "8"),
+    ("53", "report-setup", "700", "0"),
+)
+RUN_STATUS = "7 completed\n8 in_progress\n"
 
 # Columns: id, created_at, tags.
 PACKAGE_VERSIONS = (
@@ -2438,7 +2629,10 @@ class CiScopeRecipeTest(unittest.TestCase):
                 setup.index("make ci-scope"),
             )
             self.assertIn(
-                "- if: steps.scope.outputs.board-only != 'true'\n        run: make setup",
+                "- if: steps.scope.outputs.board-only != 'true'\n"
+                "        env:\n"
+                "          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}\n"
+                "        run: make setup",
                 setup,
             )
             for job in ("build", "test"):
@@ -2459,7 +2653,12 @@ class CleanupRecipeTest(unittest.TestCase):
             root = Path(tmp)
             (root / "gh.sh").write_text(FAKE_GH, encoding="utf-8")
             listing = "".join("\t".join(row) + "\n" for row in rows)
-            name = "versions.tsv" if "versions" in target else "releases.tsv"
+            name = "releases.tsv"
+            if "versions" in target:
+                name = "versions.tsv"
+            elif "artifacts" in target:
+                name = "artifacts.tsv"
+                (root / "runs.txt").write_text(RUN_STATUS, encoding="utf-8")
             (root / name).write_text(listing, encoding="utf-8")
             if version is not None:
                 (root / "build").mkdir()
@@ -2615,6 +2814,36 @@ class CleanupRecipeTest(unittest.TestCase):
             recipe = text.split("\n" + target + ": ## ")[1].split("\n\n")[0]
             self.assertIn("$(SDLC_TAG)", recipe)
             self.assertNotIn("-s --no-print-directory version", recipe)
+
+    def test_the_artifact_cleanup_deletes_every_finished_run_at_any_age(self):
+        """id: R-96"""
+        result, calls, _fields = self.run_cleanup(
+            "cleanup-actions-artifacts", ARTIFACTS
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        removed = self.deleted(calls)
+        for ident in ("50", "51", "53"):
+            self.assertTrue(
+                any(line.endswith(f"/artifacts/{ident}") for line in removed)
+            )
+        self.assertFalse(any(line.endswith("/artifacts/52") for line in removed))
+        self.assertEqual(len(removed), 3)
+        self.assertIn("Kept run 0 and 1 other run(s) that still run.", result.stdout)
+        text = PIPELINE_MK.read_text(encoding="utf-8")
+        recipe = text.split("\ncleanup-actions-artifacts: ## ")[1].split("\n\n")[0]
+        self.assertIn("select((.workflow_run.id // 0) != (env.GITHUB_RUN_ID", recipe)
+        self.assertNotIn("created_at", recipe)
+
+    def test_a_dry_run_of_the_artifacts_prints_and_deletes_nothing(self):
+        """id: R-96"""
+        result, calls, _fields = self.run_cleanup(
+            "cleanup-actions-artifacts", ARTIFACTS, dry_run="1"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "would delete artifact 50 image (220000000 bytes)\n", result.stdout
+        )
+        self.assertEqual(self.deleted(calls), [])
 
 
 HELP_MK = ROOT / "skills" / "r-project-setup" / "help.mk"
@@ -3052,7 +3281,7 @@ class LanguageIncludeFileTest(unittest.TestCase):
             "JDK_IMAGE ?= docker.io/library/eclipse-temurin:25-jdk",
             "GRADLE_VERSION ?= 9.1.0",
             "GRADLE_IMAGE ?= docker.io/library/gradle:$(GRADLE_VERSION)-jdk25",
-            "PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}')",
+            "PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's|^unix://||')",
         ):
             self.assertIn("\n" + line + "\n", jvm)
         node = self.read("r-node/node.mk")
@@ -3096,6 +3325,114 @@ class LanguageIncludeFileTest(unittest.TestCase):
             self.assertIn(f"`{name}`", text, skill)
             tooling = self.read(f"{skill}/references/tooling.md")
             self.assertIn(f"include .claude/skills/{language}", tooling, skill)
+
+
+class PytestCoverTest(unittest.TestCase):
+    def test_a_test_id_becomes_the_pytest_node_of_its_file(self):
+        """id: R-155"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "tests/test_mail.py", "def test_x():\n    pass\n")
+            self.assertEqual(
+                pytest_cover.node_id(root, "tests.test_mail.TestMail.test_x"),
+                "tests/test_mail.py::TestMail::test_x",
+            )
+            self.assertEqual(
+                pytest_cover.node_id(root, "tests.test_mail.test_x"),
+                "tests/test_mail.py::test_x",
+            )
+            self.assertIsNone(pytest_cover.node_id(root, "tests.test_gone.test_x"))
+
+    def test_changed_selects_the_nodes_that_cover_the_diff(self):
+        """id: R-155"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "tests/test_mail.py", "def test_x():\n    pass\n")
+            write(root, "tests/test_page.py", "def test_y():\n    pass\n")
+            write(
+                root,
+                "build/coverage/covered.json",
+                json.dumps(
+                    {
+                        "tests.test_mail.test_x": ["src/mail.py"],
+                        "tests.test_page.test_y": ["src/page.py"],
+                    }
+                ),
+            )
+            write(root, "build/coverage/changed.txt", "src/mail.py\n")
+            self.assertEqual(
+                pytest_cover.chosen_nodes(root), ["tests/test_mail.py::test_x"]
+            )
+
+    def test_changed_without_a_coverage_map_says_so(self):
+        """id: R-155"""
+        with tempfile.TemporaryDirectory() as tmp:
+            err = io.StringIO()
+            with redirect_stderr(err):
+                self.assertIsNone(pytest_cover.chosen_nodes(Path(tmp)))
+            self.assertIn("Run make coverage", err.getvalue())
+
+
+class JacocoReportTest(unittest.TestCase):
+    REPORT = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<report name="x">'
+        '<package name="org/x"><sourcefile name="A.java"/><sourcefile name="B.groovy"/></package>'
+        '<counter type="LINE" missed="1" covered="3"/>'
+        '<counter type="BRANCH" missed="0" covered="0"/>'
+        '<counter type="CLASS" missed="0" covered="2"/>'
+        "</report>"
+    )
+
+    def test_each_source_file_gets_the_path_from_the_repository_root(self):
+        """id: R-156"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "core/src/main/java/org/x/A.java", "class A {}\n")
+            write(root, "web/src/main/groovy/org/x/B.groovy", "class B {}\n")
+            write(root, "web/src/test/groovy/org/x/B.groovy", "class B {}\n")
+            report = write(root, "build/jacoco.xml", self.REPORT)
+            output = root / "build/repo.xml"
+            cwd = os.getcwd()
+            try:
+                os.chdir(root)
+                self.assertEqual(
+                    jacoco_repo_paths.main(["x", str(report), str(output)]), 0
+                )
+            finally:
+                os.chdir(cwd)
+            packages = {
+                package.get("name"): [
+                    s.get("name") for s in package.findall("sourcefile")
+                ]
+                for package in ElementTree.parse(output).getroot().findall("package")
+            }
+            self.assertEqual(
+                packages,
+                {
+                    "../../../core/src/main/java/org/x": ["A.java"],
+                    "../../../web/src/main/groovy/org/x": ["B.groovy"],
+                },
+            )
+
+    def test_the_summary_lists_the_counters_of_the_report(self):
+        """id: R-157"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "build/reports/jacoco/test/jacocoTestReport.xml", self.REPORT)
+            jacoco_summary.write_summary(root)
+            text = (root / "build/summaries/coverage.md").read_text(encoding="utf-8")
+            self.assertIn("- Line: 75.0% (3 covered, 1 missed)", text)
+            self.assertIn("- Branch: n/a (0 covered, 0 missed)", text)
+            self.assertNotIn("Class", text)
+
+    def test_no_report_removes_the_summary(self):
+        """id: R-157"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "build/summaries/coverage.md", "old\n")
+            jacoco_summary.write_summary(root)
+            self.assertFalse((root / "build/summaries/coverage.md").exists())
 
 
 if __name__ == "__main__":

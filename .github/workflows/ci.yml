@@ -5,7 +5,8 @@
 # Jobs: setup, then build, test, and test-java beside each other, then
 # publish-container and publish-github (each needs build and test), then report.
 # A developer or agent can do everything this pipeline does through Make.
-# The YAML only checks out, uploads and downloads artifacts, and calls make.
+# The YAML only checks out, uploads and downloads artifacts, restores and
+# saves the Gradle cache, and calls make.
 # Registry login is `make login`. It does not run Gradle, npm, podman, python, or tar.
 # The Gradle case is build: the build job runs `make build`, and that target
 # runs Gradle. The job does not call ./gradlew. setup, test, and test-java are
@@ -19,6 +20,9 @@
 # <X.Y.Z>-<run> and latest, then keeps that run and the next-lower run.
 # A manual publish from any other ref tags the version only.
 # report is last and still runs when an earlier job fails or is skipped.
+# Gradle cache: setup restores caches and wrapper of ~/.gradle/projects/*,
+# resolves the dependencies, and saves the cache when the key is new.
+# build, test, and test-java only restore it (r-github-pipeline, R-154).
 
 name: CI
 
@@ -44,6 +48,9 @@ env:
   IMAGE: ghcr.io/rbe/odisee26
   SDLC_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   JAVA_VERSION: "21"
+  # Empty: Gradle reads Maven Central. A URL: Gradle reads each Maven
+  # Central artifact from that mirror (r-jvm jvm.mk and maven-mirror.gradle).
+  MAVEN_MIRROR: ${{ vars.MAVEN_MIRROR }}
 
 jobs:
   setup:
@@ -67,8 +74,30 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CI_BEFORE: ${{ github.event.before }}
         run: make ci-scope
+      - name: Restore the Gradle cache
+        if: steps.scope.outputs.board-only != 'true'
+        id: gradle-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
+      # DEPS_TOKEN reads private git dependencies (r-project-setup). An
+      # absent repository secret is empty and changes nothing.
       - if: steps.scope.outputs.board-only != 'true'
+        env:
+          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}
         run: make setup
+      - name: Save the Gradle cache
+        if: steps.scope.outputs.board-only != 'true' && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
+          key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -89,7 +118,18 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+      - name: Restore the Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
       - run: make build
+        env:
+          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}
       - uses: actions/upload-artifact@v7
         with:
           name: dist
@@ -113,6 +153,15 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      - name: Restore the Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
       - run: make test
       - uses: actions/upload-artifact@v7
         if: always()
@@ -138,6 +187,15 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      - name: Restore the Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-
       - run: make test-java
       - uses: actions/upload-artifact@v7
         if: always()
@@ -176,6 +234,7 @@ jobs:
           REGISTRY_TOKEN: ${{ github.token }}
       - run: make publish-container
         env:
+          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
       - run: make cleanup-container-versions
         env:

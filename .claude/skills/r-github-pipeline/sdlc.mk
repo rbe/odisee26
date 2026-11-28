@@ -93,8 +93,6 @@ KEEP_VERSIONS ?= 2
 PACKAGE ?= $(or $(GITHUB_REPOSITORY),$(if $(OWNER),$(OWNER)/$(NAME)))
 SDLC_JOBS ?= setup build test docs publish-container
 SDLC_CI ?= setup build editorconfig format lint test integration coverage docs report
-SDLC_KEEP_ARTIFACTS ?= report,docs
-SDLC_ARTIFACT_AGE ?= 3600
 
 # The GitHub CLI runs in a local image. `make gh-image` builds it once:
 # the base image plus the release binary of GH_VERSION. A cleanup
@@ -108,7 +106,7 @@ GH_REPO ?= $(OWNER)/$(NAME)
 CI_WAIT_SECONDS ?= 15
 CI_WAIT_TRIES ?= 240
 CI_BOARD_FILES ?= $(BOARD_FILES)
-GH = podman run --rm -e GH_TOKEN -e GITHUB_TOKEN -e GH_HOST -e GITHUB_RUN_ID -e SDLC_ARTIFACT_AGE -e SDLC_KEEP_ARTIFACTS $(PODMAN_NET_ARGS) -v "$(CURDIR)":/work:Z -w /work $(GH_IMAGE)
+GH = podman run --rm -e GH_TOKEN -e GITHUB_TOKEN -e GH_HOST -e GITHUB_RUN_ID $(PODMAN_NET_ARGS) -v "$(CURDIR)":/work:Z -w /work $(GH_IMAGE)
 # Host mode (TOOLS=host of r-project-setup): gh runs from PATH, and
 # gh-image builds nothing.
 ifeq ($(TOOLS),host)
@@ -539,17 +537,25 @@ cleanup-github-releases: ## Match CI: on the default branch, keep this release a
 	elif [ -n "$(DRY_RUN)" ]; then status=dry-run; reason="Would delete $$deleted release(s). Kept $$tag and $$((kept - 1)) former. v* tags were not deleted. Nothing deleted."; \
 	else status=deleted; reason="Kept $$tag and $$((kept - 1)) former. v* tags were not deleted."; fi
 
-cleanup-actions-artifacts: ## Match CI: delete artifacts at least one hour old, except this run, report, and docs
+cleanup-actions-artifacts: ## Match CI: delete the artifacts of every finished run except this run
 	@set -eu; \
 	mkdir -p build/logs build/summaries; \
 	repo="$(PACKAGE)"; \
 	if [ -z "$$repo" ]; then echo "PACKAGE is empty. Set it to owner/name." >&2; exit 1; fi; \
 	export GITHUB_RUN_ID="$${GITHUB_RUN_ID:-0}"; \
-	export SDLC_ARTIFACT_AGE="$(SDLC_ARTIFACT_AGE)"; \
-	export SDLC_KEEP_ARTIFACTS="$(SDLC_KEEP_ARTIFACTS)"; \
 	$(THIS_MAKE) --no-print-directory gh-image; \
 	tab=$$(printf '\t'); \
-	ids=$$($(GH) api --paginate "repos/$$repo/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.expired | not) | select((.workflow_run.id // 0) != (env.GITHUB_RUN_ID | tonumber)) | select(.name as $$n | (env.SDLC_KEEP_ARTIFACTS | split(",")) | index($$n) | not) | select((now - (.created_at | fromdateiso8601)) >= (env.SDLC_ARTIFACT_AGE | tonumber)) | [(.id|tostring), .name, (.size_in_bytes|tostring)] | @tsv'); \
+	list=$$($(GH) api --paginate "repos/$$repo/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.expired | not) | select((.workflow_run.id // 0) != (env.GITHUB_RUN_ID | tonumber)) | [(.id|tostring), .name, (.size_in_bytes|tostring), ((.workflow_run.id // 0)|tostring)] | @tsv'); \
+	finished=" 0 "; running=0; \
+	for run in $$(printf '%s\n' "$$list" | cut -f4 | sort -u); do \
+	  if [ "$$run" = 0 ]; then continue; fi; \
+	  status=$$($(GH) api "repos/$$repo/actions/runs/$$run" --jq .status); \
+	  if [ "$$status" = completed ]; then finished="$$finished$$run "; else running=$$((running + 1)); fi; \
+	done; \
+	ids=$$(printf '%s\n' "$$list" | while IFS="$$tab" read -r id name size run; do \
+	  if [ -z "$$id" ]; then continue; fi; \
+	  case "$$finished" in *" $$run "*) printf '%s\t%s\t%s\n' "$$id" "$$name" "$$size";; esac; \
+	done); \
 	count=0; \
 	if [ -n "$$ids" ]; then \
 	  printf '%s\n' "$$ids" | while IFS="$$tab" read -r id name size; do \
@@ -560,7 +566,7 @@ cleanup-actions-artifacts: ## Match CI: delete artifacts at least one hour old, 
 	  count=$$(printf '%s\n' "$$ids" | grep -c . || true); \
 	fi; \
 	if [ "$$count" -eq 0 ]; then word=kept; elif [ -n "$(DRY_RUN)" ]; then word=dry-run; else word=deleted; fi; \
-	reason="$$count artifact(s) at least $(SDLC_ARTIFACT_AGE)s old, excluding run $$GITHUB_RUN_ID and [$(SDLC_KEEP_ARTIFACTS)]."; \
+	reason="$$count artifact(s) of finished runs. Kept run $$GITHUB_RUN_ID and $$running other run(s) that still run."; \
 	if [ -n "$(DRY_RUN)" ]; then reason="$$reason Nothing deleted."; fi; \
 	printf '# cleanup-actions-artifacts\n\nStatus: %s\nDeleted: %s\n\n%s\n' "$$word" "$$count" "$$reason" > build/summaries/cleanup-actions-artifacts.md; \
 	echo "cleanup-actions-artifacts: $$reason"

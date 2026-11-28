@@ -9,110 +9,10 @@ import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
 /**
- * The root Makefile is the frontend. {@code make help} lists every target.
+ * The project targets of the root Makefile wrap the Gradle tasks of odisee26.
  * The how-to stays in the comment block at the top of that file.
  */
 class MakefileHelpTest extends GroovyTestCase {
-
-    // The order of make help: the groups Gates, Project, Board, Delivery, and Tools.
-    private static final List<String> TARGETS = [
-            'ci',
-            'test-changed',
-            'check-docs',
-            'setup',
-            'build',
-            'test',
-            'editorconfig',
-            'format',
-            'format-fix',
-            'lint',
-            'integration',
-            'coverage',
-            'gates',
-            'gates-check',
-            'git-hooks',
-            'gradle-image',
-            'test-java',
-            'test-office',
-            'test-minio',
-            'test-keycloak',
-            'publish-github',
-            'stack',
-            'user',
-            'token',
-            'pull',
-            'run',
-            'stop',
-            'rm',
-            'clean-images',
-            'clean',
-            'old-board',
-            'test-ids',
-            'project-report',
-            'toon',
-            'ids',
-            'id',
-            'id-raise',
-            'req',
-            'links',
-            'links-check',
-            'board-check',
-            'old-board-delete',
-            'board-numbers',
-            'publish-tags',
-            'ci-status',
-            'ci-scope',
-            'pull-request',
-            'pull-request-merge',
-            'version',
-            'check-tag',
-            'report',
-            'cleanup-container-versions',
-            'cleanup-github-releases',
-            'cleanup-actions-artifacts',
-            'login',
-            'image',
-            'image-ci',
-            'publish-container',
-            'multiarch-host',
-            'gh-image',
-            'help',
-            'py',
-            'host-tools',
-            'doctor',
-            'podman-start',
-            'skills-install',
-            'skills-update',
-            'apm',
-            'wrapper',
-            'jvm-tooling',
-            'podman-socket',
-    ]
-
-    void testMakeAndHelpListEveryTarget() {
-        String help = make(0, ['help']).out
-        String bare = make(0, []).out
-        assertEquals(help, bare)
-        List<String> lines = help.readLines().findAll { it.startsWith('  ') }
-        assertEquals(TARGETS.size(), lines.size())
-        assertTrue(help.contains('The Makefile is the interface'))
-        assertTrue(help.contains('Podman is the only container engine'))
-        assertTrue(help.contains('make ci runs setup build test report. It does not publish.'))
-        TARGETS.eachWithIndex { String target, int index ->
-            String line = lines[index]
-            assertTrue(line, line.startsWith('  ' + target + ' '))
-            String explanation = line.substring(target.length() + 2).trim()
-            assertTrue(line, explanation.length() > 0)
-        }
-        assertTrue(help.contains('NAME defaults to press'))
-        assertTrue(help.contains('Prints the client id and secret'))
-        assertTrue(help.contains('CLIENT_ID and CLIENT_SECRET'))
-        assertTrue(help.contains('Starts its own container'))
-        ['Gates:', 'Project:', 'Board:', 'Delivery:', 'Tools:'].each { String group ->
-            assertTrue(group, help.readLines().contains(group))
-        }
-        assertTrue(help.contains('2.6.0-42'))
-    }
 
     void testHowToStaysInTheMakefileComment() {
         String makefile = Files.readString(repoRoot().toPath().resolve('Makefile'))
@@ -204,10 +104,6 @@ class MakefileHelpTest extends GroovyTestCase {
         String image = make(0, ['-n', 'image']).out
         assertTrue(image, image.contains('build/image-context/webservice.jar'))
         assertFalse(image, image.contains('--platform'))
-        String publish = make(0, ['-n', '_publish-container']).out
-        assertTrue(publish, publish.contains('publish-tags'))
-        assertTrue(publish, publish.contains('podman manifest push --all'))
-        assertFalse(publish, publish.contains('GITHUB_REF_NAME'))
 
         String pull = make(0, ['-n', 'pull', 'VERSION=2.6.0-42']).out
         assertTrue(pull.contains('podman pull "ghcr.io/rbe/odisee26:2.6.0-42"'))

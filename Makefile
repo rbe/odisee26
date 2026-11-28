@@ -104,9 +104,9 @@ GRADLE_VERSION ?= 8.14.5
 GRADLE_IMAGE ?= localhost/odisee26-gradle:21-$(shell cksum < gradle/Containerfile | cut -d ' ' -f 1)
 # Extra podman run arguments of the Gradle run, such as -e for a proxy.
 GRADLE_RUN_ARGS ?=
-GRADLE_RUN = mkdir -p "$$HOME/.gradle" && podman run --rm --init
+GRADLE_RUN = mkdir -p "$(GRADLE_CACHE)" && podman run --rm --init
 GRADLE_ARGS = $(GRADLE_RUN_ARGS) $(MAVEN_MIRROR_ARGS) -e CI -e GITHUB_RUN_NUMBER \
-	-e GRADLE_USER_HOME=/gradle -v "$$HOME/.gradle":/gradle:Z -v "$(CURDIR)":"$(CURDIR)":Z -w "$(CURDIR)" \
+	-e GRADLE_USER_HOME=/gradle -v "$(GRADLE_CACHE)":/gradle:Z -v "$(CURDIR)":"$(CURDIR)":Z -w "$(CURDIR)" \
 	$(GRADLE_IMAGE) ./gradlew --no-daemon --console=plain
 GRADLE = $(GRADLE_RUN) $(PODMAN_NET_ARGS) $(GRADLE_ARGS)
 # Host mode (TOOLS=host of r-project-setup): Gradle runs from the JDK on
@@ -119,10 +119,8 @@ endif
 # test-minio, test-keycloak, stack, stop, rm, clean-images) run the same
 # image with the Podman socket of the host and the host network. The
 # podman client in the image starts the containers through that socket,
-# and Gradle connects to their published ports on 127.0.0.1. On a Mac,
-# podman info names the socket inside the Podman machine, where the
-# container runs. make podman-socket (jvm.mk) starts the socket when it is off.
-PODMAN_SOCKET = $$(podman info --format '{{.Host.RemoteSocket.Path}}')
+# and Gradle connects to their published ports on 127.0.0.1. PODMAN_SOCKET
+# of jvm.mk names the socket, and make podman-socket starts it when it is off.
 GRADLE_PODMAN = $(GRADLE_RUN) --network host --security-opt label=disable \
 	-e CONTAINER_HOST=unix:///run/podman/podman.sock -v "$(PODMAN_SOCKET)":/run/podman/podman.sock \
 	$(GRADLE_ARGS)
@@ -140,14 +138,14 @@ LINT_CMD = @$(THIS_MAKE) --no-print-directory gradle-image && $(GRADLE) checksty
 # The one integration entry. It starts its own containers through the Podman socket.
 INTEGRATION_CMD = @$(THIS_MAKE) --no-print-directory test-java
 # JaCoCo writes one execution file for each project. The coverage map names the tests that cover
-# each source file. scripts/jacoco_repo_paths.py gives the XML report the paths of this multi-module
-# build. diff-cover reads that report and writes build/coverage/diff.md.
+# each source file. jacoco_repo_paths.py of r-project-report gives the XML report the paths of
+# this multi-module build. diff-cover reads that report and writes build/coverage/diff.md.
 COVERAGE_CMD = set -eu; \
 	$(THIS_MAKE) --no-print-directory gradle-image; \
 	$(GRADLE) jacocoDiffReport; \
 	files=$$(find . -path '*/build/jacoco/test.exec' -not -path './apm_modules/*' | sed 's|^\./||' | sort | tr '\n' ' '); \
 	$(PYTHON) .claude/skills/r-project-report/scripts/jacoco_cover_map.py $$files; \
-	$(PYTHON) scripts/jacoco_repo_paths.py build/reports/jacoco/diff/jacocoDiff.xml build/reports/jacoco/diff/jacocoDiffRepo.xml; \
+	$(PYTHON) .claude/skills/r-project-report/scripts/jacoco_repo_paths.py build/reports/jacoco/diff/jacocoDiff.xml build/reports/jacoco/diff/jacocoDiffRepo.xml; \
 	REPORT=build/reports/jacoco/diff/jacocoDiffRepo.xml $(DIFF_COVER)
 TEST_CHANGED_CMD = chosen=$$($(PYTHON) .claude/skills/r-project-report/scripts/changed_tests.py --print) || exit 1; \
 	chosen=$$(printf '%s' "$$chosen" | tr '\n' ' '); \
@@ -174,7 +172,7 @@ NAME ?= press
 GH_REPO ?= $(PACKAGE)
 
 include .claude/skills/r-github-pipeline/sdlc.mk
-# wrapper, jvm-tooling, and podman-socket. GRADLE_RUN, GRADLE_IMAGE, JDK_IMAGE, and PODMAN_SOCKET above win over its defaults.
+# wrapper, jvm-tooling, and podman-socket. GRADLE_RUN, GRADLE_IMAGE, and JDK_IMAGE above win over its defaults.
 include .claude/skills/r-jvm/jvm.mk
 
 ODICTL := webservice/src/main/container/bin/odictl

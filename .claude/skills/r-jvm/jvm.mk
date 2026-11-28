@@ -6,7 +6,7 @@
 #     include .claude/skills/r-project-setup/project.mk
 #     include .claude/skills/r-jvm/jvm.mk
 #
-# A project that sets JDK_IMAGE, GRADLE_VERSION, GRADLE_IMAGE,
+# A project that sets JDK_IMAGE, GRADLE_VERSION, GRADLE_IMAGE, GRADLE_CACHE,
 # GRADLE_RUN, PODMAN_SOCKET, or MAVEN_MIRROR before the include keeps its
 # value. A project that sets its own GRADLE_RUN adds $(MAVEN_MIRROR_ARGS)
 # to it.
@@ -46,11 +46,18 @@ MAVEN_MIRROR ?=
 # The init script maven-mirror.gradle beside this file does the change.
 MAVEN_MIRROR_ARGS = $(if $(strip $(MAVEN_MIRROR)),-e MAVEN_MIRROR=$(strip $(MAVEN_MIRROR)) \
 	-v "$(JVM_MK_DIR)maven-mirror.gradle":/gradle/init.d/r-maven-mirror.gradle:ro)
-GRADLE_RUN ?= mkdir -p "$$HOME/.gradle" && podman run --rm $(PODMAN_NET_ARGS) $(MAVEN_MIRROR_ARGS) -e CI -e GRADLE_USER_HOME=/gradle \
-	-v "$$HOME/.gradle":/gradle:Z -v "$(CURDIR)":/work:Z -w /work
+# Each project has its own Gradle user home on the host. Two Gradle
+# containers that share one folder wait for each other's cache lock until
+# the time runs out, because the release message does not reach another
+# container. A project that sets its own GRADLE_RUN mounts $(GRADLE_CACHE).
+GRADLE_CACHE ?= $$HOME/.gradle/projects/$(or $(NAME),$(notdir $(CURDIR)))
+GRADLE_RUN ?= mkdir -p "$(GRADLE_CACHE)" && podman run --rm $(PODMAN_NET_ARGS) $(MAVEN_MIRROR_ARGS) -e CI -e GRADLE_USER_HOME=/gradle \
+	-v "$(GRADLE_CACHE)":/gradle:Z -v "$(CURDIR)":/work:Z -w /work
 # On a Mac, podman info names the socket inside the Podman machine, where
-# the container that runs Gradle runs.
-PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}')
+# the container that runs Gradle runs. A Podman client on a Mac can write
+# that path with the prefix unix://. sed removes the prefix, because
+# podman run -v takes a path and reads a second colon as an option.
+PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's|^unix://||')
 # Host mode (TOOLS=host of podman-python.mk): Gradle runs from the JDK on
 # PATH. GRADLE_RUN drops the image name that follows it, so
 # $(GRADLE_RUN) $(JDK_IMAGE) ./gradlew runs ./gradlew. GRADLE_PODMAN

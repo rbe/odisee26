@@ -1,12 +1,12 @@
 ---
 name: r-review
-description: Checks a change after implementation and before it ships. Runs the gates and each check row in docs/skill-index.toon, checks the change against the accepted ADRs, and writes findings through r-record. Use after r-develop and before r-release.
+description: Checks a change after implementation and before it ships. Runs the gates and each check row in docs/skill-index.toon, checks the change against the accepted ADRs, and writes findings through r-record, then pushes the branch and opens the pull request. Use after r-develop and before r-release.
 ---
 
 The general rules in `CLAUDE.md` apply.
 
 <purpose>
-`r-review` is the stage between `r-develop` and `r-release`. It finds each rule that the change breaks and records each break as a finding.
+`r-review` is the stage between `r-develop` and `r-release`. It finds each rule that the change breaks and records each break as a finding. It then pushes the branch and opens the pull request, so the owner can test the change.
 </purpose>
 
 <steps>
@@ -22,6 +22,9 @@ The general rules in `CLAUDE.md` apply.
 10. If the repository has a CI workflow, read each workflow step. A `run:` step that is not `make <target>` is a finding. A step that runs `make test-changed` is a finding, because `test-changed` is not a CI target.
 11. A finding that is fixed stays in this change. Ask `r-record` for a roadmap row of the kind `defect` for each finding that waits.
 12. Ask `r-record` to write the Review section. The section holds the line for each check row, each finding, each gate that did not run, and what this change deliberately left alone.
+13. Commit the change and the history file on the one branch of the slice, with the staging rule of `r-release`. If `origin` exists, push the branch.
+14. If `.github/workflows` exists and `make help` lists `pull-request`, run `make pull-request`, then `make ci-status WAIT=1` for the pushed commit. If CI fails, the failure is a finding of this change, and the slice goes back to `r-develop`.
+15. Tell the owner that the pull request is ready for the test. Tell the owner to merge only after `r-release` has closed the task on this branch.
 </steps>
 
 <mode name="incident">
