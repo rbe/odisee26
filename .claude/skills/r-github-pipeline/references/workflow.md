@@ -49,10 +49,11 @@ A Gradle project keeps the Gradle blocks of `templates/ci.yml`. Without them, ea
 - `build` and `test` restore the cache before their first `make` step. A job that runs Gradle in a project addition restores it too.
 - The key is the hash of the Gradle build files, `gradle.properties`, the wrapper properties, and `gradle/libs.versions.toml`. A changed build file makes a new key.
 - The cache is not an artifact, so it does not use the artifact quota.
+- The steps `make setup`, `make build`, and `make publish-container` set `DEPS_TOKEN` from the repository secret `DEPS_TOKEN`. If the secret is absent, the value is empty, and a project without private git dependencies does not read it (`r-project-setup`, `deps-token.mk`).
 - The workflow `env` sets `MAVEN_MIRROR` from the repository variable `MAVEN_MIRROR`. If the variable is empty, Gradle reads Maven Central (`r-jvm`).
 - Each job uploads `report-<job>` with `build/logs` and `build/summaries`. `test` also uploads the test results and `build/coverage`.
 - The `report` job downloads `report-*` into `build/inputs` and runs `make report`. `build/report/index.md` is the entry point.
-- `make cleanup-actions-artifacts` deletes every other artifact of the repository when it is one hour old. `report` and `docs` stay until their retention ends. The artifacts of the current run stay.
+- `make cleanup-actions-artifacts` deletes the artifacts of every finished run, also `report` and `docs`. The artifacts of the current run and of runs that still run stay.
 
 ## Versioning
 

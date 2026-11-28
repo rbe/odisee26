@@ -109,7 +109,11 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       # End of Gradle.
+      # DEPS_TOKEN reads private git dependencies (r-project-setup). An
+      # absent repository secret is empty and changes nothing.
       - if: steps.scope.outputs.board-only != 'true'
+        env:
+          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}
         run: make setup
       # Gradle: keep for a Gradle project. Only setup saves the cache.
       - name: Save the Gradle cache
@@ -163,6 +167,8 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
       # End of Gradle.
       - run: make build
+        env:
+          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}
       # Image: keep when publish-container pushes the image tar of make build.
       # Delete it when the JAR blocks stay.
       - uses: actions/upload-artifact@v7
@@ -267,6 +273,7 @@ jobs:
           REGISTRY_TOKEN: ${{ github.token }}
       - run: make publish-container
         env:
+          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
       - run: make cleanup-container-versions
         env:

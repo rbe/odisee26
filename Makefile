@@ -119,12 +119,8 @@ endif
 # test-minio, test-keycloak, stack, stop, rm, clean-images) run the same
 # image with the Podman socket of the host and the host network. The
 # podman client in the image starts the containers through that socket,
-# and Gradle connects to their published ports on 127.0.0.1. On a Mac,
-# podman info names the socket inside the Podman machine, where the
-# container runs. A Podman client on a Mac can name it with the prefix
-# unix://, and sed removes that prefix, because podman run -v takes a path.
-# make podman-socket (jvm.mk) starts the socket when it is off.
-PODMAN_SOCKET = $$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's|^unix://||')
+# and Gradle connects to their published ports on 127.0.0.1. PODMAN_SOCKET
+# of jvm.mk names the socket, and make podman-socket starts it when it is off.
 GRADLE_PODMAN = $(GRADLE_RUN) --network host --security-opt label=disable \
 	-e CONTAINER_HOST=unix:///run/podman/podman.sock -v "$(PODMAN_SOCKET)":/run/podman/podman.sock \
 	$(GRADLE_ARGS)
@@ -176,7 +172,7 @@ NAME ?= press
 GH_REPO ?= $(PACKAGE)
 
 include .claude/skills/r-github-pipeline/sdlc.mk
-# wrapper, jvm-tooling, and podman-socket. GRADLE_RUN, GRADLE_IMAGE, JDK_IMAGE, and PODMAN_SOCKET above win over its defaults.
+# wrapper, jvm-tooling, and podman-socket. GRADLE_RUN, GRADLE_IMAGE, and JDK_IMAGE above win over its defaults.
 include .claude/skills/r-jvm/jvm.mk
 
 ODICTL := webservice/src/main/container/bin/odictl

@@ -625,6 +625,19 @@ class ReviewRulesTest(unittest.TestCase):
             if path.parent.name != "r-release":
                 self.assertNotIn("git add -A", path.read_text(encoding="utf-8"))
 
+    def test_review_opens_the_pull_request_and_release_closes_in_it(self):
+        """id: R-162"""
+        review = self.skill("r-review")
+        self.assertIn("run `make pull-request`, then `make ci-status WAIT=1`", review)
+        self.assertIn("merge only after `r-release` has closed the task", review)
+        release = self.skill("r-release")
+        self.assertIn("is already merged into the default branch, stop", release)
+        self.assertNotIn("run `make pull-request`,", release)
+        self.assertLess(
+            release.index("Ask `r-record` to write the Release section"),
+            release.index("Merge the branch into the default branch."),
+        )
+
 
 class GeneralRulesTest(unittest.TestCase):
     def test_the_entry_file_and_its_template_import_the_rules_file(self):
@@ -1645,7 +1658,7 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
         self.assertIn("-e GH_TOKEN -e GITHUB_TOKEN", gh)
         self.assertTrue(gh.endswith("$(GH_IMAGE)"))
         self.assertIn("\ngh-image: ## ", sdlc)
-        self.assertEqual(sdlc.count("$(GH) api"), 13)
+        self.assertEqual(sdlc.count("$(GH) api"), 14)
         self.assertEqual(host_calls(self.PIPELINE / "sdlc.mk"), [])
         for target in (
             "cleanup-container-versions",
@@ -1846,6 +1859,38 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
             skill,
         )
 
+    def test_the_podman_socket_is_a_path_when_podman_info_writes_a_unix_url(self):
+        """id: R-116"""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            podman = folder / "podman"
+            podman.write_text(
+                "#!/bin/sh\necho unix:///run/podman/podman.sock\n", encoding="utf-8"
+            )
+            podman.chmod(0o755)
+            makefile = folder / "Makefile"
+            makefile.write_text(
+                f"include {ROOT / 'skills' / 'r-jvm' / 'jvm.mk'}\n"
+                "show-socket:\n\t@echo $(PODMAN_SOCKET)\n",
+                encoding="utf-8",
+            )
+            env = dict(os.environ, PATH=f"{folder}{os.pathsep}{os.environ['PATH']}")
+            result = subprocess.run(
+                [
+                    "make",
+                    "-s",
+                    "--no-print-directory",
+                    "-f",
+                    str(makefile),
+                    "show-socket",
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=True,
+            )
+        self.assertEqual(result.stdout.strip(), "/run/podman/podman.sock")
+
     def test_maven_mirror_is_used_only_when_set(self):
         """id: R-128"""
         jvm = ROOT / "skills" / "r-jvm" / "jvm.mk"
@@ -1886,6 +1931,25 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
             text.index("plugins.gradlePluginPortal()"),
         )
 
+    def test_a_project_test_does_not_test_the_installed_collection(self):
+        """id: R-160"""
+        develop = (ROOT / "skills" / "r-develop" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "- A test of a product repository proves the facts of that project."
+            " It does not test what this skill collection installs or owns.",
+            develop,
+        )
+        for owned in (
+            "`.claude/skills/`",
+            "the included makefiles",
+            "`ci.yml` from the template",
+            "`make help`",
+            "`apm.lock.yaml`",
+        ):
+            self.assertIn(owned, develop)
+
     def test_each_project_mounts_its_own_gradle_cache(self):
         """id: R-159"""
         jvm = ROOT / "skills" / "r-jvm" / "jvm.mk"
@@ -1913,6 +1977,60 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
         pipeline = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
         self.assertNotIn("~/.gradle/caches", pipeline)
         self.assertIn("~/.gradle/projects/*/caches", pipeline)
+
+    def test_setup_stops_without_deps_token_when_deps_repos_is_set(self):
+        """id: R-161"""
+        mk = ROOT / "skills" / "r-project-setup" / "deps-token.mk"
+        with tempfile.TemporaryDirectory() as tmp:
+            makefile = Path(tmp) / "Makefile"
+            makefile.write_text(
+                f"include {mk}\nsetup:\n\t@echo installed\n"
+                "show:\n\t@echo '$(DEPS_TOKEN_BUILD_ARGS)'\n",
+                encoding="utf-8",
+            )
+            env = {
+                k: v
+                for k, v in os.environ.items()
+                if k not in ("TOOLS", "DEPS_TOKEN", "DEPS_REPOS")
+            }
+
+            def make(*args, **extra):
+                return subprocess.run(
+                    ["make", "--no-print-directory", "-f", str(makefile), *args],
+                    cwd=tmp,
+                    env={**env, **extra},
+                    capture_output=True,
+                    text=True,
+                )
+
+            stopped = make("setup", "DEPS_REPOS=OWNER/one")
+            self.assertNotEqual(stopped.returncode, 0)
+            self.assertIn("DEPS_TOKEN is empty", stopped.stderr)
+            self.assertIn("OWNER/one", stopped.stderr)
+            self.assertNotIn("installed", stopped.stdout)
+            with_token = make("setup", "DEPS_REPOS=OWNER/one", DEPS_TOKEN="t")
+            self.assertEqual(with_token.stdout.strip(), "installed")
+            self.assertEqual(make("setup").stdout.strip(), "installed")
+            host = make("setup", "DEPS_REPOS=OWNER/one", "TOOLS=host")
+            self.assertEqual(host.stdout.strip(), "installed")
+            self.assertEqual(
+                make("show", DEPS_TOKEN="t").stdout.strip(),
+                "--secret id=deps_token,env=DEPS_TOKEN",
+            )
+            self.assertEqual(make("show").stdout.strip(), "")
+
+    def test_the_workflow_passes_deps_token_only_to_the_dependency_steps(self):
+        """id: R-161"""
+        text = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
+        line = "DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}"
+        self.assertEqual(text.count(line), 3)
+        for step in ("make setup", "make build", "make publish-container"):
+            start = text.index(f"run: {step}\n")
+            step_start = text.rindex("      - ", 0, start)
+            step_end = text.find("\n      - ", start)
+            self.assertIn(line, text[step_start:step_end], step)
+        container = (self.PIPELINE / "container.mk").read_text(encoding="utf-8")
+        self.assertEqual(container.count("$(DEPS_TOKEN_BUILD_ARGS)"), 2)
 
     def test_a_gradle_workflow_restores_the_cache_and_passes_the_mirror(self):
         """id: R-154"""
@@ -2219,9 +2337,21 @@ case "$*" in
     *"-X DELETE"*) ;;
     *"/versions?per_page"*) cat versions.tsv ;;
     *"/releases?per_page"*) cat releases.tsv ;;
+    *"/artifacts?per_page"*) cat artifacts.tsv ;;
+    *"/actions/runs/"*) run=${*##*actions/runs/}; grep "^${run%% *} " runs.txt | cut -d' ' -f2 ;;
     *"users/"*) echo User ;;
 esac
 """
+
+# Columns: id, name, size, run. Run 7 is finished, run 8 still runs, and
+# run 0 is an artifact without a run. Each one is minutes old.
+ARTIFACTS = (
+    ("50", "image", "220000000", "7"),
+    ("51", "report", "12000", "7"),
+    ("52", "image", "220000000", "8"),
+    ("53", "report-setup", "700", "0"),
+)
+RUN_STATUS = "7 completed\n8 in_progress\n"
 
 # Columns: id, created_at, tags.
 PACKAGE_VERSIONS = (
@@ -2499,7 +2629,10 @@ class CiScopeRecipeTest(unittest.TestCase):
                 setup.index("make ci-scope"),
             )
             self.assertIn(
-                "- if: steps.scope.outputs.board-only != 'true'\n        run: make setup",
+                "- if: steps.scope.outputs.board-only != 'true'\n"
+                "        env:\n"
+                "          DEPS_TOKEN: ${{ secrets.DEPS_TOKEN }}\n"
+                "        run: make setup",
                 setup,
             )
             for job in ("build", "test"):
@@ -2520,7 +2653,12 @@ class CleanupRecipeTest(unittest.TestCase):
             root = Path(tmp)
             (root / "gh.sh").write_text(FAKE_GH, encoding="utf-8")
             listing = "".join("\t".join(row) + "\n" for row in rows)
-            name = "versions.tsv" if "versions" in target else "releases.tsv"
+            name = "releases.tsv"
+            if "versions" in target:
+                name = "versions.tsv"
+            elif "artifacts" in target:
+                name = "artifacts.tsv"
+                (root / "runs.txt").write_text(RUN_STATUS, encoding="utf-8")
             (root / name).write_text(listing, encoding="utf-8")
             if version is not None:
                 (root / "build").mkdir()
@@ -2676,6 +2814,36 @@ class CleanupRecipeTest(unittest.TestCase):
             recipe = text.split("\n" + target + ": ## ")[1].split("\n\n")[0]
             self.assertIn("$(SDLC_TAG)", recipe)
             self.assertNotIn("-s --no-print-directory version", recipe)
+
+    def test_the_artifact_cleanup_deletes_every_finished_run_at_any_age(self):
+        """id: R-96"""
+        result, calls, _fields = self.run_cleanup(
+            "cleanup-actions-artifacts", ARTIFACTS
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        removed = self.deleted(calls)
+        for ident in ("50", "51", "53"):
+            self.assertTrue(
+                any(line.endswith(f"/artifacts/{ident}") for line in removed)
+            )
+        self.assertFalse(any(line.endswith("/artifacts/52") for line in removed))
+        self.assertEqual(len(removed), 3)
+        self.assertIn("Kept run 0 and 1 other run(s) that still run.", result.stdout)
+        text = PIPELINE_MK.read_text(encoding="utf-8")
+        recipe = text.split("\ncleanup-actions-artifacts: ## ")[1].split("\n\n")[0]
+        self.assertIn("select((.workflow_run.id // 0) != (env.GITHUB_RUN_ID", recipe)
+        self.assertNotIn("created_at", recipe)
+
+    def test_a_dry_run_of_the_artifacts_prints_and_deletes_nothing(self):
+        """id: R-96"""
+        result, calls, _fields = self.run_cleanup(
+            "cleanup-actions-artifacts", ARTIFACTS, dry_run="1"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "would delete artifact 50 image (220000000 bytes)\n", result.stdout
+        )
+        self.assertEqual(self.deleted(calls), [])
 
 
 HELP_MK = ROOT / "skills" / "r-project-setup" / "help.mk"
@@ -3113,7 +3281,7 @@ class LanguageIncludeFileTest(unittest.TestCase):
             "JDK_IMAGE ?= docker.io/library/eclipse-temurin:25-jdk",
             "GRADLE_VERSION ?= 9.1.0",
             "GRADLE_IMAGE ?= docker.io/library/gradle:$(GRADLE_VERSION)-jdk25",
-            "PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}')",
+            "PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's|^unix://||')",
         ):
             self.assertIn("\n" + line + "\n", jvm)
         node = self.read("r-node/node.mk")

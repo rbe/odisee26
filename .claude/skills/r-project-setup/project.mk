@@ -54,6 +54,7 @@ include $(PROJECT_MK_DIR)help.mk
 include $(PROJECT_MK_DIR)podman-python.mk
 include $(PROJECT_MK_DIR)tools.mk
 include $(PROJECT_MK_DIR)doctor.mk
+include $(PROJECT_MK_DIR)deps-token.mk
 include $(PROJECT_MK_DIR)skills.mk
 include $(PROJECT_MK_DIR)old-board.mk
 include $(PROJECT_MK_DIR)test-changed.mk

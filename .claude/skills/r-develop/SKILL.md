@@ -38,6 +38,9 @@ The general rules in `CLAUDE.md` apply.
 - The Develop section does not copy the proposal.
 - A method that first rejects bad input and then does one computation does one thing.
 - A regression test fails on the code before the fix. Run it once against the old code to prove this.
+- A test of a product repository proves the facts of that project. It does not test what this skill collection installs or owns.
+  That covers `.claude/skills/`, the included makefiles, the parts of `ci.yml` from the template, the targets of `make help`, and `apm.lock.yaml`.
+  The collection tests these files itself. A project copy of such a test fails on each upgrade.
 - A test does not mock the step whose failure it tests. A mock of that step hides the fault, and the suite stays green. Stub the edge of the system, such as the network or the disk, and run the step itself.
 - If code and a document must differ for a short time because of the merge order, the document gets a block `Temporary (until #NNN)`. The block names the gap, the reason, and the condition that removes it. The change that closes the gap removes the block.
 </rules>

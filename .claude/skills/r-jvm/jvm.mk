@@ -54,8 +54,10 @@ GRADLE_CACHE ?= $$HOME/.gradle/projects/$(or $(NAME),$(notdir $(CURDIR)))
 GRADLE_RUN ?= mkdir -p "$(GRADLE_CACHE)" && podman run --rm $(PODMAN_NET_ARGS) $(MAVEN_MIRROR_ARGS) -e CI -e GRADLE_USER_HOME=/gradle \
 	-v "$(GRADLE_CACHE)":/gradle:Z -v "$(CURDIR)":/work:Z -w /work
 # On a Mac, podman info names the socket inside the Podman machine, where
-# the container that runs Gradle runs.
-PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}')
+# the container that runs Gradle runs. A Podman client on a Mac can write
+# that path with the prefix unix://. sed removes the prefix, because
+# podman run -v takes a path and reads a second colon as an option.
+PODMAN_SOCKET ?= $$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's|^unix://||')
 # Host mode (TOOLS=host of podman-python.mk): Gradle runs from the JDK on
 # PATH. GRADLE_RUN drops the image name that follows it, so
 # $(GRADLE_RUN) $(JDK_IMAGE) ./gradlew runs ./gradlew. GRADLE_PODMAN

@@ -137,7 +137,7 @@ gates: ## Run the six gates, then stamp the working tree
 	sh $(CONTRACT_DIR)/scripts/gates-stamp.sh write
 
 # Exits non-zero when build/gates.ok is missing or differs from the
-# working tree. r-release runs it before the push.
+# working tree. r-release runs it before the close.
 # help-group: Gates
 gates-check: ## Check that make gates passed after the last edit
 	@sh $(CONTRACT_DIR)/scripts/gates-stamp.sh check || { printf '%s\n' "gates-check: build/gates.ok is missing or stale. Run make gates." >&2; exit 1; }

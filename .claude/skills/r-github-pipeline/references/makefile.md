@@ -23,7 +23,6 @@ The project sets the command variables of `r-project-setup` above the include. I
 | `KEEP_VERSIONS` | The number of versions to keep, including the version just published. The default is 2 |
 | `SDLC_JOBS` | The jobs that the pipeline report lists. Add `publish-github` when that job exists |
 | `SDLC_CI` | The targets that `ci` runs, in order. The default is `setup build editorconfig format lint test integration coverage docs report`. Remove `docs` when there is no docs target |
-| `SDLC_KEEP_ARTIFACTS` | The artifact names that the hourly cleanup does not delete. The default is `report,docs` |
 | `SMOKE_PATH`, `SMOKE_NEEDLE`, `SMOKE_PAGE_NEEDLE` | In the Node block of `templates/Makefile.image`: the API path and its needle, and the text that the page at `/` must hold. The defaults are `/api/health`, `ok`, and `id="root"`. An empty `SMOKE_PAGE_NEEDLE` turns the page check off |
 | `PORT`, `HOST_PORT` | In the Node block of `templates/Makefile.image`: the port inside the container, and the port of the host that `make run` binds. `HOST_PORT` stays above 1024 and `run` fails below it |
 | `CI_BOARD_FILES` | The board files that `ci-scope` counts. A path that ends in `/` is a directory. The default is `BOARD_FILES` of `r-project-setup`, which the pre-push hook also reads |
@@ -56,7 +55,7 @@ The project sets the command variables of `r-project-setup` above the include. I
 | `pull-request-merge` | Merges the pull request of the current branch when all check runs of its head commit passed. No check run, or one that did not pass, stops the merge. `WAIT=1` waits for the checks. Uses `gh api` REST routes only |
 | `cleanup-container-versions` | On the default branch, keeps one version and the next-lower run on the same `MAJOR.MINOR.PATCH` line. The kept version is `PUBLISHED_TAG`, else the content of `build/publish-version.txt`, else the newest rolling version by `created_at`. Needs no git tag. A missing package, or a list with no rolling version, is an empty list. Does not delete `latest` or a tag that is not `MAJOR.MINOR.PATCH-<run>`. A given tag that is not exactly one version stops the target, and the message names its source. In CI, off the default branch, deletes nothing |
 | `cleanup-github-releases` | On the default branch, keeps one release and the next-lower run, chosen as in `cleanup-container-versions`. Needs no git tag. Does not delete a name that is not `MAJOR.MINOR.PATCH-<run>`. A list with no rolling release deletes nothing. In CI, off the default branch, deletes nothing |
-| `cleanup-actions-artifacts` | Deletes the artifacts of this repository that are older than one hour, except `report`, `docs`, and the artifacts of this run |
+| `cleanup-actions-artifacts` | Deletes the artifacts of every finished run of this repository. It keeps the artifacts of this run and of runs that still run |
 
 `DRY_RUN=1` makes each cleanup print what it would delete. The cleanup then only reads, so it is safe against the real API. A cleanup runs at any time, with or without `DRY_RUN=1` and with or without a git tag. Without `DRY_RUN=1` it deletes, also on a laptop.
 
