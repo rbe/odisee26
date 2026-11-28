@@ -189,7 +189,7 @@ class DeliveryTest extends GroovyTestCase {
         assertEquals('succeeded', job.status)
         assertEquals('ada-docs', job.bucket)
         assertEquals(storage.puts[0].key, job.key)
-        Map onDisk = new JsonSlurper().parse(JobStore.file(ada).toFile()).jobs[0]
+        Map onDisk = new JsonSlurper().parse(JobStore.file(ada).toFile()).jobs.find { it.id == id }
         assertEquals('ada-docs', onDisk.bucket)
         assertEquals(job.key, onDisk.key)
         assertTrue(JobStore.file(ada).toString().contains("${File.separator}${ada}${File.separator}"))
@@ -329,6 +329,8 @@ class DeliveryTest extends GroovyTestCase {
     }
 
     private String user(String name) {
+        // A run that stopped before tearDown leaves the folder of the user behind.
+        TenantPaths.userRoot(name).toFile()?.deleteDir()
         users << name
         name
     }
