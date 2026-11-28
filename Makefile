@@ -121,8 +121,10 @@ endif
 # podman client in the image starts the containers through that socket,
 # and Gradle connects to their published ports on 127.0.0.1. On a Mac,
 # podman info names the socket inside the Podman machine, where the
-# container runs. make podman-socket (jvm.mk) starts the socket when it is off.
-PODMAN_SOCKET = $$(podman info --format '{{.Host.RemoteSocket.Path}}')
+# container runs. A Podman client on a Mac can name it with the prefix
+# unix://, and sed removes that prefix, because podman run -v takes a path.
+# make podman-socket (jvm.mk) starts the socket when it is off.
+PODMAN_SOCKET = $$(podman info --format '{{.Host.RemoteSocket.Path}}' | sed 's|^unix://||')
 GRADLE_PODMAN = $(GRADLE_RUN) --network host --security-opt label=disable \
 	-e CONTAINER_HOST=unix:///run/podman/podman.sock -v "$(PODMAN_SOCKET)":/run/podman/podman.sock \
 	$(GRADLE_ARGS)
