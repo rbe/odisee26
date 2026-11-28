@@ -104,8 +104,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       # End of Gradle.
@@ -117,8 +117,8 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
       # End of Gradle.
       # Node: keep for a Node project. make setup packs the dependencies.
@@ -157,8 +157,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       # End of Gradle.
@@ -211,8 +211,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       # End of Gradle.

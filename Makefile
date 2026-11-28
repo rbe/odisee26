@@ -104,9 +104,9 @@ GRADLE_VERSION ?= 8.14.5
 GRADLE_IMAGE ?= localhost/odisee26-gradle:21-$(shell cksum < gradle/Containerfile | cut -d ' ' -f 1)
 # Extra podman run arguments of the Gradle run, such as -e for a proxy.
 GRADLE_RUN_ARGS ?=
-GRADLE_RUN = mkdir -p "$$HOME/.gradle" && podman run --rm --init
+GRADLE_RUN = mkdir -p "$(GRADLE_CACHE)" && podman run --rm --init
 GRADLE_ARGS = $(GRADLE_RUN_ARGS) $(MAVEN_MIRROR_ARGS) -e CI -e GITHUB_RUN_NUMBER \
-	-e GRADLE_USER_HOME=/gradle -v "$$HOME/.gradle":/gradle:Z -v "$(CURDIR)":"$(CURDIR)":Z -w "$(CURDIR)" \
+	-e GRADLE_USER_HOME=/gradle -v "$(GRADLE_CACHE)":/gradle:Z -v "$(CURDIR)":"$(CURDIR)":Z -w "$(CURDIR)" \
 	$(GRADLE_IMAGE) ./gradlew --no-daemon --console=plain
 GRADLE = $(GRADLE_RUN) $(PODMAN_NET_ARGS) $(GRADLE_ARGS)
 # Host mode (TOOLS=host of r-project-setup): Gradle runs from the JDK on

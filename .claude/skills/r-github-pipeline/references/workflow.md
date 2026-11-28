@@ -44,7 +44,7 @@ All repositories of one account share the artifact quota, so each upload has a s
 
 A Gradle project keeps the Gradle blocks of `templates/ci.yml`. Without them, each job resolves every dependency again, and Maven Central can answer HTTP 429.
 
-- `setup` restores `~/.gradle/caches` and `~/.gradle/wrapper` with `actions/cache/restore`, then runs `make setup`.
+- `setup` restores `caches` and `wrapper` of `~/.gradle/projects/*` with `actions/cache/restore`, then runs `make setup`. `GRADLE_CACHE` of `r-jvm` is one folder there for each project.
 - If the key was new, `setup` saves both folders with `actions/cache/save`. No other job saves the cache.
 - `build` and `test` restore the cache before their first `make` step. A job that runs Gradle in a project addition restores it too.
 - The key is the hash of the Gradle build files, `gradle.properties`, the wrapper properties, and `gradle/libs.versions.toml`. A changed build file makes a new key.

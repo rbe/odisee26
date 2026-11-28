@@ -20,7 +20,7 @@
 # <X.Y.Z>-<run> and latest, then keeps that run and the next-lower run.
 # A manual publish from any other ref tags the version only.
 # report is last and still runs when an earlier job fails or is skipped.
-# Gradle cache: setup restores ~/.gradle/caches and ~/.gradle/wrapper,
+# Gradle cache: setup restores caches and wrapper of ~/.gradle/projects/*,
 # resolves the dependencies, and saves the cache when the key is new.
 # build, test, and test-java only restore it (r-github-pipeline, R-154).
 
@@ -80,8 +80,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       - if: steps.scope.outputs.board-only != 'true'
@@ -91,8 +91,8 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v7
         if: always()
@@ -119,8 +119,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       - run: make build
@@ -152,8 +152,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       - run: make test
@@ -186,8 +186,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+            ~/.gradle/projects/*/caches
+            ~/.gradle/projects/*/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: gradle-${{ runner.os }}-
       - run: make test-java

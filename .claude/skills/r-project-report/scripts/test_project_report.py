@@ -1886,6 +1886,34 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
             text.index("plugins.gradlePluginPortal()"),
         )
 
+    def test_each_project_mounts_its_own_gradle_cache(self):
+        """id: R-159"""
+        jvm = ROOT / "skills" / "r-jvm" / "jvm.mk"
+        with tempfile.TemporaryDirectory() as tmp:
+            makefile = Path(tmp) / "Makefile"
+            makefile.write_text(
+                f"include {jvm}\nshow:\n\t@echo '$(GRADLE_RUN)'\n", encoding="utf-8"
+            )
+            run = ["make", "--no-print-directory", "-f", str(makefile), "show"]
+            env = {k: v for k, v in os.environ.items() if k != "TOOLS"}
+            shown = {
+                name: subprocess.run(
+                    [*run, f"NAME={name}"],
+                    cwd=tmp,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout
+                for name in ("alpha", "beta")
+            }
+        for name, line in shown.items():
+            self.assertIn(f'-v "$HOME/.gradle/projects/{name}":/gradle:Z', line)
+        self.assertNotIn('"$HOME/.gradle":/gradle', shown["alpha"])
+        pipeline = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
+        self.assertNotIn("~/.gradle/caches", pipeline)
+        self.assertIn("~/.gradle/projects/*/caches", pipeline)
+
     def test_a_gradle_workflow_restores_the_cache_and_passes_the_mirror(self):
         """id: R-154"""
         text = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
@@ -1898,7 +1926,7 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
         for name, step in first_gradle_step.items():
             job = rf"(?ms)^  {name}:\n.*?(?=^  [a-z-]+:\n|\Z)"
             body = re.search(job, text).group(0)
-            self.assertIn("~/.gradle/caches", body, name)
+            self.assertIn("~/.gradle/projects/*/caches", body, name)
             self.assertLess(
                 body.index("uses: actions/cache/restore@"), body.index(step), name
             )
