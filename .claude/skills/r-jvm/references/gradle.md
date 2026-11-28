@@ -12,4 +12,8 @@ The Gradle wrapper is the Gradle the project runs. Versions live in the version 
 
 The test task sets `forkEvery = 1`, so each test class has its own JVM and its own entry in the coverage map. With one JVM for all tests, `make test-changed` runs every test.
 
+If the build has several modules or Groovy trees, diff-cover does not find the sources. `jacoco_repo_paths.py REPORT.xml OUTPUT.xml` of `r-project-report` writes a copy of the report with the path of each source file from the repository root. diff-cover then reads that copy.
+
+`jacoco_summary.py` of `r-project-report` writes `build/summaries/coverage.md` from `jacocoTestReport.xml`, for the report job of `r-github-pipeline`.
+
 `make test-changed` gives the test classes that `changed_tests.py --print` names to Gradle with `--tests`.

@@ -4,8 +4,8 @@ dependencies:
 - repo_url: rbe/ralfskills
   name: ralfskills
   host: github.com
-  resolved_commit: bc94524ee3751840dc7727eb2e11fc24bb3ddee4
-  resolved_ref: v0.11.0
+  resolved_commit: b37f85a2dcb6b5bcb1a5a92942acd9686f6f8375
+  resolved_ref: v0.12.0
   version: unknown
   package_type: skill_bundle
   deployed_files:
@@ -84,8 +84,11 @@ dependencies:
   - .claude/skills/r-project-report/scripts/cover_tests.py
   - .claude/skills/r-project-report/scripts/go_cover_map.py
   - .claude/skills/r-project-report/scripts/jacoco_cover_map.py
+  - .claude/skills/r-project-report/scripts/jacoco_repo_paths.py
+  - .claude/skills/r-project-report/scripts/jacoco_summary.py
   - .claude/skills/r-project-report/scripts/node_cover_map.py
   - .claude/skills/r-project-report/scripts/project_report.py
+  - .claude/skills/r-project-report/scripts/pytest_cover.py
   - .claude/skills/r-project-report/scripts/report_links.py
   - .claude/skills/r-project-report/scripts/requirements.py
   - .claude/skills/r-project-report/scripts/select_tests.py
@@ -194,7 +197,7 @@ dependencies:
     .claude/skills/r-jvm/SKILL.md: sha256:e41019195e0adab36a4f54e915364cafdcb6a1fc29d167b6591d549da2a3465f
     .claude/skills/r-jvm/jvm.mk: sha256:4b9bbccf9d6a987a94936389aef38cffc5578054a3a1f742fe0d15f93ff5f36c
     .claude/skills/r-jvm/maven-mirror.gradle: sha256:00b4b97070794992c4f414109a1bb1fd809c53158c15f6daefefde7d14b2b1ce
-    .claude/skills/r-jvm/references/gradle.md: sha256:e5db5680283d7c019c25b30385296286697e307ede6c348a5010cfc4ac462f37
+    .claude/skills/r-jvm/references/gradle.md: sha256:6811f0c459d76ecec5a02c97549484b8feb7bd56ea89233a542d07b924b92ad1
     .claude/skills/r-jvm/references/grails.md: sha256:5e0378a59c9994c6dfa7cae866dbb8286c2f6e82b7548f9c22d9c60eea085884
     .claude/skills/r-jvm/references/groovy.md: sha256:a5204ee063fffc8ccfb8a84aa8e8e0558577075bf066307bf8ee28de689de355
     .claude/skills/r-jvm/references/java.md: sha256:d016f2939dafc2546c70161944e1c551354138a234668557b88bbdc2c8a59992
@@ -219,12 +222,15 @@ dependencies:
     .claude/skills/r-project-report/scripts/cover_tests.py: sha256:0f7afe55e38cbe4c17251b46631d5f671cb183c4a6033fe158f968970543d514
     .claude/skills/r-project-report/scripts/go_cover_map.py: sha256:1c92e00c6cd7a8d92f60f012bb80f214be0ee366c4f2435c7bb4a77e53db2283
     .claude/skills/r-project-report/scripts/jacoco_cover_map.py: sha256:99fa9b93cd159bf99442b5d757f3a1bafb32c98d8af4e9a01a4b72df9ed349b4
+    .claude/skills/r-project-report/scripts/jacoco_repo_paths.py: sha256:3946b9be8754b2ebfeacb83f06974f579c3d3e63ee15a7b9df258b4bbed504c7
+    .claude/skills/r-project-report/scripts/jacoco_summary.py: sha256:6c50df8650a1a4a8bc5b7bc4dba167fcd1e64d6a46dfd771cbf3f0a373930e67
     .claude/skills/r-project-report/scripts/node_cover_map.py: sha256:f0e48cf618f56016b292d6a87f99978f7dd79cdafe0620406f4009e27f7526ac
     .claude/skills/r-project-report/scripts/project_report.py: sha256:e8e74766d68732ea8e57da290e36152d75bb8132c6bc9c28057045884580bf5d
+    .claude/skills/r-project-report/scripts/pytest_cover.py: sha256:7f4818cf51908b49180ec7250f3b729c031c9ba14b3ce6e41a93048df2ca6689
     .claude/skills/r-project-report/scripts/report_links.py: sha256:09ea02d0a170d8f2e1f941bc52cf2613ad783de0915c332f846af7923a27e265
     .claude/skills/r-project-report/scripts/requirements.py: sha256:11f515629f8cbb4019d5bac6afe02c31102542b45777da1b353d07fe73be212f
     .claude/skills/r-project-report/scripts/select_tests.py: sha256:9dbfe387d1bae49270ac127c219c31ad1db34ef1a3e42b37cae37f3a08ba5fc7
-    .claude/skills/r-project-report/scripts/test_project_report.py: sha256:ed41ffd8d46c5cb35cbb0eeb771a569ff679e53b2ebf41581c6eae0fe6191741
+    .claude/skills/r-project-report/scripts/test_project_report.py: sha256:65a8ed212d2688b81897521ac0764140e71946f3ab9ae8976e0b61da8fb00ae7
     .claude/skills/r-project-setup/SKILL.md: sha256:7afad5e71eb5da9d3a730a0c32b9c6603844013286284ee9e28f07731046072f
     .claude/skills/r-project-setup/check-docs.mk: sha256:9bca382791e2f7fba1aaba38e68008434546879b9aa7a46efbd43b85b7c097d7
     .claude/skills/r-project-setup/contract.mk: sha256:280633a08b247c3a7ed850f5aa8976ccf2c71f9ef9b83391d5a9a22ce920b69d
@@ -283,7 +289,7 @@ dependencies:
     .claude/skills/r-system-state-report/SKILL.md: sha256:d31cb3e06057c462ec88c96fc35bbd06e9c9407d3b077e3108890434856275f4
     .claude/skills/r-system-state-report/references/cold-reader.md: sha256:ed50761d096ae7e2b8f65888d7b76fc64a3cde0224d736f4f9b3fe453447c7ea
     .claude/skills/r-ux-ui-design/SKILL.md: sha256:e864742800378b5e514b62c86fdc323368bdbe6fa15de045bbb243d6b392b62a
-  content_hash: sha256:f42f60a276d8a2a53ca08e891bf441ddd5635971af8b565282c24bf9abe4b530
+  content_hash: sha256:af2b219b455110c00c25129364a28bf91367b4287612f2718bf1fea6ab9a6445
   skill_subset:
   - r-api-design
   - r-board-merge
@@ -704,7 +710,7 @@ deployments:
   owners:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
-  content_hash: sha256:e5db5680283d7c019c25b30385296286697e307ede6c348a5010cfc4ac462f37
+  content_hash: sha256:6811f0c459d76ecec5a02c97549484b8feb7bd56ea89233a542d07b924b92ad1
 - kind: project-relative
   target: claude
   value: .claude/skills/r-jvm/references/grails.md
@@ -986,6 +992,24 @@ deployments:
   content_hash: sha256:99fa9b93cd159bf99442b5d757f3a1bafb32c98d8af4e9a01a4b72df9ed349b4
 - kind: project-relative
   target: claude
+  value: .claude/skills/r-project-report/scripts/jacoco_repo_paths.py
+  runtime: null
+  scope: project
+  owners:
+  - rbe/ralfskills
+  active_owner: rbe/ralfskills
+  content_hash: sha256:3946b9be8754b2ebfeacb83f06974f579c3d3e63ee15a7b9df258b4bbed504c7
+- kind: project-relative
+  target: claude
+  value: .claude/skills/r-project-report/scripts/jacoco_summary.py
+  runtime: null
+  scope: project
+  owners:
+  - rbe/ralfskills
+  active_owner: rbe/ralfskills
+  content_hash: sha256:6c50df8650a1a4a8bc5b7bc4dba167fcd1e64d6a46dfd771cbf3f0a373930e67
+- kind: project-relative
+  target: claude
   value: .claude/skills/r-project-report/scripts/node_cover_map.py
   runtime: null
   scope: project
@@ -1002,6 +1026,15 @@ deployments:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
   content_hash: sha256:e8e74766d68732ea8e57da290e36152d75bb8132c6bc9c28057045884580bf5d
+- kind: project-relative
+  target: claude
+  value: .claude/skills/r-project-report/scripts/pytest_cover.py
+  runtime: null
+  scope: project
+  owners:
+  - rbe/ralfskills
+  active_owner: rbe/ralfskills
+  content_hash: sha256:7f4818cf51908b49180ec7250f3b729c031c9ba14b3ce6e41a93048df2ca6689
 - kind: project-relative
   target: claude
   value: .claude/skills/r-project-report/scripts/report_links.py
@@ -1037,7 +1070,7 @@ deployments:
   owners:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
-  content_hash: sha256:ed41ffd8d46c5cb35cbb0eeb771a569ff679e53b2ebf41581c6eae0fe6191741
+  content_hash: sha256:65a8ed212d2688b81897521ac0764140e71946f3ab9ae8976e0b61da8fb00ae7
 - kind: project-relative
   target: claude
   value: .claude/skills/r-project-setup

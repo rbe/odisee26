@@ -140,14 +140,14 @@ LINT_CMD = @$(THIS_MAKE) --no-print-directory gradle-image && $(GRADLE) checksty
 # The one integration entry. It starts its own containers through the Podman socket.
 INTEGRATION_CMD = @$(THIS_MAKE) --no-print-directory test-java
 # JaCoCo writes one execution file for each project. The coverage map names the tests that cover
-# each source file. scripts/jacoco_repo_paths.py gives the XML report the paths of this multi-module
-# build. diff-cover reads that report and writes build/coverage/diff.md.
+# each source file. jacoco_repo_paths.py of r-project-report gives the XML report the paths of
+# this multi-module build. diff-cover reads that report and writes build/coverage/diff.md.
 COVERAGE_CMD = set -eu; \
 	$(THIS_MAKE) --no-print-directory gradle-image; \
 	$(GRADLE) jacocoDiffReport; \
 	files=$$(find . -path '*/build/jacoco/test.exec' -not -path './apm_modules/*' | sed 's|^\./||' | sort | tr '\n' ' '); \
 	$(PYTHON) .claude/skills/r-project-report/scripts/jacoco_cover_map.py $$files; \
-	$(PYTHON) scripts/jacoco_repo_paths.py build/reports/jacoco/diff/jacocoDiff.xml build/reports/jacoco/diff/jacocoDiffRepo.xml; \
+	$(PYTHON) .claude/skills/r-project-report/scripts/jacoco_repo_paths.py build/reports/jacoco/diff/jacocoDiff.xml build/reports/jacoco/diff/jacocoDiffRepo.xml; \
 	REPORT=build/reports/jacoco/diff/jacocoDiffRepo.xml $(DIFF_COVER)
 TEST_CHANGED_CMD = chosen=$$($(PYTHON) .claude/skills/r-project-report/scripts/changed_tests.py --print) || exit 1; \
 	chosen=$$(printf '%s' "$$chosen" | tr '\n' ' '); \
