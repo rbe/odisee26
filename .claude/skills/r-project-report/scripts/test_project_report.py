@@ -1876,6 +1876,36 @@ class MakeAndPodmanInterfaceTest(unittest.TestCase):
         text = script.read_text(encoding="utf-8")
         self.assertIn("System.getenv('MAVEN_MIRROR')", text)
         self.assertIn("'https://repo.maven.apache.org/maven2'", text)
+        self.assertIn("settingsEvaluated", text)
+        self.assertIn("plugins.isEmpty()", text)
+        self.assertLess(
+            text.index("plugins.maven { url = mirror"),
+            text.index("plugins.gradlePluginPortal()"),
+        )
+
+    def test_a_gradle_workflow_restores_the_cache_and_passes_the_mirror(self):
+        """id: R-154"""
+        text = (self.PIPELINE / "templates" / "ci.yml").read_text(encoding="utf-8")
+        self.assertIn("  MAVEN_MIRROR: ${{ vars.MAVEN_MIRROR }}\n", text)
+        first_gradle_step = {
+            "setup": "run: make setup",
+            "build": "run: make build",
+            "test": "run: make editorconfig",
+        }
+        for name, step in first_gradle_step.items():
+            job = rf"(?ms)^  {name}:\n.*?(?=^  [a-z-]+:\n|\Z)"
+            body = re.search(job, text).group(0)
+            self.assertIn("~/.gradle/caches", body, name)
+            self.assertLess(
+                body.index("uses: actions/cache/restore@"), body.index(step), name
+            )
+            if name == "setup":
+                self.assertLess(
+                    body.index(step), body.index("uses: actions/cache/save@")
+                )
+            else:
+                self.assertNotIn("actions/cache/save@", body, name)
+        self.assertEqual(text.count("actions/cache/save@"), 1)
 
     def test_a_client_package_has_one_generic_publish_workflow(self):
         """id: R-117"""

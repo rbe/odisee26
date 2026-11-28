@@ -4,9 +4,9 @@ dependencies:
 - repo_url: rbe/ralfskills
   name: ralfskills
   host: github.com
-  resolved_commit: d13e4538b5c77d8e980173e9075465527681e796
-  resolved_ref: v0.10.0
-  version: 0.0.0
+  resolved_commit: bc94524ee3751840dc7727eb2e11fc24bb3ddee4
+  resolved_ref: v0.11.0
+  version: unknown
   package_type: skill_bundle
   deployed_files:
   - .claude/hooks/ralfskills/hooks/scripts/block-bare-git-add.sh
@@ -178,14 +178,14 @@ dependencies:
     .claude/skills/r-github-pipeline/references/contract.md: sha256:398c8fab51301a04ef946c1be5e525897dce9cc4fbf84656d90ba9291f25dbb2
     .claude/skills/r-github-pipeline/references/makefile.md: sha256:da889231ff5079ea3e1ba03359b7fd5a343de3672e459f2de5bc8e3308d65664
     .claude/skills/r-github-pipeline/references/setup-files.md: sha256:59936a5f886954019d231e6c06084ebcbc2cfd37e98fc64c19104a65e0e986f6
-    .claude/skills/r-github-pipeline/references/workflow.md: sha256:e30bedecd42947181f60a471532a996285760971eb0b7ee5512a0e629b2e5734
+    .claude/skills/r-github-pipeline/references/workflow.md: sha256:cfe1acb87fd8f3ea5e3d7e266c416e7de4adbfd796cb5e1f622026975821f106
     .claude/skills/r-github-pipeline/sdlc.mk: sha256:bc0c342fb0f197fb57bfc4392027dcf49d2eed950335c37bf6daf88371f91755
     .claude/skills/r-github-pipeline/templates/Containerfile.golang: sha256:5fc4a4dff9d283092c9c4537372b5b97261adaf8ba91a0dd9488d337940277a6
     .claude/skills/r-github-pipeline/templates/Containerfile.gradle: sha256:124128b9c3d49c18236f3e654bffbb243e4f15a30795222f2efd61891008e709
     .claude/skills/r-github-pipeline/templates/Containerfile.node: sha256:b32321c56716da764d3fc5ca0091e0af4fc251316b1dafde2e404c851ed651e8
     .claude/skills/r-github-pipeline/templates/Containerfile.python: sha256:b757a04c8f8c97533cd3d2ea99039b25dc1dd1eb33ad5fd5f2b59da4bdcc1505
     .claude/skills/r-github-pipeline/templates/Makefile.image: sha256:69cbc24f3ae513409edf8053505f36a9f6a60ba3caa85005b464b56418da4ff9
-    .claude/skills/r-github-pipeline/templates/ci.yml: sha256:dbcdce4eed2061293aafa36d021856d1eb7a775571420c0d2b3bdadbb311d7bb
+    .claude/skills/r-github-pipeline/templates/ci.yml: sha256:6d561c5e4cc56650af8ee52b33e59c9f2e7d59b55f8ee058d38f9d1274acbed7
     .claude/skills/r-github-pipeline/templates/containerignore: sha256:f87cefc60e7a29b31fdac84ee03b5b3d5b005189dbe7b8e26878e1270b363dd3
     .claude/skills/r-github-pipeline/templates/contract-report.md: sha256:a766f2751c0d301ab42b80755509f7838c6b7404d4fb25c886b629c07801592b
     .claude/skills/r-github-pipeline/templates/gitignore: sha256:6b9bb2afbdfa16be168f53c2aed3480019ed3154f6f2b462572143e474c9fbec
@@ -193,12 +193,12 @@ dependencies:
     .claude/skills/r-github-pipeline/templates/publish-client.yml: sha256:ed9fc6888956d0f75b01c1a6d2aa1830c109d5852f9150f0718c041845e69e0a
     .claude/skills/r-jvm/SKILL.md: sha256:e41019195e0adab36a4f54e915364cafdcb6a1fc29d167b6591d549da2a3465f
     .claude/skills/r-jvm/jvm.mk: sha256:4b9bbccf9d6a987a94936389aef38cffc5578054a3a1f742fe0d15f93ff5f36c
-    .claude/skills/r-jvm/maven-mirror.gradle: sha256:27880444caa630d26d4246cda76b606ff07f7b8d686a2ab21d856f8186193010
+    .claude/skills/r-jvm/maven-mirror.gradle: sha256:00b4b97070794992c4f414109a1bb1fd809c53158c15f6daefefde7d14b2b1ce
     .claude/skills/r-jvm/references/gradle.md: sha256:e5db5680283d7c019c25b30385296286697e307ede6c348a5010cfc4ac462f37
     .claude/skills/r-jvm/references/grails.md: sha256:5e0378a59c9994c6dfa7cae866dbb8286c2f6e82b7548f9c22d9c60eea085884
     .claude/skills/r-jvm/references/groovy.md: sha256:a5204ee063fffc8ccfb8a84aa8e8e0558577075bf066307bf8ee28de689de355
     .claude/skills/r-jvm/references/java.md: sha256:d016f2939dafc2546c70161944e1c551354138a234668557b88bbdc2c8a59992
-    .claude/skills/r-jvm/references/tooling.md: sha256:4489926241a252531303736765a6f78c8c02b33068b254690242eb9aab28a51b
+    .claude/skills/r-jvm/references/tooling.md: sha256:1968a6833b6488d17d8fd000a2fd58ec9536aacea8607af0fb7650e2c41f0de0
     .claude/skills/r-jvm/references/upgrade.md: sha256:103008a0ea944a17aae7995a424ceee78b980949ae4b053a7e2df65c7f8d8b70
     .claude/skills/r-jvm/templates/Makefile.gradle: sha256:8dea7001483f8d9f350f8f517799d4f3086f536820f182064f73e568921a2575
     .claude/skills/r-jvm/templates/build.gradle: sha256:f90450c93a40cd8247ba619f36427515d5bf6d7ec776447c45841c9ec8339263
@@ -224,7 +224,7 @@ dependencies:
     .claude/skills/r-project-report/scripts/report_links.py: sha256:09ea02d0a170d8f2e1f941bc52cf2613ad783de0915c332f846af7923a27e265
     .claude/skills/r-project-report/scripts/requirements.py: sha256:11f515629f8cbb4019d5bac6afe02c31102542b45777da1b353d07fe73be212f
     .claude/skills/r-project-report/scripts/select_tests.py: sha256:9dbfe387d1bae49270ac127c219c31ad1db34ef1a3e42b37cae37f3a08ba5fc7
-    .claude/skills/r-project-report/scripts/test_project_report.py: sha256:8b560ae115fcd76a1131d6f645c7a421013384c924a978901d01fd62878f1d91
+    .claude/skills/r-project-report/scripts/test_project_report.py: sha256:ed41ffd8d46c5cb35cbb0eeb771a569ff679e53b2ebf41581c6eae0fe6191741
     .claude/skills/r-project-setup/SKILL.md: sha256:7afad5e71eb5da9d3a730a0c32b9c6603844013286284ee9e28f07731046072f
     .claude/skills/r-project-setup/check-docs.mk: sha256:9bca382791e2f7fba1aaba38e68008434546879b9aa7a46efbd43b85b7c097d7
     .claude/skills/r-project-setup/contract.mk: sha256:280633a08b247c3a7ed850f5aa8976ccf2c71f9ef9b83391d5a9a22ce920b69d
@@ -283,7 +283,7 @@ dependencies:
     .claude/skills/r-system-state-report/SKILL.md: sha256:d31cb3e06057c462ec88c96fc35bbd06e9c9407d3b077e3108890434856275f4
     .claude/skills/r-system-state-report/references/cold-reader.md: sha256:ed50761d096ae7e2b8f65888d7b76fc64a3cde0224d736f4f9b3fe453447c7ea
     .claude/skills/r-ux-ui-design/SKILL.md: sha256:e864742800378b5e514b62c86fdc323368bdbe6fa15de045bbb243d6b392b62a
-  content_hash: sha256:59cafba6ff86af127e665842f2e9de01bfef3742986e4f4e47ac25a733c48a5c
+  content_hash: sha256:f42f60a276d8a2a53ca08e891bf441ddd5635971af8b565282c24bf9abe4b530
   skill_subset:
   - r-api-design
   - r-board-merge
@@ -551,7 +551,7 @@ deployments:
   owners:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
-  content_hash: sha256:e30bedecd42947181f60a471532a996285760971eb0b7ee5512a0e629b2e5734
+  content_hash: sha256:cfe1acb87fd8f3ea5e3d7e266c416e7de4adbfd796cb5e1f622026975821f106
 - kind: project-relative
   target: claude
   value: .claude/skills/r-github-pipeline/sdlc.mk
@@ -614,7 +614,7 @@ deployments:
   owners:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
-  content_hash: sha256:dbcdce4eed2061293aafa36d021856d1eb7a775571420c0d2b3bdadbb311d7bb
+  content_hash: sha256:6d561c5e4cc56650af8ee52b33e59c9f2e7d59b55f8ee058d38f9d1274acbed7
 - kind: project-relative
   target: claude
   value: .claude/skills/r-github-pipeline/templates/containerignore
@@ -695,7 +695,7 @@ deployments:
   owners:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
-  content_hash: sha256:27880444caa630d26d4246cda76b606ff07f7b8d686a2ab21d856f8186193010
+  content_hash: sha256:00b4b97070794992c4f414109a1bb1fd809c53158c15f6daefefde7d14b2b1ce
 - kind: project-relative
   target: claude
   value: .claude/skills/r-jvm/references/gradle.md
@@ -740,7 +740,7 @@ deployments:
   owners:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
-  content_hash: sha256:4489926241a252531303736765a6f78c8c02b33068b254690242eb9aab28a51b
+  content_hash: sha256:1968a6833b6488d17d8fd000a2fd58ec9536aacea8607af0fb7650e2c41f0de0
 - kind: project-relative
   target: claude
   value: .claude/skills/r-jvm/references/upgrade.md
@@ -1037,7 +1037,7 @@ deployments:
   owners:
   - rbe/ralfskills
   active_owner: rbe/ralfskills
-  content_hash: sha256:8b560ae115fcd76a1131d6f645c7a421013384c924a978901d01fd62878f1d91
+  content_hash: sha256:ed41ffd8d46c5cb35cbb0eeb771a569ff679e53b2ebf41581c6eae0fe6191741
 - kind: project-relative
   target: claude
   value: .claude/skills/r-project-setup
